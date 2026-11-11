@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
+      - name: Ejecutar pruebas
+        run: pnpm test
       - name: Generar la web
         run: pnpm build
       - name: Configurar Pages

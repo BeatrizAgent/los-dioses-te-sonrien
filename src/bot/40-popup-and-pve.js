@@ -1,0 +1,101 @@
+  function recoverPopup(kind) {
+    const reportId=params.get('reportId'), type=params.get('t');
+    const safeReport=mod==='reports' && sub==='showCombatReport' && /^\d+$/.test(reportId || '') && ['0','1'].includes(type) && [...params.keys()].every(k=>['mod','submod','reportId','t','sh'].includes(k));
+    const key=kind+':' +(safeReport ? type+':'+reportId : 'overview');
+    if (state.popupRecovery?.key===key && Date.now()-state.popupRecovery.at<300000) { stop('El aviso persiste tras recargar; revisión necesaria.'); return true; }
+    let target;
+    if (safeReport) target=location.href;
+    else {
+      const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
+      try { const u=new URL(link?.getAttribute('href'),location.href); if (visible(link) && u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='overview' && !u.searchParams.has('doll') && [...u.searchParams.keys()].every(k=>['mod','sh'].includes(k))) target=u.href; } catch {}
+    }
+    if (!target) { stop('No hay una página segura para recuperar el aviso.'); return true; }
+    state.popupRecovery={key,at:Date.now()}; state.message='Recargando para recuperar aviso de '+kind+'; resultado anterior no confirmado.'; log(state.message,'warn'); save(); location.assign(target); return true;
+  }
+  function lootTick() {
+    const dialog=document.querySelector('#blackoutDialog.loot-modal');
+    if (!visible(dialog)) return false;
+    const reportId=params.get('reportId'), type=params.get('t');
+    const buttons=[...dialog.querySelectorAll('button')];
+    const button=buttons.find(b=>b.textContent.trim()==='Búsqueda exhaustiva');
+    const handler=button?.getAttribute('onclick') || '';
+    if (mod!=='reports' || sub!=='showCombatReport' || !['0','1'].includes(type) || !/^\d+$/.test(reportId || '') || !/Desvalijar a /i.test(dialog.querySelector('#header_')?.textContent || '')) { stop('Aviso de botín no reconocido; revisión necesaria.'); return true; }
+    if (/rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent+' '+(button?.outerHTML || ''))) { stop('Aviso de botín con coste no verificado; revisión necesaria.'); return true; }
+    if (!visible(button) || button.disabled) return recoverPopup('botín');
+    const expected=new RegExp('^\\s*runAction\\(this,\\s*'+type+',\\s*'+reportId+',\\s*4,\\s*function\\s*\\(\\)\\s*\\{\\s*location\\.reload\\(\\)\\s*\\}\\)\\s*;?\\s*$');
+    if (!expected.test(handler)) return recoverPopup('botín');
+    if (state.pendingLoot?.reportId===reportId && state.pendingLoot?.type===type) { if (Date.now()-state.pendingLoot.at>=15000) return recoverPopup('botín'); state.message='Esperando confirmación de búsqueda exhaustiva.'; save(); return true; }
+    state.pendingLoot={reportId,type,at:Date.now()}; state.message='Buscando botín de forma exhaustiva.'; log(state.message,'action'); save(); button.click(); return true;
+  }
+  function pveTick() {
+    const definitions={expedition:{mod:'location',bar:'#cooldown_bar_expedition',points:'#expeditionpoints_value',label:'expedición'},dungeon:{mod:'dungeon',bar:'#cooldown_bar_dungeon',points:'#dungeonpoints_value',label:'mazmorra'}};
+    const choices=[];
+    if (BUILD_CONFIG.modules.expedition && BUILD_CONFIG.expedition) choices.push('expedition');
+    if (BUILD_CONFIG.modules.dungeon && BUILD_CONFIG.dungeon) choices.push('dungeon');
+    if (!choices.length) return false;
+    const ready=key=>{const d=definitions[key],bar=document.querySelector(d.bar),text=document.querySelector(d.points)?.textContent.trim() || '',match=text.match(/^(\d+)(?:\s*\/\s*\d+)?$/),points=match ? Number(match[1]) : NaN;return Number.isSafeInteger(points)&&points>0&&cooldownSeconds(bar?.textContent)===0&&visible(bar?.querySelector('a'));};
+    let selected=choices.includes(state.pveTarget) ? state.pveTarget : null;
+    if (!selected || !ready(selected)) {
+      const arenaReady=cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0 || cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0;
+      if ((arenaReady && state.lastAction==='pve') || Date.now()-(state.lastPveAt||0)<20000) return false;
+      const options=choices.filter(ready);
+      selected=options.find(x=>x!==state.lastPveMode) || options[0];
+      if (!selected) return false;
+      state.pveTarget=selected; save();
+    }
+    const d=definitions[selected],link=document.querySelector(d.bar+' a');
+    const chosen=selected==='expedition' ? BUILD_CONFIG.expedition : BUILD_CONFIG.dungeon;
+    const area=chosen?.area;
+    if (!area?.id || !area?.name || !Number.isInteger(area.entryLevel) || area.entryLevel>BUILD_CONFIG.playerLevel) {
+      state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Configuración PvE incompleta o por encima del nivel declarado.'; log(state.message,'warn'); save(); return true;
+    }
+    const links=[...document.querySelectorAll('#mainnav a, #mainmenu a')];
+    const sameName=value=>String(value||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLocaleLowerCase('es');
+    const areaLink=links.find(a=>sameName(a.textContent)===sameName(area.name) && visible(a));
+    let areaLoc=null;
+    try { const u=new URL(areaLink?.getAttribute('href'),location.href); if (u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='location' && /^\d+$/.test(u.searchParams.get('loc')||'') && !u.searchParams.has('action')) areaLoc=u.searchParams.get('loc'); } catch {}
+    const currentArea=links.some(a=>sameName(a.textContent)===sameName(area.name) && visible(a));
+    const inConfiguredArea=currentArea && areaLoc!==null && params.get('loc')===areaLoc;
+    let dungeonLink=null,dungeonLoc=null;
+    if (selected==='dungeon') {
+      dungeonLink=link;
+      try { const u=new URL(dungeonLink?.getAttribute('href'),location.href); if (u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='dungeon' && /^\d+$/.test(u.searchParams.get('loc')||'') && !u.searchParams.has('action')) dungeonLoc=u.searchParams.get('loc'); } catch {}
+    }
+    if (!areaLink || areaLoc===null || (selected==='dungeon' && (!dungeonLink || dungeonLoc===null))) {
+      state.pveTarget=null; state.lastPveAt=Date.now(); state.message='La ruta de la zona elegida no aparece o no se puede comprobar; no atacaré.'; log(state.message,'warn'); save(); return true;
+    }
+    if (selected==='expedition' && (mod!=='location' || !inConfiguredArea)) {
+      navigation(areaLink,'Abriendo '+area.name+' para la expedición elegida.'); return true;
+    }
+    if (selected==='dungeon') {
+      if (!inConfiguredArea || (mod!=='location' && mod!=='dungeon')) { navigation(areaLink,'Abriendo '+area.name+' para la mazmorra elegida.'); return true; }
+      if (mod!=='dungeon' || params.get('loc')!==dungeonLoc) { navigation(dungeonLink,'Abriendo '+chosen.name+' ('+(chosen.difficulty==='advanced'?'avanzada':'normal')+').'); return true; }
+    }
+    if (selected==='expedition') {
+      const enemy=BUILD_CONFIG.expedition.enemy,position=enemy?.position,loc=params.get('loc');
+      const button=Number.isInteger(position)&&position>=1&&position<=4 ? document.querySelectorAll('#expedition_list .expedition_button')[position-1] : null;
+      const rival=Number.isInteger(position) ? document.querySelector('#expedition_info'+position+' .expedition_name')?.textContent.trim() : '';
+      const onclick=button?.getAttribute('onclick') || '';
+      const call=onclick.match(/^\s*attack\(null,\s*['"](\d+)['"],\s*(\d+),\s*0,\s*['"][^'"]*['"],\s*['"][^'"]*['"]\)\s*;?\s*$/);
+      const safeCall=call?.[1]===loc && Number(call?.[2])===position;
+      if (!enemy?.name || !safeCall || sameName(rival)!==sameName(enemy.name) || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
+        state.pveTarget=null; state.lastPveAt=Date.now(); state.message='El enemigo elegido no aparece exactamente en esa posición; no atacaré.'; log(state.message,'warn'); save(); return true;
+      }
+      state.pendingPve={mode:selected,at:Date.now(),target:enemy.name,area:area.name,spawn:[enemy.levelMin,enemy.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
+      state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve';
+      state.message='Atacando a '+enemy.name+' · aparición '+enemy.levelMin+'–'+enemy.levelMax+'.'; log(state.message,'action'); save(); button.click(); return true;
+    }
+    const dungeon=BUILD_CONFIG.dungeon,difficulty=dungeon.difficulty==='advanced'?'advanced':'normal',inputName=difficulty==='advanced'?'dif2':'dif1',inputLabel=difficulty==='advanced'?'Avanzado':'Normal';
+    const enter=document.querySelector('#content input[type="submit"][name="'+inputName+'"]');
+    if (visible(enter) && !enter.disabled) {
+      const form=enter.form; let u; try { u=new URL(form.getAttribute('action'),location.href); } catch { return stop('Entrada de mazmorra no reconocida.'); }
+      if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='dungeon' || u.searchParams.has('action') || u.searchParams.get('loc')!==params.get('loc') || String(form.method).toLowerCase()!=='post' || enter.value!==inputLabel || !inConfiguredArea || sameName(area.name)!==sameName(dungeon.area.name) || /rub[ií]|diamant|premium/i.test(enter.outerHTML)) return stop('Entrada de mazmorra no coincide con la zona y dificultad configuradas.');
+      if (state.pveEntryAt) { if (Date.now()-state.pveEntryAt<30000) return true; state.pveEntryAt=0; state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Entrada de mazmorra sin confirmar; esperaré antes de revisar.'; log(state.message,'warn'); save(); return true; }
+      state.pveEntryAt=Date.now(); state.message='Iniciando '+dungeon.name+' ('+difficulty+') · enemigos nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); enter.click(); return true;
+    }
+    state.pveEntryAt=0;
+    const fight=[...document.querySelectorAll('#content img[onclick^="startFight"]')].find(x=>visible(x) && /^startFight\('\d+', '\d+'\);showWait\(\);return false;$/.test(x.getAttribute('onclick') || '') && !/rub[ií]|diamant|premium/i.test(x.outerHTML));
+    if (!fight) { state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Sin encuentro reconocible en '+dungeon.name+'; no atacaré.'; log(state.message,'warn'); save(); return true; }
+    state.pendingPve={mode:selected,at:Date.now(),target:dungeon.name,boss:dungeon.boss,area:area.name,spawn:[dungeon.levelMin,dungeon.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
+    state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve'; state.message='Iniciando encuentro de '+dungeon.name+' · jefe '+dungeon.boss+' · nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); fight.click(); return true;
+  }
