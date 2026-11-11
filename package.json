@@ -1,0 +1,14 @@
+{
+  "name": "axelbot-guia",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "devDependencies": {
+    "astro": "7.4.11"
+  }
+}
