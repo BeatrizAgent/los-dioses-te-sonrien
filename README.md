@@ -7,6 +7,7 @@ Web de configuración y generación de un userscript para Gladiatus, hecha con A
 - Explica las funciones del bot, sus dependencias y sus límites.
 - Permite elegir módulos con casillas y genera un `.user.js` descargable.
 - Deja declarar un nivel de personaje entre 20 y 99 y filtra zonas/mazmorras por requisito de acceso.
+- Usa una única región PvE para expedición y mazmorra, con listas filtradas por Italia, África o Germania.
 - Permite escoger el enemigo de expedición, la mazmorra y su modo normal o avanzado.
 - Muestra por separado el nivel de acceso y el rango de aparición del enemigo o jefe.
 - Publica un catálogo trazable de 20 zonas, 80 enemigos de expedición y 22 mazmorras.

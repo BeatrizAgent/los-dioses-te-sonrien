@@ -2,6 +2,7 @@ export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 
 
 export const DEFAULT_CONFIG = Object.freeze({
   playerLevel: 20,
+  campaignRegion: 'África',
   modules: Object.freeze({
     arenaCircus: true,
     missions: true,
@@ -15,12 +16,12 @@ export const DEFAULT_CONFIG = Object.freeze({
   dungeonId: 'dungeon-temple-perdition',
 });
 
-export function eligibleExpeditions(catalog, playerLevel) {
-  return catalog.expeditions.filter(area => area.entryLevel <= playerLevel);
+export function eligibleExpeditions(catalog, playerLevel, region = null) {
+  return catalog.expeditions.filter(area => area.entryLevel <= playerLevel && (!region || area.region === region));
 }
 
-export function eligibleDungeons(catalog, playerLevel) {
-  return catalog.dungeons.filter(dungeon => dungeon.entryLevel <= playerLevel);
+export function eligibleDungeons(catalog, playerLevel, region = null) {
+  return catalog.dungeons.filter(dungeon => dungeon.entryLevel <= playerLevel && (!region || dungeon.region === region));
 }
 
 export function normalizeBuildConfig(input, catalog) {
@@ -31,6 +32,10 @@ export function normalizeBuildConfig(input, catalog) {
 
   const modules = Object.fromEntries(MODULE_KEYS.map(key => [key, input.modules?.[key] === true]));
   if (!MODULE_KEYS.some(key => modules[key])) throw new TypeError('Activa al menos un módulo.');
+  const requestedRegion = input.campaignRegion || null;
+  if (requestedRegion && !catalog.scope.regions.includes(requestedRegion)) {
+    throw new TypeError('Elige una región PvE del catálogo.');
+  }
 
   let expedition = null;
   if (modules.expedition) {
@@ -39,7 +44,7 @@ export function normalizeBuildConfig(input, catalog) {
     if (!area || !enemy) throw new TypeError('Elige una zona y un enemigo de expedición del catálogo.');
     if (area.entryLevel > playerLevel) throw new RangeError('El nivel declarado no alcanza el acceso a esa zona.');
     expedition = {
-      area: { id: area.id, name: area.name, entryLevel: area.entryLevel },
+      area: { id: area.id, name: area.name, region: area.region, entryLevel: area.entryLevel },
       enemy: { id: enemy.id, name: enemy.name, position: enemy.position, levelMin: enemy.levelMin, levelMax: enemy.levelMax },
     };
   }
@@ -50,11 +55,13 @@ export function normalizeBuildConfig(input, catalog) {
     const area = catalog.expeditions.find(item => item.id === row?.areaId);
     if (!row || !area) throw new TypeError('Elige una mazmorra del catálogo.');
     if (row.entryLevel > playerLevel) throw new RangeError('El nivel declarado no alcanza el acceso a esa mazmorra.');
+    if (row.region !== area.region) throw new TypeError('La región de la mazmorra no coincide con su zona.');
     dungeon = {
       id: row.id,
       name: row.name,
       boss: row.boss,
-      area: { id: area.id, name: area.name, entryLevel: area.entryLevel },
+      region: row.region,
+      area: { id: area.id, name: area.name, region: area.region, entryLevel: area.entryLevel },
       entryLevel: row.entryLevel,
       difficulty: row.difficulty,
       levelMin: row.levelMin,
@@ -63,7 +70,14 @@ export function normalizeBuildConfig(input, catalog) {
     };
   }
 
-  return { playerLevel, modules, expedition, dungeon };
+  const targetRegions = new Set([expedition?.area.region, dungeon?.region].filter(Boolean));
+  if (targetRegions.size > 1) throw new TypeError('Expedición y mazmorra deben pertenecer a la misma región.');
+  const targetRegion = targetRegions.values().next().value || null;
+  if (requestedRegion && targetRegion && requestedRegion !== targetRegion) {
+    throw new TypeError('Los objetivos PvE deben pertenecer a la región seleccionada.');
+  }
+
+  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon };
 }
 
 export function buildUserscript(config, fragments) {

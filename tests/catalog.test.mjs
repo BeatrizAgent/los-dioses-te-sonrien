@@ -34,6 +34,17 @@ test('el nivel del personaje filtra acceso, sin recortar el nivel de aparición 
   assert.equal(catalog.expeditions.find(area => area.id === 'de-vandal-village').enemies[3].levelMax, 110);
 });
 
+test('expediciones y mazmorras se filtran por una región compartida', () => {
+  assert.ok(eligibleExpeditions(catalog, 99, 'África').length > 0);
+  assert.ok(eligibleExpeditions(catalog, 99, 'África').every(area => area.region === 'África'));
+  assert.ok(eligibleDungeons(catalog, 99, 'Germania').length > 0);
+  assert.ok(eligibleDungeons(catalog, 99, 'Germania').every(dungeon => dungeon.region === 'Germania'));
+  for (const dungeon of catalog.dungeons) {
+    const area = catalog.expeditions.find(row => row.id === dungeon.areaId);
+    assert.equal(dungeon.region, area?.region, `${dungeon.name} y su zona deben compartir región`);
+  }
+});
+
 test('el catálogo documenta referencias y discrepancias en vez de inventar el nombre español', () => {
   assert.ok(catalog.sources.some(source => source.id === 'official-expedition-guide'));
   assert.ok(catalog.sources.some(source => source.id === 'fansite-dungeons'));

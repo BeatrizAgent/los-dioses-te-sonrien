@@ -49,6 +49,36 @@ test('rechaza nivel, zona, objetivo y mazmorra fuera del catálogo accesible', (
   }, catalog), /no alcanza el acceso/);
 });
 
+test('rechaza una expedición y una mazmorra de regiones distintas', () => {
+  assert.throws(() => normalizeBuildConfig({
+    playerLevel: 90,
+    modules: { ...DEFAULT_CONFIG.modules, expedition: true, dungeon: true },
+    expeditionAreaId: 'af-gorge',
+    expeditionEnemyId: 'af-gorge-high-shaman',
+    dungeonId: 'dungeon-dark-catacombs',
+  }, catalog), /misma región/);
+});
+
+test('conserva región única cuando se activan ambos módulos PvE', () => {
+  const config = normalizeBuildConfig({
+    ...DEFAULT_CONFIG,
+    modules: { ...DEFAULT_CONFIG.modules, expedition: true, dungeon: true },
+  }, catalog);
+  assert.equal(config.campaignRegion, 'África');
+  assert.equal(config.expedition.area.region, config.campaignRegion);
+  assert.equal(config.dungeon.region, config.campaignRegion);
+});
+
+test('rechaza objetivos PvE que no coinciden con la región seleccionada', () => {
+  assert.throws(() => normalizeBuildConfig({
+    playerLevel: 90,
+    campaignRegion: 'Germania',
+    modules: { ...DEFAULT_CONFIG.modules, expedition: true },
+    expeditionAreaId: 'af-gorge',
+    expeditionEnemyId: 'af-gorge-high-shaman',
+  }, catalog), /región seleccionada/);
+});
+
 test('el código generado valida CAPTCHA y no contiene funciones premium añadidas por el generador', () => {
   const result = buildUserscript(normalizeBuildConfig(DEFAULT_CONFIG, catalog), fragments);
   assert.match(result, /CAPTCHA detectado\. Intervención humana requerida\./);

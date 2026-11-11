@@ -1,6 +1,6 @@
 import catalog from '../data/catalog.json';
 import { fragments } from './userscript-fragments.js';
-import { buildUserscript, normalizeBuildConfig } from './build-config.mjs';
+import { buildUserscript, DEFAULT_CONFIG, eligibleDungeons, eligibleExpeditions, normalizeBuildConfig } from './build-config.mjs';
 
 const moduleKeys = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold'];
 let currentObjectUrl = '';
@@ -16,6 +16,7 @@ export function initializeGenerator() {
   const form = document.querySelector('#bot-form');
   if (!form) return;
   const level = document.querySelector('#player-level');
+  const regionSelect = document.querySelector('#campaign-region');
   const expeditionToggle = document.querySelector('#module-expedition');
   const dungeonToggle = document.querySelector('#module-dungeon');
   const areaSelect = document.querySelector('#expedition-area');
@@ -26,9 +27,17 @@ export function initializeGenerator() {
   const download = document.querySelector('#download-link');
   const preview = document.querySelector('#script-preview');
 
+  for (const region of catalog.scope.regions) option(regionSelect, region, region);
+  regionSelect.value = DEFAULT_CONFIG.campaignRegion;
+
   function refreshCatalog() {
     const playerLevel = Number(level.value);
-    const areas = Number.isInteger(playerLevel) ? catalog.expeditions.filter(area => area.entryLevel <= playerLevel) : [];
+    error.hidden = true;
+    result.hidden = true;
+    const region = regionSelect.value;
+    const areas = Number.isInteger(playerLevel)
+      ? eligibleExpeditions(catalog, playerLevel, region)
+      : [];
     const previousArea = areaSelect.value;
     areaSelect.replaceChildren();
     for (const area of areas) option(areaSelect, area.id, `${area.region} · ${area.name} · acceso ${area.entryLevel}`);
@@ -47,13 +56,15 @@ export function initializeGenerator() {
       ? `Personaje declarado nivel ${playerLevel}. Acceso a ${area.name}: ${area.entryLevel}. ${enemy.name}: aparece entre nivel ${enemy.levelMin} y ${enemy.levelMax}${enemy.boss ? ' · jefe' : ''}.`
       : 'No hay una zona desbloqueada para ese nivel.';
 
-    const dungeons = Number.isInteger(playerLevel) ? catalog.dungeons.filter(dungeon => dungeon.entryLevel <= playerLevel) : [];
+    const dungeons = Number.isInteger(playerLevel)
+      ? eligibleDungeons(catalog, playerLevel, region)
+      : [];
     const previousDungeon = dungeonSelect.value;
     dungeonSelect.replaceChildren();
     for (const dungeon of dungeons) {
       const parent = catalog.expeditions.find(item => item.id === dungeon.areaId);
       const difficulty = dungeon.difficulty === 'advanced' ? 'avanzada' : 'normal';
-      option(dungeonSelect, dungeon.id, `Acceso ${dungeon.entryLevel} · ${dungeon.name} · ${difficulty} · jefe ${dungeon.boss} (${dungeon.levelMin}–${dungeon.levelMax})`);
+      option(dungeonSelect, dungeon.id, `${dungeon.region} · acceso ${dungeon.entryLevel} · ${dungeon.name} · ${difficulty} · jefe ${dungeon.boss} (${dungeon.levelMin}–${dungeon.levelMax})`);
       dungeonSelect.lastElementChild.dataset.area = parent?.name || '';
     }
     if (dungeons.some(dungeon => dungeon.id === previousDungeon)) dungeonSelect.value = previousDungeon;
@@ -80,6 +91,7 @@ export function initializeGenerator() {
 
   level.addEventListener('input', refreshCatalog);
   level.addEventListener('change', refreshCatalog);
+  regionSelect.addEventListener('change', refreshCatalog);
   areaSelect.addEventListener('change', refreshCatalog);
   enemySelect.addEventListener('change', refreshCatalog);
   dungeonSelect.addEventListener('change', refreshCatalog);
@@ -102,6 +114,7 @@ export function initializeGenerator() {
       const modules = Object.fromEntries(moduleKeys.map(key => [key, form.querySelector(`input[name="${key}"]`).checked]));
       const config = normalizeBuildConfig({
         playerLevel: level.value,
+        campaignRegion: regionSelect.value,
         modules,
         expeditionAreaId: areaSelect.value,
         expeditionEnemyId: enemySelect.value,
@@ -115,7 +128,8 @@ export function initializeGenerator() {
       preview.textContent = userscript;
       document.querySelector('#result-title').textContent = 'Userscript generado';
       const enabled = Object.values(config.modules).filter(Boolean).length;
-      document.querySelector('#result-detail').textContent = `${enabled} módulo(s) activo(s) · nivel declarado ${config.playerLevel} · ${Math.ceil(userscript.length / 1024)} KB`;
+      const pveRegion = config.modules.expedition || config.modules.dungeon ? ` · región PvE ${config.campaignRegion}` : '';
+      document.querySelector('#result-detail').textContent = `${enabled} módulo(s) activo(s) · nivel declarado ${config.playerLevel}${pveRegion} · ${Math.ceil(userscript.length / 1024)} KB`;
       result.hidden = false;
       result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (cause) {
