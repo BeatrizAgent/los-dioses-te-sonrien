@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Los Dioses Te Sonríen - Asistente Gladiatus
 // @namespace    axelbot.evento
-// @version      0.12.24
+// @version      0.12.29
 // @description  Bot configurable para Gladiatus. Revisa los módulos elegidos antes de activarlo.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none

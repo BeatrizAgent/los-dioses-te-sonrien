@@ -191,14 +191,71 @@
       const food=healingFood(cells[0]?.querySelector('[data-tooltip][data-content-type]'));
       const button=row.querySelector('input[name="buy"]'),form=button?.form;
       let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
-      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !Number.isSafeInteger(price) || price<=0 || !food || (food.level!==null && (!level || food.level>level)) || cells[4]?.textContent.trim()!=='1' || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      const listedLevel=cells[4]?.textContent.trim() || '';
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !Number.isSafeInteger(price) || price<=0 || !food || (food.level!==null && (!level || food.level>level)) || !/^\d+$/.test(listedLevel) || (food.level!==null && Number(listedLevel)!==food.level) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
       const notice=form.getAttribute('data-confirm-message');
       if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (notice!==null && notice!=='Este objeto está vinculado al alma') || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
       return {seller,price,food,button,notice};
     }).filter(Boolean).sort((a,b)=>a.price-b.price);
   }
   function foodMarketTick() {
-    if (state.foodBuyTx || !state.foodBuyNeeded || state.goldPreviousReview || state.goldTx || state.smeltTx || state.repairTx) return false;
+    const tx=state.foodBuyTx;
+    if (tx) {
+      const now=Date.now();
+      if (!['baseline','readyBuy','buy','verify'].includes(tx.stage)) return false;
+      if (Number.isFinite(tx.retryAt)) {
+        if (now<tx.retryAt) return false;
+        delete tx.retryAt; delete tx.scan; delete tx.loadedAt; tx.at=now; save();
+      }
+      const deferFoodCheck=message=>{tx.retryAt=Date.now()+60000;delete tx.scan;delete tx.loadedAt;state.message=message;save();return false;};
+      if (tx.stage==='baseline' || tx.stage==='verify') {
+        if (mod!=='packages') { goldNav('#menue_packages','packages','Comprobando paquetes de alimento.'); return true; }
+        const packages=document.querySelector('#packages');
+        if (!packages) return true;
+        if (params.get('f')!=='7' || params.get('fq')!=='-1' || params.get('qry')!==tx.name) {
+          const form=document.querySelector('#pf'),input=form?.querySelector('input[name="qry"]'),filter=form?.querySelector('select[name="f"]'),quality=form?.querySelector('select[name="fq"]'),submit=form?.querySelector('[type="submit"]'); let u;
+          try {u=new URL(form?.getAttribute('action'),location.href);} catch {}
+          if(!u||u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('submod')!=='search'||String(form.method).toLowerCase()!=='post'||!input||!filter||!quality||!visible(submit)||submit.disabled) return deferFoodCheck('No se pudo verificar el buscador de alimento; volveré a comprobarlo.');
+          input.value=tx.name;filter.value='7';quality.value='-1';if(filter.value!=='7'||quality.value!=='-1')return deferFoodCheck('Filtro de alimento no verificable; volveré a comprobarlo.');
+          tx.scan={pages:[],matches:0,fingerprints:{}};tx.loadedAt=0;tx.at=now;save();submit.click();return true;
+        }
+        if(!tx.scan)tx.scan={pages:[],matches:0,fingerprints:{}};
+        if(!tx.loadedAt){tx.loadedAt=now;save();return true;} if(now-tx.loadedAt<5000)return true;
+        const values=params.getAll('page'),page=Number(values[0]||'1'),scan=tx.scan;
+        if(values.length>1||!Number.isSafeInteger(page)||page<1||page>100||!scan) return deferFoodCheck('Paginación de alimento ambigua; volveré a comprobarla.');
+        const go=n=>{let u;try{u=new URL(location.href);}catch{return false;}if(u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('f')!=='7'||u.searchParams.get('fq')!=='-1'||u.searchParams.get('qry')!==tx.name||[...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k))||n<1||n>100)return false;u.searchParams.delete('page');u.searchParams.set('page',String(n));tx.loadedAt=0;tx.at=Date.now();save();location.assign(u.href);return true;};
+        const expected=scan.pages.length?scan.pages.at(-1)+1:1;if(page!==expected)return go(expected) || deferFoodCheck('No se pudo revisar la página de alimento; volveré a comprobarla.');
+        const listed=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible),fp=listed.map(e=>e.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
+        if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return deferFoodCheck('Página de alimento repetida; volveré a comprobarla.');
+        if(fp)scan.fingerprints[page]=fp;
+        scan.matches+=listed.filter(e=>{const food=healingFood(e);return food && food.name===tx.name && food.amount===tx.amount && food.level===tx.level && e.getAttribute('data-basis')===tx.basis && (e.getAttribute('data-soulbound-to')||null)===tx.soul && /\bMercado\b/i.test(e.closest('.packageItem')?.textContent||'');}).length;
+        scan.pages.push(page);tx.at=now;save();if(visible(document.querySelector('.paging_right_step')))return go(page+1) || deferFoodCheck('No se pudo revisar la página siguiente de alimento; volveré a comprobarla.');
+        if(tx.stage==='baseline') {
+          if(scan.matches!==0){state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;state.packageFoodTrip=true;delete state.packageScan;state.message='Ya hay alimento en paquetes; intentaré recogerlo.';save();return true;}
+          tx.baselineEmpty=true;tx.stage='readyBuy';tx.at=now;delete tx.scan;delete tx.loadedAt;save();return true;
+        }
+        if(scan.matches!==1)return deferFoodCheck('Compra de alimento sin identificar de forma única; volveré a comprobarla sin repetir.');
+        state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;state.packageFoodTrip=true;delete state.packageScan;state.message='Compra de alimento confirmada; recogiendo comida.';log(state.message,'success');save();return true;
+      }
+      if(tx.stage==='readyBuy') {
+        if(mod!=='guildMarket'){goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Volviendo a la oferta de alimento.');return true;}
+        if(now-goldPageOpenedAt<5000)return true;
+        const offers=foodMarketOffers().filter(o=>o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.amount===tx.amount&&o.food.level===tx.level&&o.food.item.getAttribute('data-basis')===tx.basis&&o.food.item.getAttribute('data-hash')===tx.offerHash&&/^\d+$/.test(tx.offerId||'')&&o.food.item.getAttribute('data-item-id')===tx.offerId);
+        const balance=goldBalance();if(offers.length!==1||!Number.isSafeInteger(balance)||balance<tx.price){state.foodBuyTx=null;state.foodBuyRetryAt=now+60000;save();return false;}
+        const offer=offers[0],original=window.confirm; if(typeof original!=='function')return false;
+        tx.stage='buy';tx.at=now;tx.balanceBefore=balance;tx.confirmed=!offer.notice;save();
+        try {window.confirm=message=>{if(offer.notice&&!tx.confirmed&&/^Este objeto está vinculado al alma\s+¿Realmente quieres comprar este objeto\?$/.test(String(message).trim())){tx.confirmed=true;save();return true;}tx.rejected=true;save();return false;};offer.button.click();}
+        catch {state.message='Compra de alimento incierta; no repetiré.';save();} finally {window.confirm=original;} return true;
+      }
+      if(tx.stage==='buy') {
+        if(mod!=='guildMarket')return false;
+        if(now-goldPageOpenedAt<5000 || now-tx.at<5000)return true;
+        const still=foodMarketOffers().some(o=>o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.item.getAttribute('data-hash')===tx.offerHash&&o.food.item.getAttribute('data-item-id')===tx.offerId);
+        if(/^\d+$/.test(tx.offerId||'')&&!still&&tx.baselineEmpty===true&&tx.confirmed&&!tx.rejected&&Number.isSafeInteger(tx.balanceBefore)&&goldBalance()===tx.balanceBefore-tx.price){tx.stage='verify';tx.at=now;delete tx.scan;delete tx.loadedAt;save();return true;}
+        state.message='Compra de alimento incierta; no repetiré.';save();return false;
+      }
+    }
+    if (!state.foodBuyNeeded || state.goldPreviousReview || state.goldTx || state.smeltTx || state.repairTx) return false;
     if (mod!=='guildMarket') {
       if (!goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Buscando alimento en el mercado de la alianza.')) { state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; save(); return false; }
       return true;
@@ -206,18 +263,10 @@
     if (Date.now()-goldPageOpenedAt<5000) return true;
     const balance=goldBalance(), offer=foodMarketOffers().find(x=>Number.isSafeInteger(balance) && x.price<=balance);
     if (!offer) { state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; state.message='Sin alimento asequible y verificable en la alianza.'; log(state.message,'warn'); save(); return false; }
-    const tx={stage:'buy',name:offer.food.name,price:offer.price,seller:offer.seller,at:Date.now(),confirmed:!offer.notice};
-    state.foodBuyTx=tx; state.foodBuyNeeded=false; state.message='Comprando alimento: '+tx.name+'.'; log(state.message,'action'); save();
-    const original=window.confirm;
-    if (typeof original!=='function') { state.message='Compra de alimento no iniciada; revisar manualmente.'; save(); return false; }
-    try {
-      window.confirm=message=>{
-        if (offer.notice && !tx.confirmed && /^Este objeto está vinculado al alma\s+¿Realmente quieres comprar este objeto\?$/.test(String(message).trim())) { tx.confirmed=true; save(); return true; }
-        tx.rejected=true; save(); return false;
-      };
-      offer.button.click();
-    } catch { state.message='Compra de alimento incierta: revisa mercado y paquetes.'; save(); }
-    finally { window.confirm=original; }
+    const item=offer.food.item,hash=item.getAttribute('data-hash'),basis=item.getAttribute('data-basis'),offerId=item.getAttribute('data-item-id');
+    if(!validItemHash(hash)||!/^\d+-\d+$/.test(basis||'')||!/^\d+$/.test(offerId||'')){state.foodBuyNeeded=false;state.foodBuyRetryAt=Date.now()+60000;save();return false;}
+    state.foodBuyTx={stage:'baseline',name:offer.food.name,amount:offer.food.amount,level:offer.food.level,basis,soul:item.getAttribute('data-soulbound-to')||null,offerHash:hash,offerId,price:offer.price,seller:offer.seller,at:Date.now()};
+    state.foodBuyNeeded=false;state.message='Comprobando paquetes antes de comprar alimento.';save();
     return true;
   }
   // Una sola operación de oro por cuenta. Las etapas con efectos se guardan antes de actuar.

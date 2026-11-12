@@ -104,6 +104,8 @@
     }
     if (selected==='dungeon') {
       if (!inConfiguredArea || mod!=='dungeon') {
+        // No contar como intento las comprobaciones durante la espera entre navegaciones.
+        if (Date.now()-(state.lastNavigationAt||0)<8000) return true;
         const key=chosen.id+':'+areaLoc, previous=state.pveRouteGuard;
         const attempts=previous?.key===key && Date.now()-previous.at<120000 ? previous.attempts+1 : 1;
         state.pveRouteGuard={key,attempts,at:Date.now()}; save();

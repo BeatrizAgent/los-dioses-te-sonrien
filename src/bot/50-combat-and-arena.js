@@ -1,3 +1,14 @@
+  function healthReading() {
+    const text=document.querySelector('#header_values_hp_points')?.textContent || '';
+    const match=text.match(/^\s*([\d.\s]+)\s*\/\s*([\d.\s]+)\s*$/);
+    let current=match ? parseGold(match[1]) : null, maximum=match ? parseGold(match[2]) : null;
+    if (!match) {
+      const bar=document.querySelector('#header_values_hp_bar');
+      const value=bar?.getAttribute('data-value'), max=bar?.getAttribute('data-max-value');
+      if (/^\d+$/.test(value || '') && /^\d+$/.test(max || '')) { current=Number(value); maximum=Number(max); }
+    }
+    return Number.isSafeInteger(current) && Number.isSafeInteger(maximum) && maximum>0 && current>=0 && current<=maximum ? {current,maximum} : null;
+  }
   function combatTick() {
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
@@ -47,10 +58,7 @@
     if (state.repairTx) { safeRepairTick(); return; }
     const hpText = (document.querySelector('#header_values_hp_percent')?.textContent || '').trim();
     const hpMatch = hpText.match(/^(\d{1,3})\s*%$/);
-    const pointsText = document.querySelector('#header_values_hp_points')?.textContent || '';
-    const pointsMatch = pointsText.match(/^\s*([\d.\s]+)\s*\/\s*([\d.\s]+)\s*$/);
-    const current = pointsMatch && parseGold(pointsMatch[1]);
-    const maximum = pointsMatch && parseGold(pointsMatch[2]);
+    const reading=healthReading(), current=reading?.current, maximum=reading?.maximum;
     const hp = hpMatch ? Number(hpMatch[1]) : NaN;
     if ((hpMatch && hp > 100) || current === null || !Number.isSafeInteger(current) || !Number.isSafeInteger(maximum) || maximum <= 0 || current > maximum) {
       if (state.message !== 'Esperando datos fiables de salud; volveré a comprobarlos.') { state.message='Esperando datos fiables de salud; volveré a comprobarlos.'; log(state.message,'warn'); save(); }
@@ -108,6 +116,7 @@
       if (p.mode==='dungeon') state.dungeonLosses=null;
       log('Resultado de '+(p.mode==='expedition'?'expedición':'mazmorra')+' desconocido.','warn'); state.pendingPve=null; save(); return;
     }
+    if (state.foodBuyTx && foodMarketTick()) return;
     if (goldTick(true)) return;
     const healthPercent=Number.isFinite(hp) ? Math.min(hp, 100 * current / maximum) : 100 * current / maximum;
     if (healthPercent > 40 && (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood)) {

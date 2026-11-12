@@ -34,6 +34,12 @@ pnpm build
 
 ## Datos PvE y límites
 
+En 0.12.28, las compras de oro y alimento se preparan con una búsqueda previa de paquetes. Tras comprar, el bot exige oferta ausente, descuento exacto y un paquete de mercado único con la identidad esperada antes de continuar. Si la señal es ambigua, conserva la operación sin repetir la compra. En s64-es se observó un ciclo automático completo de oro: compra de 100.000, recepción en baúl I y anuncio a 24 horas. La compra automática de alimento y recuperación tras reinicio siguen pendientes de validación en juego.
+
+En 0.12.29, la comprobación de una compra de alimento ambigua se aplaza y vuelve a intentarse sin repetir la compra. Si la búsqueda previa encuentra alimento igual, intenta recogerlo en lugar de comprarlo. Estos cambios están probados en simulación y pendientes de validación instalada.
+
+En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
+
 El nivel que se escribe en el formulario es una declaración para filtrar requisitos; la web no lee la cuenta. Los rangos de nivel de los bichos proceden de guías comunitarias, incluida una publicación en el foro oficial de Gameforge. Las bandas de mazmorra se contrastan con una referencia comunitaria actual. Consulta [la investigación PvE](docs/investigacion-pve.md) para fechas, fuentes y discrepancias.
 
 El bot comprueba la zona y el control de ataque de la posición elegida antes de atacar una expedición; muestra el nombre observado cuando está disponible. Para mazmorra valida la ruta observada, la zona y el modo que se seleccionó. Si algo no coincide, espera sin iniciar el ataque. No predice victorias y no se ha validado este flujo instalado en juego ni en un móvil real.
