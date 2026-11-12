@@ -109,17 +109,23 @@
   function goldOwnCount(item,price) {
     return [...document.querySelectorAll('#market_item_table tr')].filter(row=>{
       const cells=[...(row.cells||[])];
-      return cells[1]?.textContent.trim().normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() && parseGold(cells[2]?.textContent)===price && /^(?:23:\d{2}|24(?::00)?)\s*h$/i.test(cells[3]?.textContent.trim()||'') && goldSame(goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]')),item) && !!row.querySelector('input[value="Cancelar"]');
+      return cells[1]?.textContent.trim().normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() && parseGold(cells[2]?.textContent)===price && /^\d{1,2}(?::\d{2})?\s*h$/i.test(cells[3]?.textContent.trim()||'') && goldSame(goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]')),item) && !!row.querySelector('input[value="Cancelar"]');
     }).length;
   }
   function goldTick(pendingOnly=false) {
     const tx=state.goldTx;
-    if (state.goldPreviousReview===true) return false;
+    if (state.goldPreviousReview===true || state.foodBuyTx) return false;
     const now=Date.now(), balance=goldBalance();
     // Las operaciones anteriores pueden haberse resuelto fuera del bot.
     if (state.goldPackageGuardV129!==true) {
       state.goldPackageGuardV129=true;
       if (tx) { goldReview('Operación iniciada con una versión anterior.'); return false; }
+      save();
+    }
+    // Al actualizar, ninguna operación anterior se reanuda sin revisar.
+    if (state.goldSafetyV1219!==true) {
+      state.goldSafetyV1219=true;
+      if (tx) { goldReview('Operación anterior a la actualización: comprueba el mercado y los paquetes.'); return false; }
       save();
     }
     if (tx?.manualReview) return false;
@@ -129,6 +135,7 @@
       if (now<tx.retryAt) return false;
       tx.blocked=false; tx.at=now; delete tx.retryAt; delete tx.loadedAt;
       if (tx.stage==='drop') tx.stage='market'; // El arrastre no publica ni consume oro.
+      if (tx.stage==='packages') delete tx.packageScan; // Volver a comprobar todas las páginas.
       state.goldEnabled=true; state.message='Revisando la operación de oro pendiente.'; log(state.message); save();
     }
     if (!tx && (!state.goldEnabled || pendingOnly)) return false;
@@ -169,10 +176,8 @@
       return true;
     }
     if (tx.stage==='buy') {
-      if (mod!=='guildMarket') { goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Comprobando la compra pendiente.'); return true; }
-      if (Number.isSafeInteger(balance) && balance===tx.balanceBefore-tx.price && tx.confirmed && !tx.rejected) {
-        tx.stage='packages'; tx.at=now; state.message='Compra confirmada; buscando el objeto en paquetes.'; log(state.message,'success'); save();
-      } else { state.message='Esperando confirmación de la compra de oro.'; save(); return true; }
+      // El saldo no identifica la compra: solo el jugador puede confirmarla.
+      state.message='Compra sin confirmar. Revisa mercado y paquetes antes de continuar.'; save(); return false;
     }
     if (tx.stage==='packages') {
       if (mod!=='packages') { goldNav('#menue_packages','packages','Abriendo paquetes de la alianza.'); return true; }
@@ -250,7 +255,7 @@
       const bag=goldBag(false), target=document.querySelector('#market_sell .ui-droppable');
       const items=bag?.items.filter(x=>x.getAttribute('data-hash')===tx.hash && goldSame(goldItem(x),tx.item)) || [];
       if (!bag || items.length!==1 || !visible(target)) { goldPause('Objeto o casilla de venta no verificable.'); return false; }
-      tx.stage='drop'; tx.at=now; tx.ownBefore=goldOwnCount(tx.item,tx.price); state.message='Colocando el objeto en el formulario de venta.'; log(state.message,'action'); save();
+      tx.stage='drop'; tx.at=now; tx.ownBefore=goldOwnCount(tx.item,tx.price); tx.ownCountScope='all-durations-v1'; state.message='Colocando el objeto en el formulario de venta.'; log(state.message,'action'); save();
       if (!dragFood(items[0],target)) goldPause('No se pudo preparar el arrastre al mercado.');
       return true;
     }
@@ -265,7 +270,7 @@
     }
     if (tx.stage==='sell') {
       if (mod!=='guildMarket') { goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Comprobando el anuncio pendiente.'); return true; }
-      if (goldOwnCount(tx.item,tx.price)>tx.ownBefore) {
+      if (tx.ownCountScope==='all-durations-v1' && Number.isSafeInteger(tx.ownBefore) && goldOwnCount(tx.item,tx.price)>tx.ownBefore) {
         log('Anuncio confirmado: '+tx.price.toLocaleString('es-ES')+' durante 24 horas.','success'); state.goldTx=null; state.goldCheckAt=now+60000; state.message='Paquete anunciado; esperando siguiente revisión.'; save(); return false;
       }
       state.message='Esperando confirmación de la venta de oro.'; save(); return true;
@@ -591,3 +596,4 @@
   function safeRepairTick() {
     try { return repairTick(); } catch { repairBlock('Error interno; ubicación de la pieza sin confirmar.'); return true; }
   }
+

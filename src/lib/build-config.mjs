@@ -1,4 +1,4 @@
-export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting', 'repair'];
+export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'foodMarket', 'expedition', 'dungeon', 'guildGold', 'smelting', 'repair'];
 
 export const DEFAULT_CONFIG = Object.freeze({
   playerLevel: 20,
@@ -7,6 +7,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     arenaCircus: true,
     missions: true,
     healing: true,
+    foodMarket: false,
     expedition: false,
     dungeon: false,
     guildGold: false,
@@ -35,6 +36,7 @@ export function normalizeBuildConfig(input, catalog) {
   }
 
   const modules = Object.fromEntries(MODULE_KEYS.map(key => [key, input.modules?.[key] === true]));
+  if (modules.foodMarket && !modules.healing) throw new TypeError('La compra de alimentos requiere activar la curación.');
   if (!MODULE_KEYS.some(key => modules[key])) throw new TypeError('Activa al menos un módulo.');
   const requestedRegion = input.campaignRegion || null;
   if (requestedRegion && !catalog.scope.regions.includes(requestedRegion)) {

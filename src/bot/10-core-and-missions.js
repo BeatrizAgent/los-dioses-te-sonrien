@@ -1,4 +1,6 @@
 
+
+
   const host = new URL(location.href).hostname.toLowerCase();
   const realm = host.match(/^s\d+-(es)\.gladiatus\.gameforge\.com$/)?.[1] || '';
   const KEY = host === 's64-es.gladiatus.gameforge.com' && accountName.toLocaleLowerCase() === 'cassiusferox' ? 'axelbot.evento.cassius.s64.v1' : 'axelbot.evento.account.v1.' + encodeURIComponent(accountName.normalize('NFKC').toLocaleLowerCase());
@@ -26,12 +28,6 @@
   if (state.goldAutoDefaultV1 !== true) {
     state.goldAutoDefaultV1=true;
     if (!state.goldTx?.blocked && !state.goldPreviousReview) state.goldEnabled=true;
-    save();
-  }
-  // La antigua compra manual de CassiusFerox ya se comprobó en el mercado.
-  if (host==='s64-es.gladiatus.gameforge.com' && accountName.normalize('NFKC').toLocaleLowerCase()==='cassiusferox' && state.goldPreviousReview===true) {
-    state.goldPreviousReview=false;
-    if (!state.goldTx) state.goldEnabled=true;
     save();
   }
   const visible = el => !!el && !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && el.getClientRects().length > 0;
@@ -148,3 +144,4 @@
     if (Date.now()-(state.lastNavigationAt || 0)<8000) { state.message='Esperando para actualizar identidad.'; save(); return true; }
     state.lastNavigationAt=Date.now(); state.message='Actualizando identidad del personaje.'; save(); link.click(); return true;
   }
+

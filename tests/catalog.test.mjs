@@ -59,3 +59,10 @@ test('la configuración por defecto mantiene apagados PvE y mercado', () => {
   assert.equal(config.modules.dungeon, false);
   assert.equal(config.modules.arenaCircus, true);
 });
+
+test('compra de alimentos es opcional y exige curación',()=>{
+  const input={...DEFAULT_CONFIG,modules:{...DEFAULT_CONFIG.modules}};
+  assert.equal(normalizeBuildConfig(input,catalog).modules.foodMarket,false);
+  input.modules.foodMarket=true;assert.equal(normalizeBuildConfig(input,catalog).modules.foodMarket,true);
+  input.modules.healing=false;assert.throws(()=>normalizeBuildConfig(input,catalog),/requiere activar la curación/);
+});

@@ -8,7 +8,7 @@ function fixture({page='1',names=['Ojo de Ra'],scan, next=false}={}) {
  const now=Date.now(), item={name:'Ojo de Ra',owner:null,soul:null,basis:'8-1',width:1,height:1}, tx={stage:'packages',at:now,loadedAt:now-6000,item,packageScan:scan,packageFilter:{query:'Ojo de Ra',type:'0',optimized:false}};
  const elements=names.map((name,i)=>({getAttribute:k=>({'data-tooltip':JSON.stringify([[[name,'white']]]),'data-hash':'hash'+i}[k]??null),closest:()=>({textContent:'Mercado'}),hasAttribute:()=>true,dispatchEvent(){throw Error('No debe mover objetos en esta prueba');}}));
  const pkg={querySelectorAll:()=>elements,textContent:''};
- const state={goldTx:tx,goldEnabled:true,goldPackageGuardV129:true}; const params=new URLSearchParams('f=0&fq=-1&qry=Ojo+de+Ra'+(page?'&page='+page:''));
+ const state={goldTx:tx,goldEnabled:true,goldPackageGuardV129:true,goldSafetyV1219:true}; const params=new URLSearchParams('f=0&fq=-1&qry=Ojo+de+Ra'+(page?'&page='+page:''));
  const location={origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php?mod=packages&f=0&fq=-1&qry=Ojo+de+Ra'+(page?'&page='+page:''),assign:u=>{location.destination=u;}};
  const c={state,params,location,mod:'packages',Date,URL,Number,String,Array,JSON,document:{querySelector:s=>s==='#packages'?pkg:s==='.paging_right_step'&&next?{}:null},visible:x=>!!x,log:()=>{},save:()=>{},parseGold:()=>500000,validItemHash:x=>typeof x==='string'&&!!x,accountName:'CassiusFerox'};
  vm.createContext(c);vm.runInContext(code,c);c.goldBalance=()=>500000;c.goldBag=()=>({items:[]});c.goldSpace=()=>true;c.goldItem=el=>({ ...item,name:JSON.parse(el.getAttribute('data-tooltip'))[0][0][0] });return {c,state,tx,location};

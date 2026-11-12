@@ -22,3 +22,4 @@
       .status{padding:10px}.message,.small{font-size:12px}.minimized{width:min(250px,100%);margin-left:auto}.minimized .head{padding:9px 12px}
     }
   `;
+

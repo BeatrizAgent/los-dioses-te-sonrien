@@ -62,7 +62,7 @@
         state.pendingPackageFood=null; state.packageFoodTrip=false; log('Alimento recibido en el baúl I: '+p.name+'.','success'); save();
         navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Volviendo para curar.'); return true;
       }
-      if (Date.now()-p.at>15000) { state.pendingPackageFood=null; skipHealing('Traslado de alimento sin confirmar; sigo con la cola.'); }
+      if (Date.now()-p.at>15000) { stop('Traslado de alimento sin confirmar; revisa paquetes y baúl antes de continuar.'); }
       return true;
     }
     const level=Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g,''));
@@ -75,7 +75,8 @@
       const next=document.querySelector('.paging_right_step');
       if (!visible(next)) {
         const invalid=candidates.some(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && !validItemHash(x.item.getAttribute('data-hash')));
-        skipHealing(invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; sigo con la cola.'); return true;
+        if (BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
+        skipHealing(invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; revisaré el mercado de la alianza.'); return true;
       }
       let url; try { url=new URL(next.getAttribute('href'),location.href); } catch { return stop('Paginación de paquetes no reconocible.'); }
       const pages=url.searchParams.getAll('page'), nextPage=Number(pages.at(-1)), currentPage=Number(params.get('page') || 1);
@@ -182,6 +183,44 @@
     if (!dragFood(food.item,target,true)) skipHealing('No se pudo preparar el gesto de curación.');
     return true;
   }
+  // La compra de alimento no comparte estado con la compraventa de paquetes de oro.
+  function foodMarketOffers() {
+    const level=Number((document.querySelector('#header_values_level')?.textContent||'').replace(/\D/g,''));
+    return [...document.querySelectorAll('#market_item_table tr')].map(row=>{
+      const cells=[...(row.cells||[])], seller=cells[1]?.textContent.trim(), price=parseGold(cells[2]?.textContent);
+      const food=healingFood(cells[0]?.querySelector('[data-tooltip][data-content-type]'));
+      const button=row.querySelector('input[name="buy"]'),form=button?.form;
+      let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !Number.isSafeInteger(price) || price<=0 || !food || (food.level!==null && (!level || food.level>level)) || cells[4]?.textContent.trim()!=='1' || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      const notice=form.getAttribute('data-confirm-message');
+      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (notice!==null && notice!=='Este objeto está vinculado al alma') || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
+      return {seller,price,food,button,notice};
+    }).filter(Boolean).sort((a,b)=>a.price-b.price);
+  }
+  function foodMarketTick() {
+    if (state.foodBuyTx || !state.foodBuyNeeded || state.goldPreviousReview || state.goldTx || state.smeltTx || state.repairTx) return false;
+    if (mod!=='guildMarket') {
+      if (!goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Buscando alimento en el mercado de la alianza.')) { state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; save(); return false; }
+      return true;
+    }
+    if (Date.now()-goldPageOpenedAt<5000) return true;
+    const balance=goldBalance(), offer=foodMarketOffers().find(x=>Number.isSafeInteger(balance) && x.price<=balance);
+    if (!offer) { state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; state.message='Sin alimento asequible y verificable en la alianza.'; log(state.message,'warn'); save(); return false; }
+    const tx={stage:'buy',name:offer.food.name,price:offer.price,seller:offer.seller,at:Date.now(),confirmed:!offer.notice};
+    state.foodBuyTx=tx; state.foodBuyNeeded=false; state.message='Comprando alimento: '+tx.name+'.'; log(state.message,'action'); save();
+    const original=window.confirm;
+    if (typeof original!=='function') { state.message='Compra de alimento no iniciada; revisar manualmente.'; save(); return false; }
+    try {
+      window.confirm=message=>{
+        if (offer.notice && !tx.confirmed && /^Este objeto está vinculado al alma\s+¿Realmente quieres comprar este objeto\?$/.test(String(message).trim())) { tx.confirmed=true; save(); return true; }
+        tx.rejected=true; save(); return false;
+      };
+      offer.button.click();
+    } catch { state.message='Compra de alimento incierta: revisa mercado y paquetes.'; save(); }
+    finally { window.confirm=original; }
+    return true;
+  }
   // Una sola operación de oro por cuenta. Las etapas con efectos se guardan antes de actuar.
   const goldPriceAllowed=price=>Number.isSafeInteger(price) && price>=100000 && price<=1000000;
   const goldPageOpenedAt=Date.now();
+

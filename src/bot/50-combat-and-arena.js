@@ -121,6 +121,7 @@
       state.pendingHeal=null; state.pendingPackageFood=null; state.packageFoodTrip=false; state.healSkipUntil=0;
       state.message='Vida suficiente; continuando con la cola.'; log(state.message); save();
     }
+    if (BUILD_CONFIG.modules.foodMarket && state.foodBuyNeeded && healthPercent<=40 && foodMarketTick()) return;
     if (state.packageFoodTrip && mod === 'packages') return packageFoodTick();
     if (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood || (BUILD_CONFIG.modules.healing && healthPercent <= 40 && Date.now() >= (state.healSkipUntil || 0))) return healTick(current, maximum);
     if (state.smeltTx && safeSmeltingTick()) return;
@@ -191,3 +192,4 @@
     state.lastAction='pvp';
     state.message='Iniciando combate contra '+target.name+'.'; log(state.message, 'action'); save(); target.button.click();
   }
+

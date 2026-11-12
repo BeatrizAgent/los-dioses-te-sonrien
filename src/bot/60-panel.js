@@ -68,7 +68,7 @@
   root.querySelectorAll('.tab').forEach(button => button.onclick = () => { resetConfirmation=false; tabName = button.dataset.tab; uiState.tab=tabName; saveUI(uiState); contentKey=''; root.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); renderContent(); });
   function textElement(tag, cls, text) { const node=document.createElement(tag); node.className=cls; node.textContent=text; return node; }
   function renderContent() {
-    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.smeltTx,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
+    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
     const signature = JSON.stringify([tabName,data]);
     if (signature === contentKey || (root.activeElement && $('.content').contains(root.activeElement))) return;
     contentKey=signature;
@@ -83,6 +83,20 @@
       content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Circo: '+ct),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
       content.append(textElement('div','sectionlabel','Ubicación'),textElement('div','card name',current));
       content.append(textElement('div','sectionlabel','Paquetes de oro'),textElement('p','small',state.goldPreviousReview ? 'Hay una revisión anterior pendiente.' : state.goldTx?.manualReview ? 'Revisa y resuelve la operación de oro manualmente: '+(state.goldTx.problem||'resultado desconocido') : state.goldTx?.blocked ? 'Operación pendiente: volveré a comprobarla automáticamente.' : state.goldTx ? 'Operación en curso: '+state.goldTx.stage : 'Ofertas de 100.000 a 1.000.000; reserva 100.000 más tarifa. Anuncios a 24 horas.'));
+      if (state.foodBuyTx) {
+        content.append(textElement('p','small','Compra de alimento sin confirmar: '+state.foodBuyTx.name+' · '+state.foodBuyTx.price.toLocaleString('es-ES')+' de oro. Revisa mercado y paquetes antes de continuar.'));
+        const checkedFood=textElement('button','btn','Ya revisé la compra de alimento');
+        checkedFood.onclick=()=>{if(!verified()||captcha()||!state.foodBuyTx)return;state.foodBuyTx=null;state.foodBuyNeeded=false;state.foodBuyRetryAt=Date.now()+60000;state.healSkipUntil=0;log('El jugador revisó la compra de alimento.','warn');save();contentKey='';checkedFood.blur();renderContent();};content.append(checkedFood);
+      }
+      if (state.goldTx?.stage==='buy') {
+        content.append(textElement('p','small','Comprueba en el juego que la compra se realizó antes de continuar.'));
+        const checked=textElement('button','btn','He comprobado que la compra se realizó');
+        checked.onclick=()=>{
+          if (!verified() || captcha() || state.goldTx?.stage!=='buy') return;
+          const tx=state.goldTx; tx.stage='packages'; tx.at=Date.now(); tx.blocked=false; delete tx.manualReview; delete tx.problem; delete tx.retryAt; delete tx.loadedAt; delete tx.packageScan;
+          state.message='Compra comprobada por el jugador; buscando el objeto en paquetes.'; log(state.message,'warn'); save(); contentKey=''; checked.blur(); renderContent();
+        }; content.append(checked);
+      }
       if (state.goldTx?.manualReview) { const resolved=textElement('button','btn','Ya resolví la operación de oro'); resolved.onclick=()=>{if (!verified()||captcha()||!state.goldTx?.manualReview) return;state.goldTx=null;state.goldEnabled=false;state.goldCheckAt=Date.now()+60000;log('El jugador confirmó la resolución manual de la operación de oro.');save();contentKey='';resolved.blur();renderContent();};content.append(resolved); }
       if (BUILD_CONFIG.modules.smelting || state.smeltTx) content.append(textElement('div','sectionlabel','Fundición'),textElement('p','small',state.smeltTx?.blocked ? 'Bloqueada: '+state.smeltTx.problem : state.smeltTx ? 'Etapa: '+state.smeltTx.stage : 'Activa: '+(BUILD_CONFIG.smeltingPriority==='crystal'?'prioridad cristal':BUILD_CONFIG.smeltingPriority==='stamina'?'prioridad tintura':'equipo verde o azul')+'.'));
       if (BUILD_CONFIG.modules.repair || state.repairTx) content.append(textElement('div','sectionlabel','Reparación'),textElement('p','small',state.repairTx?.blocked ? 'Revisión necesaria: '+state.repairTx.problem : state.repairTx ? 'Pieza pendiente: '+state.repairTx.item.name+' · '+state.repairTx.stage : 'Vigila refinamiento del personaje y usa baúl III.'));

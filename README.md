@@ -100,3 +100,7 @@ En la supervisión de 0.12.16, una armadura se detuvo antes de iniciar porque el
 ## Filtro de paquetes (0.12.18)
 
 Para recuperar equipo de oro o refinamiento, se busca por un término del nombre y por tipo cuando este se reconoce. Se conserva la comparación completa de identidad y origen y se revisan todas las páginas antes de mover una coincidencia única. Si la búsqueda precisa no encuentra la pieza, se vuelve a buscar con el nombre completo y todos los tipos. En una prueba manual en s64-es, la búsqueda del nombre completo de unas botas devolvió más resultados; el término «Lulus» devolvió una coincidencia y «Elíseos», dos. No se movió esa pieza durante la prueba. El ciclo automático de recuperación con este filtro no está validado instalado.
+
+## Versión 0.12.24
+
+La mazmorra usa el acceso de la zona seleccionada y aplaza una instancia activa en otra zona sin cancelarla. Las operaciones de oro inciertas requieren revisión manual, sin repetir la compra. La compra de alimentos del mercado de alianza es una opción independiente, desactivada por defecto: requiere curación, puede gastar todo el saldo y necesita revisión humana después de cada intento. Crazy Addon sigue siendo necesario para recoger alimentos de paquetes. Las pruebas son simuladas; no garantizan aceptación del servidor ni un ciclo completo real.

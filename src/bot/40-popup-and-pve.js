@@ -50,8 +50,8 @@
     const definitions={expedition:{mod:'location',bar:'#cooldown_bar_expedition',points:'#expeditionpoints_value',label:'expedición'},dungeon:{mod:'dungeon',bar:'#cooldown_bar_dungeon',points:'#dungeonpoints_value',label:'mazmorra'}};
     const choices=[];
     if (BUILD_CONFIG.modules.expedition && BUILD_CONFIG.expedition) choices.push('expedition');
-    if (BUILD_CONFIG.modules.dungeon && BUILD_CONFIG.dungeon) choices.push('dungeon');
-    if (!choices.length) return false;
+    if (BUILD_CONFIG.modules.dungeon && BUILD_CONFIG.dungeon && Date.now()>=(state.dungeonRouteRetryAt||0)) choices.push('dungeon');
+    if (!choices.length) { if (state.pveTarget==='dungeon') { state.pveTarget=null; save(); } return false; }
     const ready=key=>{const d=definitions[key],bar=document.querySelector(d.bar),text=document.querySelector(d.points)?.textContent.trim() || '',match=text.match(/^(\d+)(?:\s*\/\s*\d+)?$/),points=match ? Number(match[1]) : NaN;return Number.isSafeInteger(points)&&points>0&&cooldownSeconds(bar?.textContent)===0&&visible(bar?.querySelector('a'));};
     let selected=choices.includes(state.pveTarget) ? state.pveTarget : null;
     if (state.dungeonReset && choices.includes('dungeon')) selected='dungeon';
@@ -78,10 +78,16 @@
     const inConfiguredArea=currentArea && areaLoc!==null && params.get('loc')===areaLoc;
     let dungeonLink=null,dungeonLoc=null;
     if (selected==='dungeon') {
-      dungeonLink=link;
-      try { const u=new URL(dungeonLink?.getAttribute('href'),location.href); if (u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='dungeon' && /^\d+$/.test(u.searchParams.get('loc')||'') && !u.searchParams.has('action')) dungeonLoc=u.searchParams.get('loc'); } catch {}
+      dungeonLink=links.find(a=>{
+        if (!visible(a) || sameName(a.textContent)!=='mazmorra') return false;
+        try { const u=new URL(a.getAttribute('href'),location.href); return u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='dungeon' && u.searchParams.get('loc')===areaLoc && !u.searchParams.has('action'); } catch { return false; }
+      });
+      if (dungeonLink) dungeonLoc=areaLoc;
+      if (mod==='dungeon' && params.get('loc')!==areaLoc && [...document.querySelectorAll('#content input, #content button')].some(el=>visible(el) && (el.value || el.textContent || '').trim()==='Cancelar Mazmorra')) {
+        state.pveTarget=null; state.dungeonRouteRetryAt=Date.now()+300000; delete state.pveRouteGuard; state.message='Mazmorra aplazada: hay una instancia activa en otra zona; no se ha cancelado.'; log(state.message,'warn'); save(); return false;
+      }
     }
-    if (!areaLink || areaLoc===null || (selected==='dungeon' && (!dungeonLink || dungeonLoc===null))) {
+    if (!areaLink || areaLoc===null || (selected==='dungeon' && inConfiguredArea && (!dungeonLink || dungeonLoc===null))) {
       // Tras visitar la ciudad, sus enlaces sustituyen el menú de zonas.
       // Volver al territorio solo mediante el enlace GET visible y conocido.
       if ((!areaLink || areaLoc===null) && visible(document.querySelector('#submenuhead1'))) {
@@ -97,6 +103,12 @@
       navigation(areaLink,'Abriendo '+area.name+' para la expedición elegida.'); return true;
     }
     if (selected==='dungeon') {
+      if (!inConfiguredArea || mod!=='dungeon') {
+        const key=chosen.id+':'+areaLoc, previous=state.pveRouteGuard;
+        const attempts=previous?.key===key && Date.now()-previous.at<120000 ? previous.attempts+1 : 1;
+        state.pveRouteGuard={key,attempts,at:Date.now()}; save();
+        if (attempts>3) { stop('Ruta de mazmorra repetida; revisión necesaria. No se ha cancelado ninguna mazmorra.'); return true; }
+      } else if (state.pveRouteGuard) { delete state.pveRouteGuard; save(); }
       if (!inConfiguredArea || (mod!=='location' && mod!=='dungeon')) { navigation(areaLink,'Abriendo '+area.name+' para la mazmorra elegida.'); return true; }
       if (mod!=='dungeon' || params.get('loc')!==dungeonLoc) { navigation(dungeonLink,'Abriendo '+chosen.name+' ('+(chosen.difficulty==='advanced'?'avanzada':'normal')+').'); return true; }
     }
@@ -145,3 +157,4 @@
     state.pendingPve={mode:selected,dungeonId:dungeon.id,at:Date.now(),target:dungeon.name,boss:dungeon.boss,area:area.name,spawn:[dungeon.levelMin,dungeon.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
     state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve'; state.message='Iniciando encuentro de '+dungeon.name+' · jefe '+dungeon.boss+' · nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); fight.click(); return true;
   }
+
