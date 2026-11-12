@@ -1,4 +1,4 @@
-export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold'];
+export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting'];
 
 export const DEFAULT_CONFIG = Object.freeze({
   playerLevel: 20,
@@ -10,10 +10,13 @@ export const DEFAULT_CONFIG = Object.freeze({
     expedition: false,
     dungeon: false,
     guildGold: false,
+    smelting: false,
   }),
   expeditionAreaId: 'af-voodoo-temple',
   expeditionEnemyId: 'af-voodoo-temple-cobra',
   dungeonId: 'dungeon-temple-perdition',
+  dungeonLossLimit: 3,
+  smeltingPriority: 'crystal',
 });
 
 export function eligibleExpeditions(catalog, playerLevel, region = null) {
@@ -51,6 +54,8 @@ export function normalizeBuildConfig(input, catalog) {
 
   let dungeon = null;
   if (modules.dungeon) {
+    const lossLimit = input.dungeonLossLimit == null ? DEFAULT_CONFIG.dungeonLossLimit : Number(input.dungeonLossLimit);
+    if (!Number.isInteger(lossLimit) || lossLimit < 1 || lossLimit > 10) throw new RangeError('El límite de derrotas debe estar entre 1 y 10.');
     const row = catalog.dungeons.find(item => item.id === input.dungeonId);
     const area = catalog.expeditions.find(item => item.id === row?.areaId);
     if (!row || !area) throw new TypeError('Elige una mazmorra del catálogo.');
@@ -64,6 +69,7 @@ export function normalizeBuildConfig(input, catalog) {
       area: { id: area.id, name: area.name, region: area.region, entryLevel: area.entryLevel },
       entryLevel: row.entryLevel,
       difficulty: row.difficulty,
+      lossLimit,
       levelMin: row.levelMin,
       levelMax: row.levelMax,
       nameNote: row.nameNote || '',
@@ -77,7 +83,9 @@ export function normalizeBuildConfig(input, catalog) {
     throw new TypeError('Los objetivos PvE deben pertenecer a la región seleccionada.');
   }
 
-  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon };
+  const smeltingPriority = input.smeltingPriority ?? 'crystal';
+  if (!['crystal','stamina','green-blue'].includes(smeltingPriority)) throw new TypeError('Prioridad de fundición no válida.');
+  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon, smeltingPriority };
 }
 
 export function buildUserscript(config, fragments) {

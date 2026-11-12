@@ -36,20 +36,15 @@ const dungeonCount = catalog.dungeons.length;
       <section class="hero wrap" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="overline"><span class="rule"></span> HERRAMIENTA DE CAMPAÑA · GLADIATUS</p>
-          <h1 id="hero-title">Elige tu ruta.<br /><i>Forja tu bot.</i></h1>
+          <h1 id="hero-title">¡A la arena,<br /><i>gladiador!</i></h1>
           <p class="hero-lead">Activa solo los módulos que quieres y señala el enemigo y la mazmorra. La web genera el userscript listo para instalar, sin depender del Gist.</p>
           <a class="hero-cta" href="#configurador">Abrir el configurador <span aria-hidden="true">↓</span></a>
           <div class="hero-proof"><b>{expeditionCount}</b><span>enemigos de expedición<br />en 20 zonas</span><b>{dungeonCount}</b><span>mazmorras<br />hasta acceso 99</span></div>
         </div>
-        <div class="hero-art" aria-label="Tablilla de campaña con las rutas del bot">
-          <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="orbit orbit-c"></div>
-          <span class="star star-one">✦</span><span class="star star-two">✦</span><span class="star star-three">✧</span>
-          <span class="art-label label-top">CARTA DE CAMPAÑA <b>· XX</b></span>
-          <div class="central-mark"><span>✳</span><small>ROMA<br />VENCE</small></div>
-          <span class="route route-north">ARENA <i>↗</i></span><span class="route route-east">PVE <i>↗</i></span>
-          <span class="route route-south">MISIÓN <i>↗</i></span><span class="route route-west">SALUD <i>↗</i></span>
-          <div class="art-foot"><span>ELIGE CON CUIDADO</span><span>v0.12.0</span></div>
-        </div>
+        <figure class="hero-illustration">
+          <img src={`${base}images/arena-chibi.png`} alt="Un pequeño gladiador y su búho en la arena romana" />
+          <figcaption><span>✦</span> Tu aventura empieza aquí <span>✦</span></figcaption>
+        </figure>
       </section>
 
       <section class="safety-ribbon" aria-label="Reglas de seguridad">
@@ -60,10 +55,10 @@ const dungeonCount = catalog.dungeons.length;
 
       <section class="builder-section wrap" id="configurador" aria-labelledby="builder-title">
         <div class="builder-intro">
-          <p class="overline"><span class="rule"></span> MESA DE CONFIGURACIÓN</p>
-          <h2 id="builder-title">Tu bot,<br /><i>a tu medida.</i></h2>
+          <p class="overline"><span class="rule"></span> PREPARA TU AVENTURA</p>
+          <h2 id="builder-title">Tu aventura,<br /><i>tus reglas.</i></h2>
           <p>Marca módulos y revisa los objetivos. El nivel es el que declaras para filtrar requisitos de acceso; el juego no se consulta desde esta web.</p>
-          <div class="always-on"><span aria-hidden="true">✳</span><p><b>Siempre incluidos</b><br />Panel, control de identidad, aislamiento por personaje y parada ante verificación.</p></div>
+          <img class="campaign-illustration" src={`${base}images/mazmorra-chibi.png`} alt="Dos pequeños aventureros ante una mazmorra" loading="lazy" /><div class="always-on"><span aria-hidden="true">✳</span><p><b>Siempre incluidos</b><br />Panel, control de identidad, aislamiento por personaje y parada ante verificación.</p></div>
           <a class="source-link" href="#catalogo">Revisar los datos PvE <span aria-hidden="true">↘</span></a>
         </div>
 
@@ -75,10 +70,13 @@ const dungeonCount = catalog.dungeons.length;
             <label class="module-row"><input type="checkbox" name="arenaCircus" checked /><span class="module-glyph">⚔</span><span><b>Arena y Circo Provinciarum</b><small>Busca rivales y registra informes reconocidos.</small></span><span class="checkmark" aria-hidden="true"></span></label>
             <label class="module-row"><input type="checkbox" name="missions" checked /><span class="module-glyph">⌁</span><span><b>Misiones</b><small>Acepta, reinicia y cobra tareas compatibles.</small></span><span class="checkmark" aria-hidden="true"></span></label>
             <label class="module-row"><input type="checkbox" name="healing" checked /><span class="module-glyph">＋</span><span><b>Curación con comida</b><small>Busca comida al llegar al 40 % de salud.</small></span><span class="checkmark" aria-hidden="true"></span></label>
-            <label class="module-row"><input type="checkbox" name="expedition" id="module-expedition" /><span class="module-glyph">⌖</span><span><b>Expedición</b><small>Ataca solo el enemigo elegido si aparece.</small></span><span class="checkmark" aria-hidden="true"></span></label>
+            <label class="module-row"><input type="checkbox" name="expedition" id="module-expedition" /><span class="module-glyph">⌖</span><span><b>Expedición</b><small>Ataca la posición elegida en la zona configurada.</small></span><span class="checkmark" aria-hidden="true"></span></label>
             <label class="module-row"><input type="checkbox" name="dungeon" id="module-dungeon" /><span class="module-glyph">▧</span><span><b>Mazmorra</b><small>Elige ruta, dificultad y rango del enemigo.</small></span><span class="checkmark" aria-hidden="true"></span></label>
-            <label class="module-row"><input type="checkbox" name="guildGold" /><span class="module-glyph">◈</span><span><b>Paquetes de oro de alianza</b><small>Busca, compra y anuncia paquetes. Viene desactivado.</small></span><span class="checkmark" aria-hidden="true"></span></label>
+            <label class="module-row"><input type="checkbox" name="guildGold" /><span class="module-glyph">◈</span><span><b>Paquetes de oro de alianza</b><small>Objetos de nivel 1 por 100.000 a 1.000.000; los anuncia 24 h por el mismo precio. Viene desactivado.</small></span><span class="checkmark" aria-hidden="true"></span></label>
+            <label class="module-row"><input type="checkbox" name="smelting" /><span class="module-glyph">♨</span><span><b>Fundición</b><small>Solo equipo verde o azul; baúl II y pago con oro. Requiere Crazy Addon.</small></span><span class="checkmark" aria-hidden="true"></span></label>
           </fieldset>
+
+          <section class="target-fields"><label for="smelting-priority">Prioridad de fundición<select id="smelting-priority"><option value="crystal">Cristal</option><option value="stamina">Tintura de la resistencia</option><option value="green-blue">Equipo verde o azul</option></select></label><p class="route-caveat">Función experimental: usa oro y consume equipo verde o azul. Protege objetos púrpura, naranja, rojo y bienes de forja. La recogida automática de materiales sigue pendiente de verificar en juego.</p></section>
 
           <div class="campaign-region"><label for="campaign-region"><b>Región PvE compartida</b><small>Expedición y mazmorra usarán la misma región.</small></label><select id="campaign-region" name="campaignRegion" aria-describedby="campaign-region-help"></select><span id="campaign-region-help" class="visually-hidden">Elige un único territorio para los dos módulos PvE.</span></div>
 
@@ -92,6 +90,7 @@ const dungeonCount = catalog.dungeons.length;
             <div class="target-heading"><span class="target-icon">▧</span><div><p>OBJETIVO PvE B</p><h3 id="dungeon-title">Mazmorra</h3></div><span class="target-status" id="dungeon-status">APAGADA</span></div>
             <label for="dungeon-select">Ruta y dificultad<select id="dungeon-select" name="dungeon"></select></label>
             <p class="spawn-note" id="dungeon-note" aria-live="polite"></p>
+            <label class="loss-limit" for="dungeon-loss-limit">Derrotas antes de reiniciar <input id="dungeon-loss-limit" name="dungeonLossLimit" type="number" min="1" max="10" step="1" value="3" required /><small>Derrotas consecutivas confirmadas contra el mismo enemigo (1–10).</small></label>
             <p class="route-caveat">El bot valida la zona y el modo normal/avanzado que ve en el juego. Si la ruta o el enemigo no coinciden, espera y no inicia ese ataque.</p>
           </section>
 
@@ -99,6 +98,12 @@ const dungeonCount = catalog.dungeons.length;
           <div class="result-box" id="generation-result" aria-live="polite" hidden>
             <div><span class="result-check">✓</span><p><b id="result-title">Userscript generado</b><small id="result-detail"></small></p></div>
             <a id="download-link" class="download-link" download="los-dioses-te-sonrien.user.js">Descargar <span aria-hidden="true">↓</span></a>
+            <div class="install-url-block" id="install-url-block" hidden>
+              <label for="install-url"><b>Enlace de instalación para móvil</b><small>Copia este enlace y ábrelo con tu gestor de userscripts. Contiene la configuración elegida.</small></label>
+              <input id="install-url" type="url" readonly />
+              <div class="install-url-actions"><button id="copy-install-url" type="button">Copiar enlace</button><a id="open-install-url" href="#">Abrir enlace ↗</a></div>
+              <small id="copy-status" role="status"></small>
+            </div>
             <details><summary>Ver el código generado</summary><pre id="script-preview"></pre></details>
           </div>
           <p class="form-error" id="form-error" role="alert" hidden></p>
@@ -155,7 +160,7 @@ const dungeonCount = catalog.dungeons.length;
       <section class="what-section">
         <div class="wrap what-grid">
           <div><p class="overline"><span class="rule"></span> QUÉ HACE</p><h2>Automatiza lo elegido.<br /><i>Explica lo observado.</i></h2></div>
-          <div class="what-copy"><p>Los módulos compatibles revisan Arena y Circo Provinciarum, misiones, curación y el ciclo de paquetes de oro. En PvE, el generador fija un objetivo del catálogo: el bot comprueba que la zona, el nombre visible y el control coinciden antes de actuar. Una acción ambigua queda sin confirmar.</p><p>El panel guarda actividad, rivales, estadísticas y preferencias en el navegador del personaje. Ciertas rutinas de traslado dependen de Crazy Addon. El userscript no invoca Forge Master; la convivencia no está validada.</p><a href="#configurador">Configurar una versión <span aria-hidden="true">↑</span></a></div>
+          <div class="what-copy"><p>Los módulos compatibles revisan Arena y Circo Provinciarum, misiones, curación y el ciclo de paquetes de oro. En PvE, el generador fija un objetivo del catálogo: el bot comprueba que la zona, la posición y el control de ataque coinciden antes de actuar. Una acción ambigua queda sin confirmar.</p><p>El panel guarda actividad, rivales, estadísticas y preferencias en el navegador del personaje. Ciertas rutinas de traslado dependen de Crazy Addon. El userscript no invoca Forge Master; la convivencia no está validada.</p><a href="#configurador">Configurar una versión <span aria-hidden="true">↑</span></a></div>
         </div>
       </section>
     </main>
@@ -177,4 +182,16 @@ const dungeonCount = catalog.dungeons.length;
   .target-fields.inactive{opacity:.55}.target-fields select:disabled{cursor:not-allowed;background:#e9e3d7;color:#837b70}
   .campaign-region{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,240px);align-items:center;gap:14px;margin-top:13px;padding:12px 15px;background:#ebe4d7;border:1px solid var(--line)}.campaign-region label{display:flex;flex-direction:column}.campaign-region label b{font-size:11px}.campaign-region label small{font-size:9px;color:var(--muted)}.campaign-region select{width:100%;min-height:40px;padding:7px 10px;border:1px solid #c9bfaf;background:var(--white);color:var(--ink);font:12px var(--sans);border-radius:0}.campaign-region select:focus-visible{outline:3px solid #b89158;outline-offset:2px}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   @media(max-width:640px){.campaign-region{grid-template-columns:1fr;gap:7px;padding:12px}}
+
+  .install-url-block{display:block!important;margin-top:16px;padding:14px;background:#fff7e3;border:1px solid #b99a69}.install-url-block[hidden]{display:none!important}.install-url-block label{display:block;font-size:12px}.install-url-block label small{display:block;font-size:11px;color:var(--muted);margin:4px 0 8px}.install-url-block input{width:100%;padding:10px;border:1px solid #b99a69;background:white;color:var(--ink);font:11px var(--mono)}.install-url-actions{display:flex;gap:12px;align-items:center;margin-top:10px}.install-url-actions button{background:var(--rust);color:white;border:0;padding:10px 14px;cursor:pointer}.install-url-actions a{color:var(--rust);font-size:12px}.install-url-block #copy-status{display:block;margin-top:5px;color:var(--green)}
+  .loss-limit{margin-top:14px;font-weight:700}.target-fields .loss-limit input{display:block;width:90px;min-height:42px;margin-top:5px;padding:8px;border:1px solid #af8c59;border-radius:4px;background:#fff7e3;font:14px var(--sans);color:var(--ink)}.loss-limit small{display:block;margin-top:5px;font-weight:400}.target-fields .loss-limit input:focus-visible{outline:3px solid #b89158;outline-offset:2px}
+  /* Roman adventure: parchment, embossed bronze and painted characters. */
+  :root{--ink:#382518;--ink-soft:#5b4431;--paper:#e5d2aa;--paper-light:#f7ebce;--white:#fff5dc;--rust:#8b281e;--gold:#b17b33;--green:#405338;--line:#b99b69;--muted:#705a42}
+  body{background-color:#e5d2aa;background-image:radial-gradient(ellipse at 50% 0,#fff0c8 0,transparent 42%),repeating-linear-gradient(4deg,#6e431008 0,#6e431008 1px,transparent 1px,transparent 5px)}
+  .masthead{border-bottom:2px solid #a7783f}.seal{background:#8b281e;color:#f8dc99;border:3px double #d6b06d;box-shadow:0 2px 0 #5d2419}.seal:after{border-color:#e7c68680}.wordmark-type strong{color:#63311f}.wordmark-type em{color:#922b20}.masthead nav a{font-weight:700;color:#63432b}.masthead nav a:hover{color:#a22d20}
+  .hero{gap:42px;padding-block:54px 65px}.hero h1{color:#502719;text-shadow:0 2px #fff1c9}.hero h1 i,.builder-intro h2 i,.section-head h2 i{color:#a33424}.hero-lead{color:#604a35}.hero-cta,.generate-button{background:linear-gradient(#a73b29,#752319);border:2px solid #c4934e;box-shadow:0 3px 0 #54251a, inset 0 0 0 1px #e6bf7c;border-radius:4px}.hero-cta:hover,.generate-button:hover{background:#702218}.hero-proof b{color:#963222}
+  .hero-illustration{position:relative;margin:0;padding:8px;background:#64412b;border:3px solid #a87b42;border-radius:12px;box-shadow:0 15px 28px #5d392b40,inset 0 0 0 2px #d5ad6a;transform:rotate(1deg)}.hero-illustration:before{content:"✦";position:absolute;z-index:1;top:-16px;left:calc(50% - 17px);width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:#8b281e;color:#f8d796;border:3px double #d5ae6b}.hero-illustration img{display:block;width:100%;aspect-ratio:1.18;object-fit:cover;border:2px solid #d4ae70;border-radius:5px}.hero-illustration figcaption{position:absolute;bottom:-16px;left:10%;width:80%;padding:8px;text-align:center;background:#8b281e;border:2px solid #d6ae6c;box-shadow:0 3px 0 #5b261c;color:#fff0cd;font:700 11px var(--sans);letter-spacing:.1em;text-transform:uppercase}.hero-illustration figcaption span{color:#f1cb7a;padding:0 8px}
+  .safety-ribbon{background:#5a291d;border-block:4px double #c39455}.ribbon-inner b{color:#f0c879}.builder-section{gap:64px}.campaign-illustration{display:block;width:100%;max-width:330px;aspect-ratio:1.55;object-fit:cover;border:4px ridge #b5894c;border-radius:5px;box-shadow:0 5px 14px #50331d36;margin-top:27px}.always-on{border-color:#bd9e6e}.forge-form{background:#f9eccd;border:5px ridge #b48950;border-radius:8px;box-shadow:0 14px 25px #67401e24}.form-topline{color:#8b3827;font-weight:bold}.level-field input,.target-fields select,.campaign-region select{border-color:#af8c59;border-radius:4px;background:#fff7e3}.module-row{border-color:#dfc79d}.module-glyph{color:#a23623}.module-row b{font-size:12px}.module-row small{font-size:11px}.checkmark{border:2px solid #a87d49;border-radius:4px;background:#fff5d8}.module-row input:checked~.checkmark{background:#66764c;border-color:#53633c}.target-fields{background:#f2e1bd;border:1px solid #c4a474;border-radius:5px}.target-icon{background:#8b281e;color:#f7d99e;border:2px solid #c99c60}.target-status{border-radius:3px}.campaign-region{background:#ead5ae;border-color:#c4a474;border-radius:5px}
+  .catalog-section{background:#d6bd91;border-block:4px double #a77a45}.zone-card,.install-route{background:#f5e5c4;border:1px solid #c4a474;border-radius:5px;box-shadow:0 3px 0 #b99a69}.install-route{border-top:4px solid #8b3023}.source-method{background:#eddbb7;border-color:#b99a69}.what-section{background:#493728;border-block:4px double #b88b52}.what-copy p{color:#f2e0bd}.footer{color:#60422b}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #a12d20;outline-offset:3px}
+  @media(max-width:640px){.hero-illustration{width:min(100%,390px);align-self:center;margin-bottom:15px}.hero-illustration img{aspect-ratio:1.3}.campaign-illustration{max-width:100%;aspect-ratio:2}.forge-form{padding-inline:13px}.hero{gap:29px}}
 </style>

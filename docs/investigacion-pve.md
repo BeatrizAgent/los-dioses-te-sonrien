@@ -25,7 +25,7 @@ Cada fila en `src/data/catalog.json` contiene `sourceIds`. El objeto `sources` c
 
 El formulario pide una región PvE compartida. Al cambiarla, filtra a esa misma región las zonas de expedición y las mazmorras disponibles para el nivel declarado. La validación también rechaza una configuración manipulada que mezcle regiones. Las 22 mazmorras del catálogo se comprobaron contra la región de su zona asociada.
 
-La zona y la criatura se eligen por nombre. El generador guarda en el userscript la región, la zona, la posición y el nombre del objetivo seleccionados. En juego, el bot busca la zona por el texto del enlace visible y comprueba que el enemigo mostrado coincide exactamente con el elegido y su posición antes de hacer clic. No codifica identificadores `loc` tomados de una guía.
+La zona y la criatura se eligen por nombre. El generador guarda en el userscript la región, la zona, la posición y el nombre del objetivo seleccionados. En juego, el bot busca la zona por el texto del enlace visible y valida que la acción de ataque corresponda a la posición elegida y a la zona actual; el nombre observado se registra sin exigir coincidencia. El cambio se ha probado en simulación y está pendiente de validación instalada. No codifica identificadores `loc` tomados de una guía.
 
 Para mazmorras, el generador guarda zona, nombre, requisito de acceso, dificultad y rango del jefe. El bot contrasta el enlace, la zona y el control normal/avanzado que encuentra en el juego. Si no puede asociar la ruta seleccionada a lo observado, no la inicia. El rango del jefe es información de referencia; el flujo no identifica atributos ocultos del enemigo.
 

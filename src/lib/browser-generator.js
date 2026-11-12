@@ -1,8 +1,9 @@
+import { configToSearch } from './install-link.mjs';
 import catalog from '../data/catalog.json';
 import { fragments } from './userscript-fragments.js';
 import { buildUserscript, DEFAULT_CONFIG, eligibleDungeons, eligibleExpeditions, normalizeBuildConfig } from './build-config.mjs';
 
-const moduleKeys = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold'];
+const moduleKeys = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting'];
 let currentObjectUrl = '';
 
 function option(select, value, label) {
@@ -22,10 +23,19 @@ export function initializeGenerator() {
   const areaSelect = document.querySelector('#expedition-area');
   const enemySelect = document.querySelector('#expedition-enemy');
   const dungeonSelect = document.querySelector('#dungeon-select');
+  const dungeonLossLimit = document.querySelector('#dungeon-loss-limit');
   const result = document.querySelector('#generation-result');
   const error = document.querySelector('#form-error');
   const download = document.querySelector('#download-link');
   const preview = document.querySelector('#script-preview');
+  const installBlock = document.querySelector('#install-url-block');
+  const installUrl = document.querySelector('#install-url');
+  const copyButton = document.querySelector('#copy-install-url');
+  const copyStatus = document.querySelector('#copy-status');
+  copyButton?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(installUrl.value); copyStatus.textContent = 'Enlace copiado.'; }
+    catch { installUrl.focus(); installUrl.select(); copyStatus.textContent = 'Selecciona y copia el enlace.'; }
+  });
 
   for (const region of catalog.scope.regions) option(regionSelect, region, region);
   regionSelect.value = DEFAULT_CONFIG.campaignRegion;
@@ -87,6 +97,7 @@ export function initializeGenerator() {
     document.querySelector('#dungeon-status').classList.toggle('on', dungeonOn);
     for (const control of [areaSelect, enemySelect]) control.disabled = !expOn;
     dungeonSelect.disabled = !dungeonOn;
+    dungeonLossLimit.disabled = !dungeonOn;
   }
 
   level.addEventListener('input', refreshCatalog);
@@ -95,6 +106,8 @@ export function initializeGenerator() {
   areaSelect.addEventListener('change', refreshCatalog);
   enemySelect.addEventListener('change', refreshCatalog);
   dungeonSelect.addEventListener('change', refreshCatalog);
+  dungeonLossLimit.addEventListener('input', () => { result.hidden = true; error.hidden = true; });
+  document.querySelector('#smelting-priority').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   expeditionToggle.addEventListener('change', updateModuleControls);
   dungeonToggle.addEventListener('change', updateModuleControls);
   for (const key of moduleKeys) {
@@ -112,14 +125,17 @@ export function initializeGenerator() {
     error.hidden = true;
     try {
       const modules = Object.fromEntries(moduleKeys.map(key => [key, form.querySelector(`input[name="${key}"]`).checked]));
-      const config = normalizeBuildConfig({
+      const input = {
         playerLevel: level.value,
         campaignRegion: regionSelect.value,
         modules,
         expeditionAreaId: areaSelect.value,
         expeditionEnemyId: enemySelect.value,
         dungeonId: dungeonSelect.value,
-      }, catalog);
+        dungeonLossLimit: dungeonLossLimit.value,
+        smeltingPriority: document.querySelector('#smelting-priority').value,
+      };
+      const config = normalizeBuildConfig(input, catalog);
       const userscript = buildUserscript(config, fragments);
       const blob = new Blob([userscript], { type: 'text/javascript;charset=utf-8' });
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
@@ -130,6 +146,15 @@ export function initializeGenerator() {
       const enabled = Object.values(config.modules).filter(Boolean).length;
       const pveRegion = config.modules.expedition || config.modules.dungeon ? ` · región PvE ${config.campaignRegion}` : '';
       document.querySelector('#result-detail').textContent = `${enabled} módulo(s) activo(s) · nivel declarado ${config.playerLevel}${pveRegion} · ${Math.ceil(userscript.length / 1024)} KB`;
+      const installOrigin = import.meta.env.PUBLIC_INSTALL_ORIGIN;
+      installBlock.hidden = !installOrigin;
+      if (installOrigin) {
+        const url = new URL('/los-dioses-te-sonrien.user.js', installOrigin === 'same-origin' ? window.location.origin : installOrigin);
+        url.search = configToSearch(input).toString();
+        installUrl.value = url.toString();
+        document.querySelector('#open-install-url').href = url.toString();
+        copyStatus.textContent = '';
+      }
       result.hidden = false;
       result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (cause) {

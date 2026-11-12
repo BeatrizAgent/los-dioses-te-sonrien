@@ -12,7 +12,7 @@ test('genera un userscript completo desde los ocho módulos y sustituye la confi
   const config = normalizeBuildConfig(DEFAULT_CONFIG, catalog);
   const result = buildUserscript(config, fragments);
   assert.match(result, /@name\s+Los Dioses Te Sonríen/);
-  assert.match(result, /@version\s+0\.12\.0/);
+  assert.match(result, /@version\s+0\.12\.8/);
   assert.match(result, /const BUILD_CONFIG = Object\.freeze\(\{"playerLevel":20/);
   assert.ok(result.trimEnd().endsWith('})();'));
   assert.ok(!result.includes('__BUILD_CONFIG__'));
@@ -20,7 +20,7 @@ test('genera un userscript completo desde los ocho módulos y sustituye la confi
   assert.doesNotThrow(() => new vm.Script(result));
 });
 
-test('selecciona solo el enemigo configurado y no ataca si el nombre observado no coincide', () => {
+test('la configuración conserva la posición elegida del enemigo', () => {
   const config = normalizeBuildConfig({
     playerLevel: 90,
     modules: { ...DEFAULT_CONFIG.modules, expedition: true },
@@ -29,9 +29,6 @@ test('selecciona solo el enemigo configurado y no ataca si el nombre observado n
   }, catalog);
   assert.equal(config.expedition.enemy.name, 'Sumo Chamán');
   assert.equal(config.expedition.enemy.position, 4);
-  const pve = fragments[4];
-  assert.match(pve, /sameName\(rival\)!==sameName\(enemy\.name\)/);
-  assert.match(pve, /El enemigo elegido no aparece exactamente/);
 });
 
 test('rechaza nivel, zona, objetivo y mazmorra fuera del catálogo accesible', () => {

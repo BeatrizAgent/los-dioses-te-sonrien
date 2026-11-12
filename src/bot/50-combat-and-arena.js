@@ -89,14 +89,21 @@
       if (mod==='reports' && sub==='showCombatReport' && params.get('t')===expected) {
         const attacker=(document.querySelector('#attackerAvatar1')?.innerText || document.querySelector('#attackerAvatar1')?.textContent || '').trim();
         const winner=[...document.querySelectorAll('#content div')].map(x=>x.textContent.trim()).find(x=>/^Ganador:\s*[^\n]+$/.test(x));
-        const confirmed=attacker.toLocaleLowerCase()===accountName.toLocaleLowerCase() && winner?.replace(/^Ganador:\s*/i,'').trim().toLocaleLowerCase()===accountName.toLocaleLowerCase();
-        const result=confirmed ? 'win' : null;
+        const winnerName=winner?.replace(/^Ganador:\s*/i,'').trim() || '';
+        const defenderNode=document.querySelector('#defenderAvatar11');
+        const defender=(defenderNode?.innerText || defenderNode?.textContent || '').split('\n').map(x=>x.trim()).find(Boolean) || '';
+        const normal=value=>String(value || '').normalize('NFKC').trim().toLocaleLowerCase('es');
+        const attackerOK=normal(attacker)===normal(accountName);
+        const result=attackerOK && winnerName && normal(winnerName)===normal(accountName) ? 'win' : attackerOK && defender && winnerName && normal(winnerName)===normal(defender) && normal(defender)!==normal(accountName) ? 'loss' : null;
+        const confirmed=!!result;
+        if (p.mode==='dungeon') recordDungeonOutcome(p,result,defender,params.get('reportId'));
         const gold=confirmed ? reportGold(document.querySelector('#content')?.innerText) : null;
         state.statsEvents.push({kind:'pve',mode:p.mode,at:Date.now(),confirmed,result,gold});
         log((p.mode==='expedition'?'Expedición':'Mazmorra')+': '+(result==='win'?'victoria':result==='loss'?'derrota':'resultado desconocido')+'.',confirmed?'success':'warn');
         state.pendingPve=null; state.pendingLoot=null; save(); return;
       }
       if (Date.now()-p.at<30000) return;
+      if (p.mode==='dungeon') state.dungeonLosses=null;
       log('Resultado de '+(p.mode==='expedition'?'expedición':'mazmorra')+' desconocido.','warn'); state.pendingPve=null; save(); return;
     }
     if (goldTick(true)) return;
@@ -118,7 +125,9 @@
     }
     if (state.packageFoodTrip && mod === 'packages') return packageFoodTick();
     if (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood || (BUILD_CONFIG.modules.healing && healthPercent <= 40 && Date.now() >= (state.healSkipUntil || 0))) return healTick(current, maximum);
+    if (state.smeltTx && safeSmeltingTick()) return;
     if (BUILD_CONFIG.modules.guildGold && goldTick()) return;
+    if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
     if (mod === 'quests' && BUILD_CONFIG.modules.missions) {
       questTick();
       if (state.running && !state.pending) {
