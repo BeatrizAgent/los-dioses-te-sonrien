@@ -1,4 +1,5 @@
   function recoverPopup(kind) {
+    if (captcha()) { stop('CAPTCHA detectado. Intervención humana requerida.'); return true; }
     const reportId=params.get('reportId'), type=params.get('t');
     const safeReport=mod==='reports' && sub==='showCombatReport' && /^\d+$/.test(reportId || '') && ['0','1'].includes(type) && [...params.keys()].every(k=>['mod','submod','reportId','t','sh'].includes(k));
     const key=kind+':' +(safeReport ? type+':'+reportId : 'overview');
@@ -12,6 +13,13 @@
     if (!target) { stop('No hay una página segura para recuperar el aviso.'); return true; }
     state.popupRecovery={key,at:Date.now()}; state.message='Recargando para recuperar aviso de '+kind+'; resultado anterior no confirmado.'; log(state.message,'warn'); save(); location.assign(target); return true;
   }
+  function recoverUnexpectedPopup(dialog, kind) {
+    const text=(dialog?.textContent || '').normalize('NFKC');
+    if (captcha() || /captcha|turnstile|verificaci[oó]n|verificar.{0,30}(?:humano|identidad|cuenta)|security\s*check|human\s*verification/i.test(text)) {
+      stop('Posible verificación detectada. Intervención humana requerida.'); return true;
+    }
+    return recoverPopup(kind);
+  }
   function lootTick() {
     const dialog=document.querySelector('#blackoutDialog.loot-modal');
     if (!visible(dialog)) return false;
@@ -19,8 +27,8 @@
     const buttons=[...dialog.querySelectorAll('button')];
     const button=buttons.find(b=>b.textContent.trim()==='Búsqueda exhaustiva');
     const handler=button?.getAttribute('onclick') || '';
-    if (mod!=='reports' || sub!=='showCombatReport' || !['0','1'].includes(type) || !/^\d+$/.test(reportId || '') || !/Desvalijar a /i.test(dialog.querySelector('#header_')?.textContent || '')) { stop('Aviso de botín no reconocido; revisión necesaria.'); return true; }
     if (/rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent+' '+(button?.outerHTML || ''))) { stop('Aviso de botín con coste no verificado; revisión necesaria.'); return true; }
+    if (mod!=='reports' || sub!=='showCombatReport' || !['0','1'].includes(type) || !/^\d+$/.test(reportId || '') || !/Desvalijar a /i.test(dialog.querySelector('#header_')?.textContent || '')) return recoverUnexpectedPopup(dialog,'botín desconocido');
     if (!visible(button) || button.disabled) return recoverPopup('botín');
     const expected=new RegExp('^\\s*runAction\\(this,\\s*'+type+',\\s*'+reportId+',\\s*4,\\s*function\\s*\\(\\)\\s*\\{\\s*location\\.reload\\(\\)\\s*\\}\\)\\s*;?\\s*$');
     if (!expected.test(handler)) return recoverPopup('botín');

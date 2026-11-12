@@ -13,7 +13,7 @@ function setup(tx, extra={}) {
 }
 const item=(quality,classes,type='5',name='Guantes Servius')=>({classList:{contains:c=>classes.includes(c)},getAttribute:k=>({'data-basis':type+'-7','data-quality':quality,'data-hash':'opaque','data-measurement-x':'2','data-measurement-y':'2','data-tooltip':JSON.stringify([[[name,'blue']]])}[k]??null),parentElement:{parentElement:{textContent:'Expedición'}}});
 test('selección real protege calidades superiores, comida y materiales',()=>{
- const {c}=setup(null);assert.ok(c.smeltItem(item('1',['item-i-blue'])));for(const x of [item('2',['item-i-purple']),item('3',['item-i-orange']),item(null,['item-i-green'],'7'),item('1',['item-i-blue'],'18'),item('1',['item-i-blue','item-i-purple'])]) assert.equal(c.smeltItem(x),null);
+ const {c}=setup(null);assert.ok(c.smeltItem(item('1',['item-i-blue'])));for(const x of [item('2',['item-i-purple']),item('3',['item-i-orange']),...['7','11','12','13','14','15','18','19','20','21'].map(type=>item('1',['item-i-blue'],type)),item('1',['item-i-blue','item-i-purple'])]) assert.equal(c.smeltItem(x),null);
 });
 test('confirma fundición solo con hueco en marcha y baúl correcto',()=>{
  const {c,state}=setup({stage:'rent',slot:2,hash:'opaque',name:'Guantes',at:Date.now(),actionAt:Date.now()}); assert.equal(c.smeltingTick(),true);assert.equal(state.smeltTx,null);assert.ok(state.smeltNextAt>Date.now());

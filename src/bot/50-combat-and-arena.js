@@ -2,13 +2,14 @@
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
     if (!verified()) { if (renewIdentity()) return; return stop('Identidad sin verificar. Abre Visión general del personaje y reactiva.'); }
-    if (lootTick()) return;
+    if (!state.repairTx && lootTick()) return;
     const levelDialog=document.querySelector('#blackoutDialognotification');
     if (visible(levelDialog)) {
-      if (/(?:subid[oa]|alcanzad[oa]|nuevo).{0,40}nivel|nivel.{0,40}(?:subid[oa]|alcanzad[oa]|nuevo)/i.test(levelDialog.textContent || '') && !/rub[ií]|diamant|premium|reducir tiempo/i.test(levelDialog.textContent || '')) return recoverPopup('nivel');
-      return stop('Notificación no reconocida; revisión necesaria.');
+      if (/(?:subid[oa]|alcanzad[oa]|nuevo).{0,40}nivel|nivel.{0,40}(?:subid[oa]|alcanzad[oa]|nuevo)/i.test(levelDialog.textContent || '') && !/rub[ií]|diamant|premium|reducir tiempo/i.test(levelDialog.textContent || '')) return recoverUnexpectedPopup(levelDialog,'nivel');
+      return recoverUnexpectedPopup(levelDialog,'notificación desconocida');
     }
-    if (visible(document.querySelector('#blackoutDialog'))) return stop('Aviso del juego no reconocido. Revisión humana necesaria.');
+    const unknownDialog=document.querySelector('#blackoutDialog');
+    if (visible(unknownDialog)) return recoverUnexpectedPopup(unknownDialog,'aviso desconocido');
     if (mod === 'overview' && params.has('doll') && params.get('doll') !== '0') {
       navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Volviendo al personaje principal.'); return;
     }
@@ -19,7 +20,7 @@
       const confirm=dialog.querySelector('#linkbod');
       const match=text.match(/^Hoy ya has luchado (\d+) veces contra ([\s\S]+), por lo que este sería un ataque deshonroso\. En caso de victoria, no le quitarás oro a tu adversario\.$/);
       const recognized=match && Number(match[1])>=5 && match[2].trim().length>0;
-      if (!/^¿Deseas atacar de todos modos\?$/i.test(header) || !recognized || !visible(confirm) || confirm.disabled || confirm.value!=='¡Ir!' || !/^\s*startProvinciarumFightConfirmed\(\)\s*;?\s*$/.test(confirm.getAttribute('onclick') || '') || /rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent)) return stop('Aviso de combate desconocido. Revisión humana necesaria.');
+      if (!/^¿Deseas atacar de todos modos\?$/i.test(header) || !recognized || !visible(confirm) || confirm.disabled || confirm.value!=='¡Ir!' || !/^\s*startProvinciarumFightConfirmed\(\)\s*;?\s*$/.test(confirm.getAttribute('onclick') || '') || /rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent)) return recoverUnexpectedPopup(dialog,'combate desconocido');
       const shownRival=match[2].trim();
       if (!state.pendingFight) state.pendingFight={name:shownRival,mode:params.get('aType')==='2'?'arena-provinciarum':'turma-provinciarum',at:Date.now(),unattributed:true};
       const fight=state.pendingFight;
@@ -43,6 +44,7 @@
       }
       return;
     }
+    if (state.repairTx) { safeRepairTick(); return; }
     const hpText = (document.querySelector('#header_values_hp_percent')?.textContent || '').trim();
     const hpMatch = hpText.match(/^(\d{1,3})\s*%$/);
     const pointsText = document.querySelector('#header_values_hp_points')?.textContent || '';
@@ -107,10 +109,6 @@
       log('Resultado de '+(p.mode==='expedition'?'expedición':'mazmorra')+' desconocido.','warn'); state.pendingPve=null; save(); return;
     }
     if (goldTick(true)) return;
-    if (mod === 'overview' && document.querySelector('#inv')) {
-      const bag=document.querySelector('#inventory_nav a');
-      if (visible(bag) && !bag.classList.contains('current')) { bag.click(); state.message='Seleccionando baúl I.'; save(); return; }
-    }
     const healthPercent=Number.isFinite(hp) ? Math.min(hp, 100 * current / maximum) : 100 * current / maximum;
     if (healthPercent > 40 && (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood)) {
       const p=state.pendingHeal;
@@ -126,6 +124,7 @@
     if (state.packageFoodTrip && mod === 'packages') return packageFoodTick();
     if (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood || (BUILD_CONFIG.modules.healing && healthPercent <= 40 && Date.now() >= (state.healSkipUntil || 0))) return healTick(current, maximum);
     if (state.smeltTx && safeSmeltingTick()) return;
+    if (BUILD_CONFIG.modules.repair && safeRepairTick()) return;
     if (BUILD_CONFIG.modules.guildGold && goldTick()) return;
     if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
     if (mod === 'quests' && BUILD_CONFIG.modules.missions) {

@@ -1,4 +1,4 @@
-export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting'];
+export const MODULE_KEYS = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting', 'repair'];
 
 export const DEFAULT_CONFIG = Object.freeze({
   playerLevel: 20,
@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     dungeon: false,
     guildGold: false,
     smelting: false,
+    repair: false,
   }),
   expeditionAreaId: 'af-voodoo-temple',
   expeditionEnemyId: 'af-voodoo-temple-cobra',

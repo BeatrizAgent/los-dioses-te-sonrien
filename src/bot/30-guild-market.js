@@ -1,3 +1,13 @@
+  function packageSearchPlan(item) {
+    const name=typeof item?.name==='string' ? item.name.trim() : '';
+    const parts=name.match(/[\p{L}\p{N}]+/gu) || [];
+    const terms=parts.filter(s=>s.length>=4).sort((a,b)=>b.length-a.length);
+    const match=/^(\d+)-\d+$/.exec(item?.basis||'');
+    const type=match&&['1','2','3','4','5','6','8','9'].includes(match[1]) ? match[1] : '0';
+    const query=terms[0] || name;
+    return {query,type,optimized:!!query && (query!==name || type!=='0')};
+  }
+  function packageBroadPlan(item) { return {query:item.name,type:'0',optimized:false}; }
   function goldItem(el) {
     if (!el) return null;
     let rows; try { rows=JSON.parse(el.getAttribute('data-tooltip'))?.[0]; } catch { return null; }
@@ -80,6 +90,10 @@
     if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.problem=message; state.goldTx.retryAt=Date.now()+60000; }
     state.message='Oro: '+message+' Volveré a comprobarlo.'; log(state.message,'warn'); save();
   }
+  function goldReview(message) {
+    if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.manualReview=true; state.goldTx.problem=message; }
+    state.goldEnabled=false; state.message='Oro: '+message+' Revisión manual necesaria.'; log(state.message,'warn'); save();
+  }
   function goldOffers() {
     const rows=[...document.querySelectorAll('#market_item_table tr')];
     return rows.map(row=>{
@@ -102,6 +116,13 @@
     const tx=state.goldTx;
     if (state.goldPreviousReview===true) return false;
     const now=Date.now(), balance=goldBalance();
+    // Las operaciones anteriores pueden haberse resuelto fuera del bot.
+    if (state.goldPackageGuardV129!==true) {
+      state.goldPackageGuardV129=true;
+      if (tx) { goldReview('Operación iniciada con una versión anterior.'); return false; }
+      save();
+    }
+    if (tx?.manualReview) return false;
     if (tx?.blocked) {
       // Compatibilidad con operaciones bloqueadas por versiones anteriores.
       if (!Number.isFinite(tx.retryAt)) tx.retryAt=now;
@@ -156,30 +177,42 @@
     if (tx.stage==='packages') {
       if (mod!=='packages') { goldNav('#menue_packages','packages','Abriendo paquetes de la alianza.'); return true; }
       if (!tx.item?.name) { goldPause('Falta el nombre del objeto pendiente.'); return false; }
+      if (!tx.packageFilter) {tx.packageFilter=packageSearchPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;save();}
+      const packageFilter=tx.packageFilter;
       const bag=goldBag(), packages=document.querySelector('#packages');
       if (!bag || !packages) { state.message='Esperando baúl I y paquetes.'; save(); return true; }
       if (!goldSpace(bag,tx.item)) { goldPause('No hay espacio verificable para el objeto en el baúl I.'); return false; }
-      if (params.get('f')!=='0' || params.get('fq')!=='-1' || params.get('qry')!==tx.item.name) {
+      if (params.get('f')!==packageFilter.type || params.get('fq')!=='-1' || params.get('qry')!==packageFilter.query) {
         const form=document.querySelector('#pf'), input=form?.querySelector('input[name="qry"]'), filter=form?.querySelector('select[name="f"]'), quality=form?.querySelector('select[name="fq"]'), submit=form?.querySelector('[type="submit"]'); let u;
         try { u=new URL(form.getAttribute('action'),location.href); } catch { goldPause('Buscador de paquetes no verificable.'); return false; }
         if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='packages' || u.searchParams.get('submod')!=='search' || String(form.method).toLowerCase()!=='post' || !input || !filter || !quality || !visible(submit) || submit.disabled || !tx.item?.name) { goldPause('Buscador de paquetes no verificable.'); return false; }
-        input.value=tx.item.name; filter.value='0'; quality.value='-1'; if (filter.value!=='0' || quality.value!=='-1') { goldPause('Filtro de paquetes no verificable.'); return false; }
+        input.value=packageFilter.query; filter.value=packageFilter.type; quality.value='-1'; if (filter.value!==packageFilter.type || quality.value!=='-1') { goldPause('Filtro de paquetes no verificable.'); return false; }
         tx.loadedAt=0; tx.at=now; state.message='Buscando el objeto de oro por nombre.'; save(); submit.click(); return true;
       }
       if (!tx.loadedAt) { tx.loadedAt=now; save(); return true; }
       if (now-tx.loadedAt<5000) return true;
-      const matches=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(el=>visible(el) && goldSame(goldItem(el),tx.item) && /\bMercado\b/i.test(el.closest('.packageItem')?.textContent||''));
+      const pageValues=params.getAll('page');
+      if (pageValues.length>1 || (pageValues.length===1 && !/^[1-9]\d*$/.test(pageValues[0]))) { goldReview('Paginación de paquetes ambigua.'); return false; }
+      const listed=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible);
+      // El filtro del juego puede incluir otros nombres. Nunca tratar esa inclusión
+      // como identidad: comparar los datos completos y el origen de cada objeto.
+      const matches=listed.filter(el=>goldSame(goldItem(el),tx.item) && /\bMercado\b/i.test(el.closest('.packageItem')?.textContent||''));
       if (!matches.length && /^\s*No hay paquetes\s*$/i.test(packages.textContent || '') && (params.get('page')||'1')==='1') {
+        if(packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
         if (!Array.isArray(state.goldUnresolved)) state.goldUnresolved=[];
         if (state.goldUnresolved.length>=20) { goldPause('Demasiadas operaciones antiguas sin resolver.'); return false; }
         state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldCheckAt=now+60000;
         state.message='Objeto anterior ausente en la búsqueda; operación archivada sin confirmar. Se excluyen objetos iguales.'; log(state.message,'warn'); save(); return false;
       }
-      const page=Number(params.getAll('page').at(-1) || '1');
+      const page=Number(pageValues[0] || '1');
       const scan=tx.packageScan || (tx.packageScan={pages:[],matches:[],complete:false});
+      const fingerprint=listed.map(el=>el.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
+      if (!scan.fingerprints) scan.fingerprints={};
+      if (fingerprint && Object.entries(scan.fingerprints).some(([p,value])=>Number(p)!==page && value===fingerprint)) { goldReview('La misma página de paquetes se ha repetido.'); return false; }
+      if (fingerprint) scan.fingerprints[page]=fingerprint;
       const goPage=number=>{
         let u; try { u=new URL(location.href); } catch { return false; }
-        if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='packages' || u.searchParams.get('f')!=='0' || u.searchParams.get('fq')!=='-1' || u.searchParams.get('qry')!==tx.item.name || [...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k)) || !Number.isSafeInteger(number) || number<1 || number>100) return false;
+        if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='packages' || u.searchParams.get('f')!==packageFilter.type || u.searchParams.get('fq')!=='-1' || u.searchParams.get('qry')!==packageFilter.query || [...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k)) || !Number.isSafeInteger(number) || number<1 || number>100) return false;
         u.searchParams.delete('page'); u.searchParams.set('page',String(number)); tx.loadedAt=0; tx.at=Date.now(); state.message='Revisando página '+number+' de paquetes de oro.'; save(); location.assign(u.href); return true;
       };
       if (!Number.isSafeInteger(page) || page<1 || page>100) { goldPause('Página de paquetes no verificable.'); return false; }
@@ -190,7 +223,8 @@
         scan.pages.push(page); save();
         const next=document.querySelector('.paging_right_step');
         if (visible(next)) { if (!goPage(page+1)) goldPause('No se pudo revisar la siguiente página.'); return true; }
-        if (scan.matches.length!==1) { goldPause('Objeto comprado aún no identificable de forma única en paquetes.'); return false; }
+        if (scan.matches.length===0 && packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
+        if (scan.matches.length!==1) { goldReview('Objeto comprado aún no identificable de forma única en paquetes.'); return false; }
         scan.complete=true; save();
       }
       const found=scan.matches[0];
@@ -338,6 +372,7 @@
       }
       if (now-tx.at<5000) return true;
       if (params.get('f')!=='0' || params.get('fq')!=='-1' || (params.get('qry')||'')!==tx.query) {if(now-tx.at>20000) smeltBlock('Búsqueda de paquetes sin confirmar.');return true;}
+      if (params.getAll('page').length>1 || (params.has('page') && !/^[1-9]\d*$/.test(params.get('page')))) {smeltBlock('Paginación de paquetes ambigua.');return false;}
       const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].map(e=>smeltItem(e)).filter(x=>x && (priority==='green-blue'||x.name.normalize('NFKC').toLocaleLowerCase('es').split(/\s+/).includes(tx.query.toLocaleLowerCase('es'))) && x.el.hasAttribute('data-gca-flag_double-click-event'));
       const rect=inv.getBoundingClientRect(),capacity=Math.floor(rect.width/32)*Math.floor(rect.height/32);
       const occupied=items.reduce((n,e)=>n+Number(e.getAttribute('data-measurement-x'))*Number(e.getAttribute('data-measurement-y')),0);
@@ -360,4 +395,199 @@
   function safeSmeltingTick() {
     try { return smeltingTick(); }
     catch (error) { smeltBlock('Error interno; revisar operación antes de continuar.'); return false; }
+  }
+  // Reparación del personaje: una sola pieza y un solo efecto por etapa.
+  function repairItem(el) {
+    if (!el || !visible(el)) return null;
+    let rows; try { rows=JSON.parse(el.getAttribute('data-tooltip'))?.[0]; } catch { return null; }
+    if (!Array.isArray(rows)) return null;
+    const texts=rows.flat(Infinity).filter(x=>typeof x==='string');
+    const name=rows[0]?.[0], refinement=texts.find(x=>/^Refinamiento\s/i.test(x))?.match(/^Refinamiento\s+([\d.]+)\s*\/\s*([\d.]+)\s*\((\d+)%\)/i);
+    const owner=texts.find(x=>/^Vinculado al alma de:/i.test(x))?.replace(/^Vinculado al alma de:\s*/i,'').trim() || '';
+    const hash=el.getAttribute('data-hash'), basis=el.getAttribute('data-basis'),quality=el.getAttribute('data-quality'), level=el.getAttribute('data-level');
+    const width=Number(el.getAttribute('data-measurement-x')),height=Number(el.getAttribute('data-measurement-y'));
+    const refinementValue=refinement ? Number(refinement[1].replace(/\./g,'')) : NaN, refinementMax=refinement ? Number(refinement[2].replace(/\./g,'')) : NaN;
+    if (typeof name!=='string'||!name.trim()||!refinement||!Number.isSafeInteger(refinementValue)||!Number.isSafeInteger(refinementMax)||refinementMax<=0||refinementValue>refinementMax||Number(refinement[3])>100||!validItemHash(hash)||!/^\d+-\d+$/.test(basis||'')||!/^\d+$/.test(level||'')||!/^\d+$/.test(quality||'')||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1) return null;
+    return {el,name:name.trim(),refinement:Number(refinement[3]),refinementValue,refinementMax,hash,basis,quality,level,owner,width,height};
+  }
+  function repairSame(a,b) { return !!a && !!b && ['name','basis','quality','level','owner','width','height'].every(k=>a[k]===b[k]); }
+  function repairBlock(message) { if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;} stop('Reparación: '+message+' Revisa la pieza antes de continuar.'); }
+  function repairRestore(message) { state.repairTx.stage='restore';state.repairTx.reason=message;state.repairTx.at=Date.now();save();return true; }
+  function repairAcknowledge() {
+    const tx=state.repairTx;
+    if (!tx?.blocked || state.running || mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0') || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
+    const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
+    const item=repairItem(target?.querySelector('[data-tooltip][data-basis]'));
+    if(!item || !repairSame(item,tx.item) || (item.hash!==tx.item.hash && item.refinement!==100)) return false;
+    state.repairTx=null;state.repairNextAt=Date.now()+300000;state.message='Pieza comprobada en su ranura; reparación pendiente resuelta.';log(state.message,'success');save();return true;
+  }
+  function repairTick() {
+    let tx=state.repairTx; const now=Date.now();
+    if (!BUILD_CONFIG.modules.repair && !tx) return false;
+    if (tx?.blocked) { stop('Reparación pendiente: '+tx.problem); return true; }
+    if (!tx) {
+      if (now<(state.repairNextAt||0) || state.goldTx || state.smeltTx || state.pendingFight || state.pendingPve || state.pending) return false;
+      if (!Number.isSafeInteger(goldBalance()) || goldBalance()<101000) {state.repairNextAt=now+300000;save();return false;}
+      if (mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0')) {
+        const link=document.querySelector('#mainmenu a[href*="mod=overview"]'); let url;
+        try {url=new URL(link?.getAttribute('href'),location.href);} catch {return false;}
+        if (!visible(link)||url.origin!==location.origin||url.pathname!=='/game/index.php'||url.searchParams.get('mod')!=='overview'||url.searchParams.has('doll')||[...url.searchParams.keys()].some(k=>!['mod','sh'].includes(k))) return false;
+        return navigation(link,'Revisando refinamiento del personaje.');
+      }
+      const bag=document.querySelector('#inventory_nav a[data-bag-number="514"]'), inv=document.querySelector('#inv');
+      if (!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv) {state.repairNextAt=now+300000;save();return false;}
+      if (!bag.classList.contains('current')) {bag.click();return true;}
+      if (inv.querySelector('[data-basis]')) {state.repairNextAt=now+300000;state.message='Baúl III ocupado; pospongo la reparación.';save();return false;}
+      const equipped=[...document.querySelectorAll('#char > .ui-droppable[data-container-number] > [data-tooltip][data-basis]')].map(repairItem).filter(Boolean);
+      const choice=equipped.find(x=>x.refinement<=50 && /^[2-9]$|^1[01]$/.test(x.el.parentElement?.getAttribute('data-container-number')||''));
+      if (!choice) {state.repairNextAt=now+300000;save();return false;}
+      const slot=choice.el.parentElement.getAttribute('data-container-number');
+      tx=state.repairTx={stage:'unequip',at:now,slot,item:{name:choice.name,hash:choice.hash,basis:choice.basis,quality:choice.quality,level:choice.level,owner:choice.owner,width:choice.width,height:choice.height,refinementMax:choice.refinementMax},actionAt:now};
+      state.message='Retirando equipo para reparar: '+choice.name;log(state.message,'action');save();
+      if (!dragFood(choice.el,inv)) repairBlock('No se pudo iniciar el traslado al baúl III.'); return true;
+    }
+    const fail=(message)=>{repairBlock(message);return true;};
+    if (!Number.isFinite(tx.at)||now-tx.at>180000) return fail('Tiempo agotado con pieza pendiente.');
+    const bag=document.querySelector('#inventory_nav a[data-bag-number="514"]'),inv=document.querySelector('#inv');
+    const bagItems=()=>inv?[...inv.querySelectorAll('[data-tooltip][data-basis]')].map(repairItem).filter(Boolean):[];
+    if (tx.stage==='unequip') {
+      if (!visible(bag)||!bag.classList.contains('current')||!inv) return true;
+      const found=bagItems().filter(x=>x.hash===tx.item.hash && repairSame(x,tx.item));
+      const slot=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
+      if(found.length===1 && slot && !slot.querySelector('[data-basis]')) {tx.stage='workbench';tx.at=now;save();return true;}
+      if(now-tx.actionAt>20000)return fail('Traslado al baúl III sin confirmar.');return true;
+    }
+    if (['workbench','preview','rent','resources','start','crafting','package','awaitPackage'].includes(tx.stage)) {
+      if(mod!=='forge'||sub!=='workbench') {
+        if(smeltNav('#mainmenu a[href*="submod=workbench"],#mainnav a[href*="submod=workbench"]','forge','workbench','Abriendo banco de trabajo.')) {tx.at=now;save();return true;}
+        if(smeltNav('#mainmenu a.submenuswitch[href*="submod=city"]','map','city','Abriendo ciudad para el banco de trabajo.')) {tx.at=now;save();return true;}
+        if(now-tx.at>25000) return tx.stage==='workbench' ? repairRestore('Banco de trabajo no disponible.') : fail('Banco de trabajo no disponible.');
+        return true;
+      }
+      const slots=[...document.querySelectorAll('#forge_nav > div')],active=slots.findIndex(x=>x.classList.contains('tabActive'));
+      if(slots.length!==6||active<0)return true;
+      if(tx.stage==='workbench') {
+        if(!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv)return true;
+        if(!bag.classList.contains('current')){bag.click();return true;}
+        const item=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
+        if(item.length!==1)return fail('Pieza original no identificable en baúl III.');
+        const free=slots.findIndex(x=>x.classList.contains('forge_closed'));if(free<0)return repairRestore('No hay hueco libre en el banco de trabajo.');
+        tx.slotIndex=free;if(active!==free){slots[free].click();return true;}
+        const target=document.querySelector('#slot-closed #itembox');if(!visible(target)||target.querySelector('[data-basis]'))return repairRestore('Casilla de reparación no verificable.');
+        tx.stage='preview';tx.actionAt=now;tx.at=now;save();if(!dragFood(item[0].el,target))return fail('No se pudo presentar la pieza.');return true;
+      }
+      if(tx.stage==='preview') {
+        const preview=repairItem(document.querySelector('#slot-closed #itembox [data-basis]'));
+        if(!preview||preview.hash!==tx.item.hash||!repairSame(preview,tx.item)){if(now-tx.actionAt>20000)return fail('Vista previa de pieza no confirmada.');return true;}
+        const pay=document.querySelector('#slot-closed [data-rent="2"]'), cost=parseGold(pay?.textContent), balance=goldBalance();
+        if(!visible(pay)||!pay.querySelector('.icon_gold')||pay.querySelector('.icon_rubies')||!Number.isSafeInteger(cost)||cost<=0||!Number.isSafeInteger(balance)||balance-cost<100000)return repairRestore('Coste en oro o reserva no verificable.');
+        tx.stage='rent';tx.at=now;tx.actionAt=now;tx.cost=cost;tx.balance=balance;save();pay.click();return true;
+      }
+      if(tx.stage==='rent') {
+        if(active===tx.slotIndex && slots[active].classList.contains('forge_opened') && goldBalance()===tx.balance-tx.cost){tx.stage='resources';tx.at=now;save();return true;}
+        if(now-tx.actionAt>20000)return fail('Pago del banco sin confirmar.');return true;
+      }
+      if(tx.stage==='resources') {
+        if(active!==tx.slotIndex||!slots[active].classList.contains('forge_opened'))return fail('Hueco de reparación inesperado.');
+        const sel=document.querySelector('#resource-quality'),btn=document.querySelector('#storage-to-warehouse');
+        if(!sel||!visible(btn))return fail('Crazy Addon o selector de recursos no disponible.');
+        const option=[...sel.options].find(o=>['-1','0'].includes(o.value)&&/\((\d+)\/(\d+)\)/.test(o.textContent)&&(()=>{const m=o.textContent.match(/\((\d+)\/(\d+)\)/);return Number(m[2])>0&&Number(m[1])>=Number(m[2]);})());
+        if(!option)return fail('Faltan recursos estándar o Ceres suficientes.');
+        sel.value=option.value;if(!['-1','0'].includes(sel.value))return fail('Calidad de recursos no verificable.');
+        tx.stage='start';tx.at=now;tx.actionAt=now;tx.resourceQuality=sel.value;save();btn.click();return true;
+      }
+      if(tx.stage==='start') {
+        const start=document.querySelector('#slot-opened #forge_start');
+        if(!visible(start)||start.classList.contains('disabled')){if(now-tx.actionAt>20000)return fail('Carga de recursos sin confirmar.');return true;}
+        // GCA reconstruye el selector tras cargar; la opción visible puede volver
+        // a estándar aunque se hayan solicitado materiales Ceres.
+        if(!['-1','0'].includes(tx.resourceQuality))return fail('Calidad de recursos solicitada no verificable.');
+        const finalRefinement=parseGold(document.querySelector('#forge_refinement_base')?.textContent);
+        if(!document.querySelector('#content')?.textContent.includes(tx.item.name)||!Number.isSafeInteger(tx.item.refinementMax)||tx.item.refinementMax<=0||finalRefinement!==tx.item.refinementMax)return fail('Refinamiento final o pieza no verificables.');
+        tx.stage='crafting';tx.at=now;tx.actionAt=now;save();start.click();return true;
+      }
+      if(tx.stage==='crafting') {
+        if(active!==tx.slotIndex){slots[tx.slotIndex]?.click();return true;}
+        if(slots[active].classList.contains('forge_finished-succeeded')){tx.stage='package';tx.at=now;save();return true;}
+        if(slots[active].classList.contains('forge_crafting')) { if(now-tx.actionAt>10000 && now-(tx.refreshedAt||0)>15000){const link=document.querySelector('#mainnav a[href*="submod=workbench"]');if(navigation(link,'Comprobando reparación.')){tx.refreshedAt=now;tx.at=now;save();}} return true; }
+        if(now-tx.actionAt>20000)return fail('Inicio de reparación sin confirmar.');return true;
+      }
+      if(tx.stage==='package') {
+        const send=document.querySelector('#slot-finished-succeeded #forge_lootbox');
+        if(active!==tx.slotIndex||!slots[active].classList.contains('forge_finished-succeeded')||!visible(send)||send.textContent.trim()!=='Enviar en forma de paquete')return fail('Envío de la pieza reparada no verificable.');
+        tx.stage='awaitPackage';tx.at=now;tx.actionAt=now;save();send.click();return true;
+      }
+      if(tx.stage==='awaitPackage') {
+        if(active===tx.slotIndex && slots[active].classList.contains('forge_closed')){tx.stage='search';tx.at=now;save();return true;}
+        if(now-tx.actionAt>20000)return fail('Envío al paquete sin confirmar.');return true;
+      }
+    }
+    if(tx.stage==='search' || tx.stage==='find' || tx.stage==='collect') {
+      if(mod!=='packages') {if(!smeltNav('#menue_packages','packages',null,'Buscando pieza reparada en paquetes.') && now-tx.at>25000)return fail('No se pudieron abrir los paquetes.');return true;}
+      if(!visible(bag)||!inv||!document.querySelector('#packages'))return true;
+      if(!bag.classList.contains('current')){bag.click();return true;}
+      const packages=document.querySelector('#packages');
+      if(tx.stage==='collect') {
+        const found=bagItems().filter(x=>x.hash===tx.newHash&&repairSame(x,tx.item));
+        if(found.length===1 && ![...packages.querySelectorAll('[data-hash]')].some(e=>e.getAttribute('data-hash')===tx.newHash)){tx.stage='equip';tx.at=now;save();return true;}
+        if(now-tx.actionAt>20000)return fail('Recepción de pieza sin confirmar.');return true;
+      }
+      if(tx.stage==='search') {
+        if(!tx.packageFilter)tx.packageFilter=packageSearchPlan(tx.item);
+        const form=document.querySelector('#pf'),input=form?.querySelector('input[name="qry"]'),filter=form?.querySelector('select[name="f"]'),quality=form?.querySelector('select[name="fq"]'),submit=form?.querySelector('[type="submit"]');let u;
+        try{u=new URL(form?.getAttribute('action'),location.href);}catch{}
+        if(!u||u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('submod')!=='search'||String(form.method).toLowerCase()!=='post'||!input||!filter||!quality||!visible(submit))return fail('Filtro de paquetes no verificable.');
+        input.value=tx.packageFilter.query;filter.value=tx.packageFilter.type;quality.value='-1';if(filter.value!==tx.packageFilter.type||quality.value!=='-1')return fail('Filtro de paquetes no disponible.');
+        tx.stage='find';tx.at=now;tx.loadedAt=0;tx.scan={pages:[],matches:[],fingerprints:{}};save();submit.click();return true;
+      }
+      if(!tx.packageFilter){tx.stage='search';tx.at=now;save();return true;}
+      if(params.get('f')!==tx.packageFilter.type||params.get('fq')!=='-1'||params.get('qry')!==tx.packageFilter.query||params.getAll('page').length>1)return fail('Filtro o página de paquetes ambiguos.');
+      if(!tx.loadedAt){tx.loadedAt=now;save();return true;} if(now-tx.loadedAt<5000)return true;
+      const page=Number(params.get('page')||'1'),scan=tx.scan,listed=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible);
+      if(!scan||!Number.isSafeInteger(page)||page<1||page>100)return fail('Paginación de paquetes no verificable.');
+      const matches=listed.map(repairItem).filter(x=>x&&x.refinement===100&&repairSame(x,tx.item)&&/^Banco de trabajo\b/i.test((x.el.closest('.packageItem')?.textContent||'').trim()));
+      const go=n=>{let u;try{u=new URL(location.href);}catch{return false;}if(u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('f')!==tx.packageFilter.type||u.searchParams.get('fq')!=='-1'||u.searchParams.get('qry')!==tx.packageFilter.query||[...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k))||n<1||n>100)return false;u.searchParams.delete('page');u.searchParams.set('page',String(n));tx.loadedAt=0;tx.at=Date.now();save();location.assign(u.href);return true;};
+      if(!scan.complete){
+        const expected=scan.pages.length?scan.pages.at(-1)+1:1;if(page!==expected){if(!go(expected))return fail('No se pudo abrir la página esperada.');return true;}
+        const fp=listed.map(e=>e.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
+        if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return fail('Página de paquetes repetida.');
+        if(fp)scan.fingerprints[page]=fp;
+        for(const x of matches){if(scan.matches.some(m=>m.hash===x.hash))return fail('Pieza reparada ambigua.');scan.matches.push({hash:x.hash,page});}
+        scan.pages.push(page);save();const next=document.querySelector('.paging_right_step');
+        if(visible(next)){if(!go(page+1))return fail('No se pudo revisar la siguiente página.');return true;}
+        if(scan.matches.length===0&&tx.packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);tx.stage='search';tx.at=now;save();return true;}
+        if(scan.matches.length!==1)return fail('No se identificó una pieza reparada única.');scan.complete=true;save();
+      }
+      const found=scan.matches[0];if(page!==found.page){if(!go(found.page))return fail('No se pudo volver a la pieza reparada.');return true;}
+      const item=matches.find(x=>x.hash===found.hash);if(matches.length!==1||!item||!item.el.hasAttribute('data-gca-flag_double-click-event')||bagItems().length)return fail('Pieza o baúl III ambiguos antes de recoger.');
+      tx.stage='collect';tx.newHash=found.hash;tx.at=now;tx.actionAt=now;save();item.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
+    }
+    if(['equip','verifyEquip','restore','verifyRestore'].includes(tx.stage)) {
+      if(mod!=='overview'||(params.has('doll')&&params.get('doll')!=='0')){if(!smeltNav('#mainmenu a[href*="mod=overview"]','overview',null,'Volviendo al personaje para equipar.')&&now-tx.at>25000)return fail('No se pudo abrir el personaje.');return true;}
+      if(!visible(bag)||!inv)return true;if(!bag.classList.contains('current')){bag.click();return true;}
+      const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
+      if(!target)return fail('Ranura original no verificable.');
+      const equipped=repairItem(target.querySelector('[data-tooltip][data-basis]'));
+      if(tx.stage==='verifyRestore'){
+        if(equipped&&equipped.hash===tx.item.hash&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.item.hash)){state.repairTx=null;state.repairNextAt=now+300000;state.message='Pieza original reequipada; '+tx.reason;log(state.message,'warn');save();return true;}
+        if(now-tx.actionAt>20000)return fail('Reequipamiento original sin confirmar.');return true;
+      }
+      if(tx.stage==='verifyEquip'){
+        if(equipped&&equipped.hash===tx.newHash&&equipped.refinement===100&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.newHash)){state.repairTx=null;state.repairNextAt=now;state.message='Pieza reparada y equipada: '+tx.item.name;log(state.message,'success');save();return true;}
+        if(now-tx.actionAt>20000)return fail('Reequipamiento sin confirmar.');return true;
+      }
+      if(equipped||target.querySelector('[data-basis]'))return fail('Ranura original ocupada.');
+      if(tx.stage==='restore'){
+        const original=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
+        if(original.length!==1)return fail('Pieza original no identificable para restaurar.');
+        tx.stage='verifyRestore';tx.at=now;tx.actionAt=now;save();if(!dragFood(original[0].el,target))return fail('No se pudo restaurar la pieza original.');return true;
+      }
+      const candidates=bagItems().filter(x=>x.hash===tx.newHash&&x.refinement===100&&repairSame(x,tx.item));
+      if(candidates.length!==1)return fail('Pieza reparada no identificable en baúl III.');
+      tx.stage='verifyEquip';tx.at=now;tx.actionAt=now;save();if(!dragFood(candidates[0].el,target))return fail('No se pudo intentar equipar la pieza.');return true;
+    }
+    return fail('Etapa de reparación desconocida.');
+  }
+  function safeRepairTick() {
+    try { return repairTick(); } catch { repairBlock('Error interno; ubicación de la pieza sin confirmar.'); return true; }
   }

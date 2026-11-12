@@ -3,7 +3,7 @@ import catalog from '../data/catalog.json';
 import { fragments } from './userscript-fragments.js';
 import { buildUserscript, DEFAULT_CONFIG, eligibleDungeons, eligibleExpeditions, normalizeBuildConfig } from './build-config.mjs';
 
-const moduleKeys = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting'];
+const moduleKeys = ['arenaCircus', 'missions', 'healing', 'expedition', 'dungeon', 'guildGold', 'smelting', 'repair'];
 let currentObjectUrl = '';
 
 function option(select, value, label) {
