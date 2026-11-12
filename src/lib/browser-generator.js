@@ -89,6 +89,10 @@ export function initializeGenerator() {
   function updateModuleControls() {
     const expOn = expeditionToggle.checked;
     const dungeonOn = dungeonToggle.checked;
+    document.querySelector('#campaign-region-fields').hidden = !(expOn || dungeonOn);
+    document.querySelector('#expedition-fields').hidden = !expOn;
+    document.querySelector('#dungeon-fields').hidden = !dungeonOn;
+    document.querySelector('#smelting-fields').hidden = !form.querySelector('input[name=smelting]').checked;
     document.querySelector('#expedition-fields').classList.toggle('inactive', !expOn);
     document.querySelector('#dungeon-fields').classList.toggle('inactive', !dungeonOn);
     document.querySelector('#expedition-status').textContent = expOn ? 'ACTIVA' : 'APAGADA';
@@ -110,6 +114,7 @@ export function initializeGenerator() {
   document.querySelector('#smelting-priority').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   expeditionToggle.addEventListener('change', updateModuleControls);
   dungeonToggle.addEventListener('change', updateModuleControls);
+  form.querySelector('input[name=smelting]').addEventListener('change', updateModuleControls);
   for (const key of moduleKeys) {
     const checkbox = form.querySelector(`input[name="${key}"]`);
     checkbox?.addEventListener('change', () => {
