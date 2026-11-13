@@ -24,6 +24,11 @@
   if (state.running===false && state.message==='Identificador de alimento no verificable.') {
     state.running=true; state.message='Reanudando tras corregir el identificador de alimento.'; log(state.message); save();
   }
+  // Recuperar únicamente la parada causada por el antiguo guardia de rutas.
+  if (BUILD_CONFIG.modules.dungeon && state.running===false && state.message==='Ruta de mazmorra repetida; revisión necesaria. No se ha cancelado ninguna mazmorra.' && state.pveRouteGuard?.attempts>3) {
+    state.running=true;state.pveTarget=null;state.dungeonRouteRetryAt=Date.now()+300000;delete state.pveRouteGuard;
+    state.message='Ruta de mazmorra aplazada; continúo con las demás tareas.';log(state.message,'warn');save();
+  }
   // Migración única: activar oro por defecto sin borrar estados que requieren revisión.
   if (state.goldAutoDefaultV1 !== true) {
     state.goldAutoDefaultV1=true;

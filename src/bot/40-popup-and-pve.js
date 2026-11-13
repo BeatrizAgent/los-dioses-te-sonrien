@@ -106,13 +106,19 @@
       if (!inConfiguredArea || mod!=='dungeon') {
         // No contar como intento las comprobaciones durante la espera entre navegaciones.
         if (Date.now()-(state.lastNavigationAt||0)<8000) return true;
+        const leg=!inConfiguredArea || (mod!=='location' && mod!=='dungeon') ? 'area' : 'dungeon';
         const key=chosen.id+':'+areaLoc, previous=state.pveRouteGuard;
-        const attempts=previous?.key===key && Date.now()-previous.at<120000 ? previous.attempts+1 : 1;
-        state.pveRouteGuard={key,attempts,at:Date.now()}; save();
-        if (attempts>3) { stop('Ruta de mazmorra repetida; revisión necesaria. No se ha cancelado ninguna mazmorra.'); return true; }
+        const attempts=previous?.key===key && previous.leg===leg && Date.now()-previous.at<120000 ? previous.attempts+1 : 1;
+        if (attempts>3) {
+          state.pveTarget=null;state.dungeonRouteRetryAt=Date.now()+300000;delete state.pveRouteGuard;
+          state.message='Ruta de mazmorra sin avance; aplazada cinco minutos. No se ha cancelado ninguna mazmorra.';log(state.message,'warn');save();return false;
+        }
+        state.pveRouteGuard={key,leg,attempts,at:Date.now()}; save();
+        const routeLink=leg==='area' ? areaLink : dungeonLink;
+        const purpose=leg==='area' ? 'Abriendo '+area.name+' para la mazmorra elegida.' : 'Abriendo '+chosen.name+' ('+(chosen.difficulty==='advanced'?'avanzada':'normal')+').';
+        if (!navigation(routeLink,purpose)) {state.pveRouteGuard=previous;save();}
+        return true;
       } else if (state.pveRouteGuard) { delete state.pveRouteGuard; save(); }
-      if (!inConfiguredArea || (mod!=='location' && mod!=='dungeon')) { navigation(areaLink,'Abriendo '+area.name+' para la mazmorra elegida.'); return true; }
-      if (mod!=='dungeon' || params.get('loc')!==dungeonLoc) { navigation(dungeonLink,'Abriendo '+chosen.name+' ('+(chosen.difficulty==='advanced'?'avanzada':'normal')+').'); return true; }
     }
     if (selected==='expedition') {
       const enemy=BUILD_CONFIG.expedition.enemy,position=enemy?.position,loc=params.get('loc');
