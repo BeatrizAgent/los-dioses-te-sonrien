@@ -20,6 +20,8 @@ test('mantiene el bloqueo manual y no reintenta la compra',()=>{const x=fixture(
 test('avanza a la pagina siguiente con un solo parametro',()=>{const x=fixture({next:true});assert.equal(x.c.goldTick(),true);const u=new URL(x.location.destination);assert.deepEqual(u.searchParams.getAll('page'),['2']);assert.equal(x.tx.manualReview,undefined);});
 
 test('una transaccion de versiones anteriores requiere revision manual',()=>{const x=fixture();delete x.state.goldPackageGuardV129;assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,true);assert.match(x.tx.problem,/versión anterior/);});
+test('el módulo inicia automáticamente aunque el interruptor antiguo estuviera apagado',()=>{const x=fixture();x.state.goldTx=null;x.state.goldEnabled=false;x.c.mod='overview';x.c.document.querySelector=()=>({});let calls=0;x.c.goldNav=()=>{calls++;return true;};assert.equal(x.c.goldTick(),true);assert.equal(calls,1);});
+test('la revisión pendiente sigue impidiendo iniciar otra compra automáticamente',()=>{const x=fixture();x.state.goldTx=null;x.state.goldEnabled=false;x.state.goldPreviousReview=true;x.c.mod='overview';let calls=0;x.c.goldNav=()=>{calls++;return true;};assert.equal(x.c.goldTick(),false);assert.equal(calls,0);});
 
 
 test('elige término completo y tipo de equipo para reducir resultados',()=>{const x=fixture();const p=x.c.packageSearchPlan({name:'Botas de Placas Lulus de los Campos Elíseos',basis:'8-10'});assert.equal(p.query,'Elíseos');assert.equal(p.type,'8');assert.equal(p.optimized,true);});

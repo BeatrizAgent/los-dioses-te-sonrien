@@ -96,7 +96,7 @@
       const cells=[...(row.cells||[])], seller=cells[1]?.textContent.trim(), price=parseGold(cells[2]?.textContent), item=goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]'));
       const button=row.querySelector('input[name="buy"]'), form=button?.form;
       let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
-      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || !/^6-\d+$/.test(item.basis) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
       const notice=form.getAttribute('data-confirm-message');
       if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (item.owner ? notice!=='Este objeto está vinculado al alma' : notice!==null) || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
       return {seller,price,item,button};
@@ -168,7 +168,8 @@
       if (tx.stage==='packages') delete tx.packageScan; // Volver a comprobar todas las páginas.
       state.goldEnabled=true; state.message='Revisando la operación de oro pendiente.'; log(state.message); save();
     }
-    if (!tx && (!state.goldEnabled || pendingOnly)) return false;
+    // La casilla del generador controla el módulo; no existe una segunda activación.
+    if (!tx && pendingOnly) return false;
     if (tx && (!Number.isFinite(tx.at) || now-tx.at>60000)) { goldPause('Operación sin confirmar.'); return false; }
     if (!tx) {
       if (!Number.isSafeInteger(balance) || balance<=200000 || now<(state.goldCheckAt||0)) return false;

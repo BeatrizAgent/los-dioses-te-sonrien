@@ -40,6 +40,8 @@ En 0.12.29, la comprobación de una compra de alimento ambigua se aplaza y vuelv
 
 En 0.12.30, la compra de apoyo a la alianza omite las búsquedas de paquetes antes y después de cada compra: comprueba la desaparición del anuncio y el descuento exacto para continuar. Una compra incierta queda pendiente sin repetirse. La compra para curación conserva su comprobación de paquetes. La nueva ruta rápida está probada en simulación y pendiente de validación en juego.
 
+En 0.12.31, el módulo de oro seleccionado funciona al activar el bot sin otro interruptor; las nuevas ofertas se limitan a anillos de nivel 1. La recogida periódica de utilizables y la pausa de Circo tras tres listas fallidas están probadas en simulación, pendientes de validación instalada. Con la versión anterior instalada en CassiusFerox se observó la compra, recepción y anuncio a 24 horas de un anillo de 300.000; no se observó un ciclo de 500.000.
+
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
 
 El nivel que se escribe en el formulario es una declaración para filtrar requisitos; la web no lee la cuenta. Los rangos de nivel de los bichos proceden de guías comunitarias, incluida una publicación en el foro oficial de Gameforge. Las bandas de mazmorra se contrastan con una referencia comunitaria actual. Consulta [la investigación PvE](docs/investigacion-pve.md) para fechas, fuentes y discrepancias.
@@ -116,3 +118,9 @@ La mazmorra usa el acceso de la zona seleccionada y aplaza una instancia activa 
 ### Comprobación de espacio en el mercado de alianza
 
 La versión local calcula la cuadrícula lógica con las dimensiones de layout del baúl y usa la geometría visible para ubicar objetos, incluso con escalado. Comprueba huecos contiguos también para objetos de una casilla y rechaza posiciones ambiguas o solapadas. Las pruebas son simuladas: falta verificar una compra y el traslado completos en el juego, incluida la carga del baúl.
+
+## Cambios locales: oro y Turma
+
+Las nuevas ofertas de oro usan anillos de nivel 1 entre 100.000 y 1.000.000 y mantienen la reserva y la tarifa. Tras tres búsquedas sin rival reconocible, Turma Provinciarum se aplaza cinco minutos y las demás tareas continúan. Pendiente de validación en juego.
+
+Con curación activada, el bot revisa periódicamente la categoría Utilizable y traslada un objeto al baúl I cuando hay espacio verificable. La recogida no filtra por nivel ni consume el objeto; la curación sí exige un alimento compatible con el nivel del personaje. Los traslados inciertos no se repiten. Pendiente de validación del nuevo flujo en juego.

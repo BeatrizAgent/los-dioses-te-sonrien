@@ -8,7 +8,7 @@ const price=healing.match(/  const goldPriceAllowed=.*;/)[0];
 const offers=market.slice(market.indexOf('  function goldOffers()'),market.indexOf('  function goldOwnCount'));
 function run(prices){
  const rows=prices.map(price=>{const button={value:'Comprar',disabled:false,outerHTML:'<input>',form:{method:'post',getAttribute:k=>k==='action'?'/game/index.php?mod=guildMarket':null}};return {cells:[{querySelector:()=>({})},{textContent:'Aliado'},{textContent:String(price)},{textContent:'24 h'},{textContent:'1'}],textContent:'objeto',querySelector:()=>button};});
- const ctx={document:{querySelectorAll:()=>rows},goldItem:()=>({name:'Anillo',owner:null}),parseGold:x=>/^\d+$/.test(x||'')?Number(x):null,goldPriceAllowed:null,URL,location:{href:'https://s64-es.gladiatus.gameforge.com/game/index.php',origin:'https://s64-es.gladiatus.gameforge.com'},accountName:'CassiusFerox',visible:()=>true,Number};
+ const ctx={document:{querySelectorAll:()=>rows},goldItem:()=>({name:'Anillo',owner:null,basis:'6-1'}),parseGold:x=>/^\d+$/.test(x||'')?Number(x):null,goldPriceAllowed:null,URL,location:{href:'https://s64-es.gladiatus.gameforge.com/game/index.php',origin:'https://s64-es.gladiatus.gameforge.com'},accountName:'CassiusFerox',visible:()=>true,Number};
  return vm.runInNewContext(`${price}\n${offers}\ngoldOffers().map(o=>o.price)`,ctx);
 }
 test('acepta ofertas entre 100k y 1kk, ordenadas por precio',()=>{assert.deepEqual(Array.from(run([200000,300000,500000,1000000,150001,99999,1000001])),[1000000,500000,300000,200000,150001]);});

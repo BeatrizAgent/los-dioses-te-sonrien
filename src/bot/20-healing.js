@@ -31,6 +31,12 @@
     if (!Number.isSafeInteger(amount) || amount<=0) return null;
     return {item, amount, name:texts[0] || 'alimento', level:levelText ? Number(levelText.match(/\d+/)[0]) : null, oneCell:item.getAttribute('data-measurement-x') === '1' && item.getAttribute('data-measurement-y') === '1'};
   }
+  function packageUsable(item) {
+    if (item?.getAttribute('data-content-type')!=='64' || !/^7-\d+$/.test(item.getAttribute('data-basis')||'')) return null;
+    let rows; try { rows=JSON.parse(item.getAttribute('data-tooltip'))?.[0]; } catch { return null; }
+    const name=rows?.[0]?.[0];
+    return typeof name==='string' && name.trim() ? {item,name:name.trim()} : null;
+  }
   function inventorySpace(bag,item) {
     const width=item?.width ?? 1, height=item?.height ?? 1;
     if (!bag || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1) return false;
@@ -61,6 +67,11 @@
     state.pendingPackageFood=null;
   }
   function packageFoodTick() {
+    const collecting=state.packageCollectTrip===true;
+    if (collecting && mod!=='packages') {
+      if (!goldNav('#menue_packages','packages','Buscando utilizables en paquetes.')) {state.packageCollectTrip=false;state.packageCollectAt=Date.now()+120000;save();return false;}
+      return true;
+    }
     const inv=document.querySelector('#inv'), packages=document.querySelector('#packages');
     if (!inv || !packages) {
       if (!state.packageWaitAt) { state.packageWaitAt=Date.now(); state.message='Esperando a que carguen los paquetes.'; save(); }
@@ -90,7 +101,9 @@
       const p=state.pendingPackageFood;
       const count=inventory.filter(x=>x.getAttribute('data-hash') === p.hash).length;
       if (count>p.before) {
-        state.pendingPackageFood=null; state.packageFoodTrip=false; log('Alimento recibido en el baúl I: '+p.name+'.','success'); save();
+        state.pendingPackageFood=null; state.packageFoodTrip=false;
+        if (collecting) {state.packageCollectTrip=false;state.packageCollectAt=Date.now()+120000;log('Utilizable recibido en el baúl I: '+p.name+'.','success');save();return true;}
+        log('Alimento recibido en el baúl I: '+p.name+'.','success'); save();
         navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Volviendo para curar.'); return true;
       }
       if (Date.now()-p.at>15000) { rememberUnknownPackageFood(); skipHealing('Traslado de alimento sin confirmar; sigo con la cola.'); }
@@ -100,16 +113,16 @@
     const pageKey=(params.get('page') || '1')+':'+params.get('f');
     if (state.packageScan?.key!==pageKey) { state.packageScan={key:pageKey,at:Date.now()}; state.message='Esperando los alimentos y el complemento de paquetes.'; save(); return true; }
     if (Date.now()-state.packageScan.at<5000) return true;
-    const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible).map(healingFood).filter(x=>x && (x.level===null || (level>0 && x.level<=level)));
+    const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible).map(collecting ? packageUsable : healingFood).filter(x=>x && (collecting || x.level===null || (level>0 && x.level<=level)));
     const available=candidates.filter(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && validItemHash(x.item.getAttribute('data-hash')) && !(Array.isArray(state.unknownPackageFood) && state.unknownPackageFood.includes(x.item.getAttribute('data-hash'))));
     const food=available.find(x=>inventorySpace({inv,items:inventory},{width:Number(x.item.getAttribute('data-measurement-x')),height:Number(x.item.getAttribute('data-measurement-y'))}));
-    if (!food && available.length) { skipHealing('Baúl I lleno o espacio no verificable para alimentos; revisaré después.'); return true; }
+    if (!food && available.length) { skipHealing('Baúl I lleno o espacio no verificable para '+(collecting?'utilizables':'alimentos')+'; revisaré después.'); return true; }
     if (!food) {
       const next=document.querySelector('.paging_right_step');
       if (!visible(next)) {
         const invalid=candidates.some(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && !validItemHash(x.item.getAttribute('data-hash')));
-        if (BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
-        skipHealing(invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; revisaré el mercado de la alianza.'); return true;
+        if (!collecting && BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
+        skipHealing(collecting ? 'Sin utilizables trasladables en paquetes; revisaré después.' : invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; revisaré el mercado de la alianza.'); return true;
       }
       let url; try { url=new URL(next.getAttribute('href'),location.href); } catch { return stop('Paginación de paquetes no reconocible.'); }
       const pages=url.searchParams.getAll('page'), nextPage=Number(pages.at(-1)), currentPage=Number(params.get('page') || 1);
@@ -119,10 +132,11 @@
     }
     const hash=food.item.getAttribute('data-hash');
     state.pendingPackageFood={hash,name:food.name,before:inventory.filter(x=>x.getAttribute('data-hash')===hash).length,at:Date.now()};
-    state.message='Recogiendo alimento: '+food.name+'.'; log(state.message,'action'); save();
+    state.message='Recogiendo '+(collecting?'utilizable: ':'alimento: ')+food.name+'.'; log(state.message,'action'); save();
     food.item.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window})); return true;
   }
   function skipHealing(message) {
+    if (state.packageCollectTrip) {state.packageCollectTrip=false;state.packageCollectAt=Date.now()+120000;delete state.packageScan;delete state.packageWaitAt;state.message=message;log(message,'warn');save();return;}
     state.pendingHeal=null; state.packageFoodTrip=false; delete state.packageScan; delete state.packageWaitAt; state.healSkipUntil=Date.now()+60000;
     state.message=message; log(message,'warn'); save();
   }
@@ -202,7 +216,8 @@
       return true;
     }
     const target=document.querySelector('#avatar');
-    const foods=[...document.querySelectorAll('#inv .ui-draggable[data-tooltip][data-hash]')].map(healingFood).filter(x=>x && validItemHash(x.item.getAttribute('data-hash')));
+    const playerLevel=Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g,''));
+    const foods=[...document.querySelectorAll('#inv .ui-draggable[data-tooltip][data-hash]')].map(healingFood).filter(x=>x && validItemHash(x.item.getAttribute('data-hash')) && (x.level===null || (playerLevel>0 && x.level<=playerLevel)));
     foods.sort((a,b)=>Number(b.oneCell)-Number(a.oneCell) || Math.abs(maximum-current-a.amount)-Math.abs(maximum-current-b.amount));
     const food=foods[0], hash=food?.item.getAttribute('data-hash');
     if (!food) {

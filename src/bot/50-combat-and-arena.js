@@ -9,6 +9,19 @@
     }
     return Number.isSafeInteger(current) && Number.isSafeInteger(maximum) && maximum>0 && current>=0 && current<=maximum ? {current,maximum} : null;
   }
+  function turmaListMiss(bar) {
+    const now=Date.now(), retry=state.turmaListRetry || {count:0,next:0};
+    if (now<retry.next) return;
+    if (retry.count<2 && now-(state.lastNavigationAt||0)<8000) return;
+    retry.count++; retry.next=now+15000; state.turmaListRetry=retry;
+    if (retry.count>=3) {
+      state.turmaSkipUntil=now+300000; delete state.turmaListRetry;
+      state.message='Turma sin adversarios tras tres intentos; lo revisaré en cinco minutos.';
+      log(state.message,'warn'); save(); return;
+    }
+    state.message='Turma sin adversarios; buscando de nuevo ('+retry.count+'/3).'; save();
+    if (!navigation(document.querySelector(bar+' a'),'Actualizando lista de adversarios de Turma.')) { retry.count--; retry.next=0; save(); }
+  }
   function combatTick() {
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
@@ -118,6 +131,7 @@
     }
     if (state.foodBuyTx && foodMarketTick()) return;
     if (goldTick(true)) return;
+    if (state.packageCollectTrip) { if (packageFoodTick()) return; }
     const healthPercent=Number.isFinite(hp) ? Math.min(hp, 100 * current / maximum) : 100 * current / maximum;
     if (healthPercent > 40 && (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood)) {
       const p=state.pendingHeal;
@@ -135,13 +149,17 @@
     if (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood || (BUILD_CONFIG.modules.healing && healthPercent <= 40 && Date.now() >= (state.healSkipUntil || 0))) return healTick(current, maximum);
     if (state.smeltTx && safeSmeltingTick()) return;
     if (BUILD_CONFIG.modules.repair && safeRepairTick()) return;
-    if (BUILD_CONFIG.modules.guildGold && BUILD_CONFIG.modules.foodMarket && state.goldEnabled && !state.goldTx && !state.goldPreviousReview) {
+    if (BUILD_CONFIG.modules.guildGold && BUILD_CONFIG.modules.foodMarket && !state.goldTx && !state.goldPreviousReview) {
       const balance=goldBalance();
       if (Number.isSafeInteger(balance) && balance<=200000 && state.goldSupportSweepDone) {state.goldSupportSweepDone=false;save();}
       if (Number.isSafeInteger(balance) && balance>200000 && !state.goldSupportSweepDone && !state.foodSupportNeeded) {state.foodSupportNeeded=true;save();}
       if (state.foodSupportNeeded && Date.now()>=(state.foodBuyRetryAt||0) && foodMarketTick()) return;
     }
     if (!state.foodSupportNeeded) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
+    if (BUILD_CONFIG.modules.healing && !state.goldTx && !state.smeltTx && !state.repairTx && Date.now()>=(state.packageCollectAt||0)) {
+      state.packageCollectTrip=true; state.packageCollectAt=Date.now()+120000; delete state.packageScan; delete state.packageWaitAt; save();
+      if (packageFoodTick()) return;
+    }
     if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
     if (mod === 'quests' && BUILD_CONFIG.modules.missions) {
       questTick();
@@ -160,7 +178,7 @@
     const ctRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent);
     const arenaRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent);
     const arenaReady = arenaRemaining === 0;
-    const ctReady = ctRemaining === 0;
+    const ctReady = ctRemaining === 0 && Date.now() >= (state.turmaSkipUntil || 0);
     const type = arenaReady && (!ctReady || state.lastFightMode !== 'arena-provinciarum') ? '2' : '3';
     const mode = type === '2' ? 'arena-provinciarum' : 'turma-provinciarum';
     const bar = type === '2' ? '#cooldown_bar_arena' : '#cooldown_bar_ct';
@@ -169,6 +187,7 @@
       const quest = document.querySelector('#mainmenu a[href*="mod=quests"]');
       if (navigation(quest, 'Revisando misiones del Panteón.')) return;
     }
+    if (!arenaReady && !ctReady && Date.now() < (state.turmaSkipUntil || 0)) { state.message='Turma aplazado; esperando otras tareas.'; save(); return; }
     if (mod !== 'arena' || sub !== 'serverArena' || params.get('aType') !== type) {
       navigation(document.querySelector(bar + ' a'), 'Abriendo ' + (type === '2' ? 'Arena' : 'Circo') + ' Provinciarum.'); return;
     }
@@ -180,6 +199,7 @@
     const table = [...document.querySelectorAll('#content table')].find(t => /Nombre\s+Nivel/.test(t.innerText));
     const level = Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g,''));
     if (!table || !level) {
+      if (type === '3') { turmaListMiss(bar); return; }
       state.message='Lista de rivales no disponible; volveré a comprobarla.';
       if (Date.now()-(state.lastListWarningAt || 0)>=60000) { state.lastListWarningAt=Date.now(); log(state.message,'warn'); }
       save(); return;
@@ -197,11 +217,13 @@
     candidates.sort((a,b) => (a.losses>0)-(b.losses>0) || (b.wins>0)-(a.wins>0) || (a.experience === null)-(b.experience === null) || (b.experience ?? 0)-(a.experience ?? 0) || (a.damage === null)-(b.damage === null) || (a.damage ?? 0)-(b.damage ?? 0) || a.rivalLevel-b.rivalLevel);
     const target=candidates[0];
     if (!target) {
+      if (type === '3') { turmaListMiss(bar); return; }
       if (Date.now() - (state.emptyListReloadAt || 0) > 60000) { if (navigation(document.querySelector(bar + ' a'), 'Actualizando lista de adversarios.')) { state.emptyListReloadAt=Date.now(); save(); } return; }
       state.message='Sin adversarios reconocidos; volveré a revisar la lista.'; save(); return;
     }
     if (Date.now() < (state.fightRetryAt || 0)) { state.message='Esperando para volver a combatir tras un aviso sin confirmar.'; save(); return; }
     state.emptyListReloadAt=0;
+    if (type === '3') { delete state.turmaListRetry; delete state.turmaSkipUntil; }
     state.pendingFight={name:target.name,server:target.server,rivalLevel:target.rivalLevel,level,mode,healthBefore:current,xpBefore:xpReading(),at:Date.now()};
     state.lastFightMode=mode;
     state.lastAction='pvp';
