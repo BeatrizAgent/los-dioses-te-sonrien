@@ -19,7 +19,7 @@
   const needsStatsStart = !Number.isFinite(state.statsStartedAt);
   if (needsStatsStart) state.statsStartedAt = Date.now();
   function log(message, type = 'info') { state.logs.unshift({at: Date.now(), message, type}); state.logs = state.logs.slice(0, 40); }
-  const save = () => { if (ownerActive) localStorage.setItem(KEY, JSON.stringify(state)); };
+  const save = () => { if (!ownerActive) return; const serialized=JSON.stringify(state); if (localStorage.getItem(KEY)!==serialized) localStorage.setItem(KEY,serialized); };
   if (needsStatsStart) save();
   if (state.running===false && state.message==='Identificador de alimento no verificable.') {
     state.running=true; state.message='Reanudando tras corregir el identificador de alimento.'; log(state.message); save();

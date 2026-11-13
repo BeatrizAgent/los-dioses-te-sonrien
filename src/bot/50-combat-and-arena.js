@@ -127,7 +127,7 @@
       if (confirmed) log('Curación confirmada: '+p.name+'.','success');
       else if (p) log('Vida recuperada; resultado de la curación anterior desconocido.','warn');
       if (state.pendingPackageFood) log('Búsqueda de alimento interrumpida: vida suficiente; traslado anterior sin confirmar.','warn');
-      state.pendingHeal=null; state.pendingPackageFood=null; state.packageFoodTrip=false; state.healSkipUntil=0;
+      state.pendingHeal=null; rememberUnknownPackageFood(); state.packageFoodTrip=false; state.healSkipUntil=0;
       state.message='Vida suficiente; continuando con la cola.'; log(state.message); save();
     }
     if (BUILD_CONFIG.modules.foodMarket && state.foodBuyNeeded && healthPercent<=40 && foodMarketTick()) return;
@@ -135,7 +135,13 @@
     if (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood || (BUILD_CONFIG.modules.healing && healthPercent <= 40 && Date.now() >= (state.healSkipUntil || 0))) return healTick(current, maximum);
     if (state.smeltTx && safeSmeltingTick()) return;
     if (BUILD_CONFIG.modules.repair && safeRepairTick()) return;
-    if (BUILD_CONFIG.modules.guildGold && goldTick()) return;
+    if (BUILD_CONFIG.modules.guildGold && BUILD_CONFIG.modules.foodMarket && state.goldEnabled && !state.goldTx && !state.goldPreviousReview) {
+      const balance=goldBalance();
+      if (Number.isSafeInteger(balance) && balance<=200000 && state.goldSupportSweepDone) {state.goldSupportSweepDone=false;save();}
+      if (Number.isSafeInteger(balance) && balance>200000 && !state.goldSupportSweepDone && !state.foodSupportNeeded) {state.foodSupportNeeded=true;save();}
+      if (state.foodSupportNeeded && Date.now()>=(state.foodBuyRetryAt||0) && foodMarketTick()) return;
+    }
+    if (!state.foodSupportNeeded) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
     if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
     if (mod === 'quests' && BUILD_CONFIG.modules.missions) {
       questTick();

@@ -29,35 +29,31 @@
   function goldBag(requireFree=true) {
     const inv=document.querySelector('#inv'), bag=document.querySelector('#inventory_nav a');
     if (!inv || !visible(bag)) return null;
-    if (!bag.classList.contains('current')) { bag.click(); state.message='Seleccionando baúl I para el oro.'; save(); return null; }
-    const items=[...inv.querySelectorAll('.ui-draggable[data-hash]')];
+    if (bag.getAttribute('data-available')==='false' || (bag.getAttribute('data-bag-number') && bag.getAttribute('data-bag-number')!=='512')) return null;
+    if (!bag.classList.contains('current')) { state.goldBagSwitchAt=Date.now(); state.message='Seleccionando baúl I para el oro.'; save(); bag.click(); return null; }
+    if (state.goldBagSwitchAt && Date.now()-state.goldBagSwitchAt<5000) return null;
+    if (state.goldBagSwitchAt) { delete state.goldBagSwitchAt; save(); }
+    const items=[...inv.querySelectorAll('.ui-draggable')];
+    if (items.some(x=>!validItemHash(x.getAttribute('data-hash')))) return null;
     if (items.some(x=>x.getAttribute('data-container-number') && x.getAttribute('data-container-number')!=='512')) return null;
-    const box=inv.getBoundingClientRect();
-    const capacity=Math.floor(box.width/32)*Math.floor(box.height/32);
-    let occupied=0;
-    for (const item of items) {
-      const x=Number(item.getAttribute('data-measurement-x')), y=Number(item.getAttribute('data-measurement-y'));
-      if (!Number.isInteger(x)||!Number.isInteger(y)||x<1||y<1) return null;
-      occupied+=x*y;
-    }
-    return Number.isInteger(capacity)&&capacity>0&&occupied<=capacity&&(!requireFree||occupied<capacity) ? {inv,items} : null;
+    const snapshot={inv,items};
+    return !requireFree || goldSpace(snapshot,{width:1,height:1}) ? snapshot : null;
   }
-  // Para objetos grandes, comprobar un rectángulo libre real. Los atributos de
-  // posición pueden estar desactualizados tras un traslado; usar geometría visible.
+  // Las dimensiones lógicas se obtienen del layout; el rectángulo visual
+  // solo convierte coordenadas, también con zoom o transformaciones CSS.
   function goldSpace(bag,item) {
     const width=item?.width ?? 1, height=item?.height ?? 1;
     if (!bag || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1) return false;
-    if (width===1 && height===1) return true; // goldBag ya comprobó una casilla libre.
-    const box=bag.inv.getBoundingClientRect(), cols=Math.floor(box.width/32), rows=Math.floor(box.height/32);
-    if (cols<width || rows<height || cols>20 || rows>20) return false;
-    // MooTools sustituye Array.from y puede ignorar el segundo argumento.
-    const used=[];
+    const inv=bag.inv, box=inv.getBoundingClientRect();
+    const cols=inv.offsetWidth/32, rows=inv.offsetHeight/32;
+    if (!Number.isInteger(cols)||!Number.isInteger(rows)||cols<width||rows<height||cols>20||rows>20 || !Number.isFinite(box.width)||!Number.isFinite(box.height)||box.width<=0||box.height<=0) return false;
+    const cellX=box.width/cols, cellY=box.height/rows, used=[];
     for (let row=0;row<rows;row++) { const cells=[]; for (let col=0;col<cols;col++) cells.push(false); used.push(cells); }
     for (const el of bag.items) {
       if (!visible(el)) return false;
       const w=Number(el.getAttribute('data-measurement-x')),h=Number(el.getAttribute('data-measurement-y')),rect=el.getBoundingClientRect();
-      const dx=(rect.left-box.left)/32,dy=(rect.top-box.top)/32,x=Math.round(dx),y=Math.round(dy);
-      if (!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||Math.abs(dx-x)>.1||Math.abs(dy-y)>.1||x<0||y<0||x+w>cols||y+h>rows) return false;
+      const dx=(rect.left-box.left)/cellX,dy=(rect.top-box.top)/cellY,x=Math.round(dx),y=Math.round(dy);
+      if (!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||!Number.isFinite(dx)||!Number.isFinite(dy)||Math.abs(dx-x)>.1||Math.abs(dy-y)>.1||x<0||y<0||x+w>cols||y+h>rows) return false;
       for (let j=y;j<y+h;j++) for (let i=x;i<x+w;i++) { if (used[j][i]) return false; used[j][i]=true; }
     }
     for (let y=0;y<=rows-height;y++) for (let x=0;x<=cols-width;x++) {
@@ -112,6 +108,40 @@
       return cells[1]?.textContent.trim().normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() && parseGold(cells[2]?.textContent)===price && /^\d{1,2}(?::\d{2})?\s*h$/i.test(cells[3]?.textContent.trim()||'') && goldSame(goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]')),item) && !!row.querySelector('input[value="Cancelar"]');
     }).length;
   }
+  // Recuento completo antes y después de anunciar. Una página parcial nunca
+  // sirve como línea base; navegar solo por enlaces del mismo mercado y filtro.
+  function goldMarketScan(tx,phase) {
+    const now=Date.now(), values=params.getAll('p');
+    const page=values.length ? Number(values[0]) : 1;
+    const allowed=['mod','fl','fq','f','qry','seller','s','p','sh'];
+    if (values.length>1 || !Number.isSafeInteger(page) || page<1 || [...params.keys()].some(k=>!allowed.includes(k)) || (params.get('f')||'0')!=='0' || (params.get('fq')||'-1')!=='-1' || (params.get('qry')||'')!=='' || (params.get('seller')||'')!=='') { goldReview('Filtro o página del mercado ambiguos.'); return false; }
+    const table=document.querySelector('#market_item_table');
+    if (!table || now-goldPageOpenedAt<5000) return true;
+    const text=document.body?.innerText || document.body?.textContent || '';
+    const pagination=[...text.matchAll(/Página\s+(\d+)\s*\/\s*(\d+)/gi)];
+    if (pagination.length!==1) { goldPause('Paginación del mercado no verificable.'); return false; }
+    const current=Number(pagination[0][1]),total=Number(pagination[0][2]);
+    if (current!==page || !Number.isSafeInteger(total) || total<page || total>100) { goldReview('Paginación del mercado contradictoria.'); return false; }
+    let scan=tx.saleScan;
+    if (!scan || scan.phase!==phase) scan=tx.saleScan={phase,pages:[],count:0,fingerprints:{}};
+    const go=target=>{
+      const links=[...document.querySelectorAll('a[href]')];
+      const link=links.find(a=>{try {const u=new URL(a.getAttribute('href'),location.href);const here=new URL(location.href);if(u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='guildMarket'||u.searchParams.getAll('p').length!==1||u.searchParams.get('p')!==String(target)||[...u.searchParams.keys()].some(k=>!allowed.includes(k)))return false;const defaults={fl:'0',fq:'-1',f:'0',qry:'',seller:'',s:''};return Object.keys(defaults).every(k=>(u.searchParams.get(k)??defaults[k])===(here.searchParams.get(k)??defaults[k]));}catch{return false;}});
+      if (!visible(link)) return false;
+      tx.at=now;state.message='Revisando página '+target+' del mercado de alianza.';save();link.click();return true;
+    };
+    const expected=scan.pages.length ? scan.pages.at(-1)+1 : 1;
+    if (page!==expected) { if (!go(expected)) goldPause('No se pudo abrir la página necesaria del mercado.'); return true; }
+    const rows=[...table.querySelectorAll('tr')].slice(1);
+    const fingerprint=rows.map(row=>{const cells=row.cells||[],item=cells[0]?.querySelector('[data-tooltip][data-basis]');return [cells[1]?.textContent.trim(),cells[2]?.textContent.trim(),item?.getAttribute('data-item-id')||item?.getAttribute('data-hash')||''].join('|');}).join('\n');
+    if (fingerprint && Object.values(scan.fingerprints).includes(fingerprint)) { goldReview('Página de mercado repetida; no se puede verificar el anuncio.'); return false; }
+    if (fingerprint) scan.fingerprints[page]=fingerprint;
+    scan.count+=goldOwnCount(tx.item,tx.price);scan.pages.push(page);tx.at=now;save();
+    if (page<total) { if (!go(page+1)) goldPause('No se pudo abrir la siguiente página del mercado.'); return true; }
+    if (phase==='baseline') {tx.ownBefore=scan.count;tx.ownCountScope='all-pages-v2';delete tx.saleScan;tx.at=now;save();return true;}
+    if (scan.count>tx.ownBefore) {log('Anuncio confirmado: '+tx.price.toLocaleString('es-ES')+' durante 24 horas.','success');state.goldTx=null;state.goldSupportSweepDone=false;state.goldCheckAt=now+60000;state.message='Paquete anunciado; esperando siguiente revisión.';save();return false;}
+    delete tx.saleScan; goldPause('Anuncio no confirmado tras revisar el mercado completo.'); return false;
+  }
   function goldTick(pendingOnly=false) {
     const tx=state.goldTx;
     if (state.goldPreviousReview===true || state.foodBuyTx) return false;
@@ -145,12 +175,16 @@
       if (mod!=='guildMarket') {
         const link=document.querySelector('#gca_shortcuts_bar a[href*="mod=guildMarket"]');
         if (!visible(link)) { state.goldCheckAt=now+60000; save(); return false; }
+        if (now-(state.lastNavigationAt||0)<8000) return true;
         if (!goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Revisando paquetes de oro de la alianza.')) { state.goldCheckAt=now+15000; save(); return false; }
         return true;
       }
       if (now-goldPageOpenedAt<5000) { state.message='Esperando a que cargue el baúl I y el mercado.'; save(); return true; }
       const availableBag=goldBag();
-      if (!availableBag) { state.goldCheckAt=now+60000; state.message='Baúl I sin espacio verificable; revisaré el oro más tarde.'; save(); return false; }
+      if (!availableBag) {
+        if (state.goldBagSwitchAt && now-state.goldBagSwitchAt<5000) return true;
+        state.goldCheckAt=now+60000; state.message='Baúl I sin espacio verificable; revisaré el oro más tarde.'; save(); return false;
+      }
       let chosen=null, fee=null;
       for (const offer of goldOffers()) {
         if (!goldSpace(availableBag,offer.item)) continue;
@@ -170,6 +204,7 @@
       if (now-goldPageOpenedAt<5000) return true;
       const candidates=goldOffers().filter(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && /^\d+$/.test(tx.offerId||'') && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
       const availableBag=goldBag(),fee=goldFee(tx.price);
+      if (!availableBag && state.goldBagSwitchAt && now-state.goldBagSwitchAt<5000) return true;
       if(candidates.length!==1 || !availableBag || !goldSpace(availableBag,tx.item) || fee===null || !Number.isSafeInteger(balance) || balance-tx.price-fee<100000) {state.goldTx=null;state.goldCheckAt=now+60000;state.message='Oferta o reserva cambiaron antes de comprar.';save();return false;}
       const chosen=candidates[0],t=tx;
       t.stage='buy';t.at=now;t.balanceBefore=balance;t.confirmed=!chosen.item.owner;state.message='Comprando paquete de '+t.price.toLocaleString('es-ES')+' de '+t.seller+'.';log(state.message,'action');save();
@@ -272,10 +307,11 @@
     }
     if (tx.stage==='market') {
       if (mod!=='guildMarket') { goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Preparando la venta a 24 horas.'); return true; }
+      if (tx.ownCountScope!=='all-pages-v2') return goldMarketScan(tx,'baseline');
       const bag=goldBag(false), target=document.querySelector('#market_sell .ui-droppable');
       const items=bag?.items.filter(x=>x.getAttribute('data-hash')===tx.hash && goldSame(goldItem(x),tx.item)) || [];
       if (!bag || items.length!==1 || !visible(target)) { goldPause('Objeto o casilla de venta no verificable.'); return false; }
-      tx.stage='drop'; tx.at=now; tx.ownBefore=goldOwnCount(tx.item,tx.price); tx.ownCountScope='all-durations-v1'; state.message='Colocando el objeto en el formulario de venta.'; log(state.message,'action'); save();
+      tx.stage='drop'; tx.at=now; state.message='Colocando el objeto en el formulario de venta.'; log(state.message,'action'); save();
       if (!dragFood(items[0],target)) goldPause('No se pudo preparar el arrastre al mercado.');
       return true;
     }
@@ -290,10 +326,8 @@
     }
     if (tx.stage==='sell') {
       if (mod!=='guildMarket') { goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Comprobando el anuncio pendiente.'); return true; }
-      if (tx.ownCountScope==='all-durations-v1' && Number.isSafeInteger(tx.ownBefore) && goldOwnCount(tx.item,tx.price)>tx.ownBefore) {
-        log('Anuncio confirmado: '+tx.price.toLocaleString('es-ES')+' durante 24 horas.','success'); state.goldTx=null; state.goldCheckAt=now+60000; state.message='Paquete anunciado; esperando siguiente revisión.'; save(); return false;
-      }
-      state.message='Esperando confirmación de la venta de oro.'; save(); return true;
+      if (tx.ownCountScope!=='all-pages-v2' || !Number.isSafeInteger(tx.ownBefore)) { goldReview('Venta anterior sin referencia completa del mercado; revisa el anuncio antes de continuar.'); return false; }
+      return goldMarketScan(tx,'verify');
     }
     goldPause('Estado de oro no reconocido.'); return false;
   }
@@ -325,9 +359,21 @@
     const now=Date.now();
     if (!BUILD_CONFIG.modules.smelting && !state.smeltTx) return false;
     let tx=state.smeltTx;
-    if (tx?.blocked) return false;
+    // Solo se reinician lecturas/navegación: ninguna de estas etapas envía
+    // traslados, pagos ni recogidas de materiales.
+    const readOnlyStage=()=>['forge','packages','search'].includes(tx?.stage);
+    if (tx?.blocked) {
+      if (tx.problem!=='Operación sin confirmar; revisión necesaria.' || !readOnlyStage()) return false;
+      tx.blocked=false;delete tx.problem;delete tx.pages;
+      if (tx.stage==='search') tx.stage='packages';
+      tx.at=now;state.message='Reanudando lectura de fundición pendiente.';log(state.message);save();
+    }
     if (!tx) { if (now<(state.smeltNextAt||0)) return false; tx=state.smeltTx={stage:'forge',at:now};save(); }
-    if (now-tx.at>90000 && tx.stage==='search' && mod==='packages' && params.get('f')==='0' && params.get('fq')==='-1' && (params.get('qry')||'')===tx.query) {tx.at=now-5000;save();}
+    if (!Number.isFinite(tx.at)) {smeltBlock('Fecha de operación no verificable.');return false;}
+    if (now-tx.at>90000 && readOnlyStage()) {
+      if (tx.stage==='search') {tx.stage='packages';delete tx.pages;}
+      tx.at=now;state.message='Reanudando lectura de fundición pendiente.';save();
+    }
     if (now-tx.at>90000) {smeltBlock('Operación sin confirmar; revisión necesaria.');return false;}
     if (tx.stage==='forge' || tx.stage==='save' || tx.stage==='place' || tx.stage==='rent') {
       if (mod!=='forge' || sub!=='smeltery') {
@@ -382,8 +428,8 @@
       const bag=document.querySelector('#inventory_nav a[data-bag-number="513"]'),inv=document.querySelector('#inv'),packages=document.querySelector('#packages');
       if (!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv||!packages) {if(now-tx.at>15000) smeltBlock('Paquetes o baúl II no disponibles.');return true;}
       if (!bag.classList.contains('current')) {bag.click();return true;}
-      const items=[...inv.querySelectorAll('.ui-draggable[data-hash]')];
-      if (items.some(e=>e.getAttribute('data-container-number') && e.getAttribute('data-container-number')!=='513')) return true;
+      const items=[...inv.querySelectorAll('.ui-draggable')];
+      if (items.some(e=>!validItemHash(e.getAttribute('data-hash')) || (e.getAttribute('data-container-number') && e.getAttribute('data-container-number')!=='513'))) return true;
       if (tx.stage==='transfer') {
         if (items.filter(e=>e.getAttribute('data-hash')===tx.hash).length===1 && ![...packages.querySelectorAll('[data-hash]')].some(e=>e.getAttribute('data-hash')===tx.hash)) {tx.stage='place';tx.at=now;save();return true;}
         if (now-tx.actionAt>20000) {smeltBlock('Traslado a baúl II sin confirmar; no repetiré.');return false;} return true;
@@ -399,9 +445,7 @@
       if (params.get('f')!=='0' || params.get('fq')!=='-1' || (params.get('qry')||'')!==tx.query) {if(now-tx.at>20000) smeltBlock('Búsqueda de paquetes sin confirmar.');return true;}
       if (params.getAll('page').length>1 || (params.has('page') && !/^[1-9]\d*$/.test(params.get('page')))) {smeltBlock('Paginación de paquetes ambigua.');return false;}
       const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].map(e=>smeltItem(e)).filter(x=>x && (priority==='green-blue'||x.name.normalize('NFKC').toLocaleLowerCase('es').split(/\s+/).includes(tx.query.toLocaleLowerCase('es'))) && x.el.hasAttribute('data-gca-flag_double-click-event'));
-      const rect=inv.getBoundingClientRect(),capacity=Math.floor(rect.width/32)*Math.floor(rect.height/32);
-      const occupied=items.reduce((n,e)=>n+Number(e.getAttribute('data-measurement-x'))*Number(e.getAttribute('data-measurement-y')),0);
-      const hasSpace=Number.isSafeInteger(capacity)&&capacity>0&&Number.isSafeInteger(occupied)&&occupied<capacity;
+      const hasSpace=goldSpace({inv,items},{width:1,height:1});
       const candidate=hasSpace ? candidates.find(x=>goldSpace({inv,items},x)) : null;
       if (!candidate) {
         const next=document.querySelector('.paging_right_step');

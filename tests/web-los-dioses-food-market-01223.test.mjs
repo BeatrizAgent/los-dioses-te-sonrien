@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
 const src=fs.readFileSync(new URL('../src/bot/20-healing.js',import.meta.url),'utf8');
-const code=src.slice(src.indexOf('  function foodMarketOffers()'),src.indexOf('  // Una sola operación de oro'));
+const code=src.slice(src.indexOf('  function foodMarketOffers('),src.indexOf('  // Una sola operación de oro'));
 function setup() {
  let clicks=0; const state={foodBuyNeeded:true}; const food={name:'Pan',amount:1000,level:1,item:{getAttribute:k=>({'data-hash':'foodhash','data-basis':'7-1','data-item-id':'123'}[k]??null)}};
  const c={state,Date,Number,String,URL,mod:'guildMarket',goldPageOpenedAt:0,goldBalance:()=>2000000,goldNav:()=>true,save:()=>{},log:()=>{},validItemHash:()=>true,window:{confirm:()=>false},foodMarketOffers:()=>[],location:{origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php'},accountName:'Cassius',visible:x=>!!x};
@@ -25,3 +25,26 @@ test('solo admite ofertas de alimentos compatibles, excluye las propias y ordena
  x.c.document={querySelector:()=>({textContent:'96'}),querySelectorAll:()=>rows};x.c.parseGold=Number;x.c.healingFood=el=>el?{name:'Pan',amount:100,level:el.level}:null;
  vm.runInContext(code,x.c);const offers=x.c.foodMarketOffers();assert.deepEqual(Array.from(offers,o=>o.price),[300000,900000]);
 });
+
+test('apoyo compra alimento aunque ya existan paquetes iguales y verifica incremento',()=>{
+ const x=setup(),now=Date.now(),tx=x.state.foodBuyTx={support:true,offerPage:1,stage:'baseline',name:'Pan',amount:1000,level:1,basis:'7-1',soul:null,at:now,loadedAt:now-6000,scan:{pages:[],matches:0,fingerprints:{}}};
+ x.c.mod='packages';x.c.params=new URLSearchParams('f=7&fq=-1&qry=Pan');let items=[{food:{name:'Pan',amount:1000,level:1},getAttribute:k=>({'data-hash':'old','data-basis':'7-1'}[k]??null),closest:()=>({textContent:'Mercado'})}];x.c.document={querySelector:s=>s==='#packages'?{querySelectorAll:()=>items}:null};x.c.healingFood=e=>e.food;
+ assert.equal(x.c.foodMarketTick(),true);assert.equal(tx.stage,'readyBuy');assert.equal(tx.baselineCount,1);assert.equal(tx.baselineComplete,true);
+ tx.stage='verify';tx.loadedAt=now-6000;tx.scan={pages:[],matches:0,fingerprints:{}};items.push({food:{name:'Pan',amount:1000,level:1},getAttribute:k=>({'data-hash':'new','data-basis':'7-1'}[k]??null),closest:()=>({textContent:'Mercado'})});
+ assert.equal(x.c.foodMarketTick(),true);assert.equal(x.state.foodBuyTx,null);assert.equal(x.state.foodSupportNeeded,true);assert.equal(x.state.packageFoodTrip,undefined);
+});
+test('apoyo sin incremento no repite compra',()=>{
+ const x=setup(),now=Date.now(),tx=x.state.foodBuyTx={support:true,stage:'verify',baselineCount:1,name:'Pan',amount:1000,level:1,basis:'7-1',at:now,loadedAt:now-6000,scan:{pages:[],matches:0,fingerprints:{}}};
+ x.c.mod='packages';x.c.params=new URLSearchParams('f=7&fq=-1&qry=Pan');x.c.document={querySelector:s=>s==='#packages'?{querySelectorAll:()=>[]}:null};assert.equal(x.c.foodMarketTick(),false);assert.equal(tx.stage,'verify');assert.equal(x.clicks,0);
+});
+test('apoyo continúa hasta agotar todas las páginas de mercado',()=>{
+ const x=setup();x.state.foodBuyNeeded=false;x.state.foodSupportNeeded=true;x.c.foodMarketOffers=()=>[];x.c.params=new URLSearchParams('mod=guildMarket&p=1');x.c.document={body:{innerText:'Página 1 / 2'}};let page=0;x.c.foodMarketGoPage=n=>{page=n;return true;};assert.equal(x.c.foodMarketTick(),true);assert.equal(page,2);assert.equal(x.state.goldSupportSweepDone,undefined);
+ x.c.params=new URLSearchParams('mod=guildMarket&p=2');x.c.document.body.innerText='Página 2 / 2';assert.equal(x.c.foodMarketTick(),false);assert.equal(x.state.goldSupportSweepDone,true);assert.equal(x.state.foodSupportNeeded,false);
+});
+
+test('apoyo acepta precio alto si hay saldo y conserva identidad de página',()=>{
+ const x=setup();x.state.foodBuyNeeded=false;x.state.foodSupportNeeded=true;x.c.params=new URLSearchParams('mod=guildMarket&p=2');assert.equal(x.c.foodMarketTick(),true);assert.equal(x.clicks,0);assert.equal(x.state.foodBuyTx.price,1500000);assert.equal(x.state.foodBuyTx.offerPage,2);assert.equal(x.state.foodBuyTx.support,true);assert.equal(x.state.foodBuyTx.stage,'readyBuy');
+});
+test('apoyo continúa sin recorrer paquetes tras comprobar saldo y desaparición',()=>{const x=setup();x.c.params=new URLSearchParams('mod=guildMarket&p=1');x.c.foodMarketOffers=()=>[];x.c.goldBalance=()=>500000;x.state.foodBuyTx={support:true,offerPage:1,stage:'buy',offerId:'123',offerHash:'foodhash',price:1500000,balanceBefore:2000000,confirmed:true,at:Date.now()-6000};assert.equal(x.c.foodMarketTick(),true);assert.equal(x.state.foodBuyTx,null);assert.equal(x.state.foodSupportNeeded,true);assert.equal(x.clicks,0);});
+test('apoyo mantiene pendiente la compra si el saldo no confirma',()=>{const x=setup();x.c.params=new URLSearchParams('mod=guildMarket&p=1');x.c.foodMarketOffers=()=>[];x.state.foodBuyTx={support:true,offerPage:1,stage:'buy',offerId:'123',price:1500000,balanceBefore:2000000,confirmed:true,at:Date.now()-6000};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.state.foodBuyTx.stage,'buy');assert.equal(x.clicks,0);});
+test('compra de apoyo sin saldo no intenta pagar',()=>{const x=setup();x.state.foodBuyNeeded=false;x.state.foodSupportNeeded=true;x.c.goldBalance=()=>100;x.c.params=new URLSearchParams('mod=guildMarket&p=1');x.c.document={body:{innerText:'Página 1 / 1'}};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.clicks,0);assert.equal(x.state.foodBuyTx,undefined);});

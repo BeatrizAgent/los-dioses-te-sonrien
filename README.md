@@ -38,6 +38,8 @@ En 0.12.28, las compras de oro y alimento se preparan con una búsqueda previa d
 
 En 0.12.29, la comprobación de una compra de alimento ambigua se aplaza y vuelve a intentarse sin repetir la compra. Si la búsqueda previa encuentra alimento igual, intenta recogerlo en lugar de comprarlo. Estos cambios están probados en simulación y pendientes de validación instalada.
 
+En 0.12.30, la compra de apoyo a la alianza omite las búsquedas de paquetes antes y después de cada compra: comprueba la desaparición del anuncio y el descuento exacto para continuar. Una compra incierta queda pendiente sin repetirse. La compra para curación conserva su comprobación de paquetes. La nueva ruta rápida está probada en simulación y pendiente de validación en juego.
+
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
 
 El nivel que se escribe en el formulario es una declaración para filtrar requisitos; la web no lee la cuenta. Los rangos de nivel de los bichos proceden de guías comunitarias, incluida una publicación en el foro oficial de Gameforge. Las bandas de mazmorra se contrastan con una referencia comunitaria actual. Consulta [la investigación PvE](docs/investigacion-pve.md) para fechas, fuentes y discrepancias.
@@ -109,4 +111,8 @@ Para recuperar equipo de oro o refinamiento, se busca por un término del nombre
 
 ## Versión 0.12.24
 
-La mazmorra usa el acceso de la zona seleccionada y aplaza una instancia activa en otra zona sin cancelarla. Las operaciones de oro inciertas requieren revisión manual, sin repetir la compra. La compra de alimentos del mercado de alianza es una opción independiente, desactivada por defecto: requiere curación, puede gastar todo el saldo y necesita revisión humana después de cada intento. Crazy Addon sigue siendo necesario para recoger alimentos de paquetes. Las pruebas son simuladas; no garantizan aceptación del servidor ni un ciclo completo real.
+La mazmorra usa el acceso de la zona seleccionada y aplaza una instancia activa en otra zona sin cancelarla. Las operaciones de oro inciertas requieren revisión manual, sin repetir la compra. La compra de alimentos del mercado de alianza es una opción independiente, desactivada por defecto: requiere curación y puede gastar todo el saldo. Las compras confirmadas continúan automáticamente; las inciertas quedan pendientes sin repetirse. Crazy Addon sigue siendo necesario para recoger alimentos de paquetes. Las pruebas son simuladas; no garantizan aceptación del servidor ni un ciclo completo real.
+
+### Comprobación de espacio en el mercado de alianza
+
+La versión local calcula la cuadrícula lógica con las dimensiones de layout del baúl y usa la geometría visible para ubicar objetos, incluso con escalado. Comprueba huecos contiguos también para objetos de una casilla y rechaza posiciones ambiguas o solapadas. Las pruebas son simuladas: falta verificar una compra y el traslado completos en el juego, incluida la carga del baúl.

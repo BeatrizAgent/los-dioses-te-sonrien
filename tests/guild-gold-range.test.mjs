@@ -15,7 +15,7 @@ test('acepta ofertas entre 100k y 1kk, ordenadas por precio',()=>{assert.deepEqu
 test('valida el precio tanto al comprar como al calcular la tarifa de venta',()=>{assert.equal((market.match(/!goldPriceAllowed\(price\)/g)||[]).length,2);assert.match(market,/balance-offer\.price-cost>=100000/);assert.match(market,/goldFee\(tx\.price\)/);});
 const space=market.slice(market.indexOf('  function goldSpace('),market.indexOf('  function goldFee('));
 function fits(width,height,items){
- const ctx={bag:{inv:{getBoundingClientRect:()=>({left:0,top:0,width:128,height:96})},items:items.map(({x,y,w=1,h=1})=>({getBoundingClientRect:()=>({left:x*32,top:y*32}),getAttribute:k=>String(k==='data-measurement-x'?w:h)}))},item:{width,height},visible:()=>true,Number,Math,Array};
+ const ctx={bag:{inv:{offsetWidth:128,offsetHeight:96,getBoundingClientRect:()=>({left:0,top:0,width:128,height:96})},items:items.map(({x,y,w=1,h=1})=>({getBoundingClientRect:()=>({left:x*32,top:y*32}),getAttribute:k=>String(k==='data-measurement-x'?w:h)}))},item:{width,height},visible:()=>true,Number,Math,Array};
  return vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,ctx);
 }
 test('verifica hueco rectangular para objetos grandes y rechaza posiciones ambiguas',()=>{
@@ -28,7 +28,24 @@ function item(name,basis,width,height){const attrs={'data-tooltip':JSON.stringif
 test('admite objetos de varias casillas y protege materiales reservados',()=>{assert.equal(item('Armadura','3-1',2,3)?.height,3);assert.equal(item('Material de forja','12-1',1,1),null);});
 
 test('encuentra espacio con Array.from reemplazado por MooTools',()=>{
- const bag={inv:{getBoundingClientRect:()=>({left:0,top:0,width:256,height:160})},items:[]};
+ const bag={inv:{offsetWidth:256,offsetHeight:160,getBoundingClientRect:()=>({left:0,top:0,width:256,height:160})},items:[]};
  const ArrayMoo={from:()=>[undefined,undefined,undefined,undefined,undefined]};
  assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,{bag,item:{width:2,height:2},visible:()=>true,Number,Math,Array:ArrayMoo}),true);
 });
+
+ test('escala visual y hueco real de una casilla',()=>{
+  for (const scale of [1,1.25,1.5,0.75]) {
+    const bag={inv:{offsetWidth:128,offsetHeight:96,getBoundingClientRect:()=>({left:10,top:20,width:128*scale,height:96*scale})},items:[]};
+    for(let y=0;y<3;y++) for(let x=0;x<4;x++) if(x!==3||y!==2) bag.items.push({getBoundingClientRect:()=>({left:10+x*32*scale,top:20+y*32*scale}),getAttribute:()=> '1'});
+    const ctx={bag,item:{width:1,height:1},visible:()=>true,Number,Math,Array};
+    assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,ctx),true);
+    bag.items.push({getBoundingClientRect:()=>({left:10+96*scale,top:20+64*scale}),getAttribute:()=> '1'});
+    assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,ctx),false);
+    bag.items[11]=bag.items[0];
+    assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,ctx),false);
+  }
+ });
+ test('rechaza dimensiones lógicas y posiciones no verificables',()=>{
+  const bag={inv:{offsetWidth:127,offsetHeight:96,getBoundingClientRect:()=>({left:0,top:0,width:128,height:96})},items:[]};
+  assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,{bag,item:{width:1,height:1},visible:()=>true,Number,Math,Array}),false);
+ });

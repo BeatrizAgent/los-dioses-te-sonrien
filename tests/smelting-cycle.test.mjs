@@ -72,7 +72,7 @@ test('revisa páginas consecutivas sin seguir rutas externas',()=>{
  let destination='';const now=Date.now();const bag={classList:{contains:()=>true},getAttribute:()=> 'true'};const inv={querySelectorAll:()=>[],getBoundingClientRect:()=>({width:256,height:160})};const packages={querySelectorAll:()=>[]};
  const next={getAttribute:()=>'/game/index.php?mod=packages&f=0&fq=-1&qry=Servius&page=3'};
  const document={querySelectorAll:()=>[],querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:s==='#packages'?packages:s==='.paging_right_step'?next:null};
- const x=setup({stage:'search',query:'Servius',at:now-6000},{mod:'packages',sub:null,document,params:new URLSearchParams('f=0&fq=-1&qry=Servius&page=1'),location:{origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php?mod=packages',assign:u=>destination=u}});
+ const x=setup({stage:'search',query:'Servius',at:now-6000},{goldSpace:()=>true,mod:'packages',sub:null,document,params:new URLSearchParams('f=0&fq=-1&qry=Servius&page=1'),location:{origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php?mod=packages',assign:u=>destination=u}});
  x.c.smeltingTick();assert.equal(new URL(destination).searchParams.get('page'),'2');assert.equal(x.state.smeltTx.stage,'search');
 });
 
@@ -80,8 +80,15 @@ test('excepción del módulo bloquea fundición sin romper la cola',()=>{
  const {c,state}=setup({stage:'place',slot:2,at:Date.now()},{document:{querySelectorAll:()=>{throw Error('DOM')}}});
  assert.equal(c.safeSmeltingTick(),false);assert.equal(state.smeltTx.blocked,true);assert.match(state.smeltTx.problem,/Error interno/);
 });
-test('búsqueda antigua se reanuda solo en la página correspondiente',()=>{
+test('búsqueda antigua reinicia lectura sin asumir la página',()=>{
  const now=Date.now(),tx={stage:'search',query:'Servius',at:now-100000};
- const {c,state}=setup(tx,{mod:'packages',params:new URLSearchParams('f=0&fq=-1&qry=Otro'),document:{querySelector:()=>null,querySelectorAll:()=>[]}});
- assert.equal(c.smeltingTick(),false);assert.equal(state.smeltTx.blocked,true);
+ const {c,state}=setup(tx,{mod:'overview',params:new URLSearchParams('f=0&fq=-1&qry=Otro'),document:{querySelector:()=>null,querySelectorAll:()=>[]}});
+ assert.equal(c.smeltingTick(),true);assert.equal(state.smeltTx.stage,'packages');assert.equal(state.smeltTx.blocked,undefined);
 });
+
+test('recupera timeout antiguo de búsqueda sin repetir traslado ni pago',()=>{
+ let clicks=0;const tx={stage:'search',query:'Servius',blocked:true,problem:'Operación sin confirmar; revisión necesaria.',at:Date.now()-120000,pages:[1,2]};
+ const x=setup(tx,{mod:'overview',document:{querySelectorAll:()=>[],querySelector:()=>null},smeltNav:()=>false});
+ x.c.smeltingTick();assert.equal(tx.blocked,false);assert.equal(tx.stage,'packages');assert.equal(tx.pages,undefined);assert.equal(clicks,0);
+});
+test('no reanuda pago o traslado incierto por timeout genérico',()=>{for(const stage of ['rent','transfer','save','place']){const tx={stage,blocked:true,problem:'Operación sin confirmar; revisión necesaria.',at:Date.now()-120000};const x=setup(tx);assert.equal(x.c.smeltingTick(),false);assert.equal(tx.blocked,true);}});
