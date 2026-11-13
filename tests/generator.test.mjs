@@ -12,7 +12,7 @@ test('genera un userscript completo desde los ocho módulos y sustituye la confi
   const config = normalizeBuildConfig(DEFAULT_CONFIG, catalog);
   const result = buildUserscript(config, fragments);
   assert.match(result, /@name\s+Los Dioses Te Sonríen/);
-  assert.match(result, /@version\s+0\.12\.31/);
+  assert.match(result, /@version\s+0\.12\.32/);
   assert.match(result, /const BUILD_CONFIG = Object\.freeze\(\{"playerLevel":20/);
   assert.ok(result.trimEnd().endsWith('})();'));
   assert.ok(!result.includes('__BUILD_CONFIG__'));

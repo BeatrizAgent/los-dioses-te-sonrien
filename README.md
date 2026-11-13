@@ -42,6 +42,8 @@ En 0.12.30, la compra de apoyo a la alianza omite las búsquedas de paquetes ant
 
 En 0.12.31, el módulo de oro seleccionado funciona al activar el bot sin otro interruptor; las nuevas ofertas se limitan a anillos de nivel 1. La recogida periódica de utilizables y la pausa de Circo tras tres listas fallidas están probadas en simulación, pendientes de validación instalada. Con la versión anterior instalada en CassiusFerox se observó la compra, recepción y anuncio a 24 horas de un anillo de 300.000; no se observó un ciclo de 500.000.
 
+En 0.12.32, la compra de apoyo se limita a tres alimentos confirmados por ciclo de oro. Las compras inciertas no cuentan ni se repiten. La limitación está probada en simulación y pendiente de validación en juego.
+
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
 
 El nivel que se escribe en el formulario es una declaración para filtrar requisitos; la web no lee la cuenta. Los rangos de nivel de los bichos proceden de guías comunitarias, incluida una publicación en el foro oficial de Gameforge. Las bandas de mazmorra se contrastan con una referencia comunitaria actual. Consulta [la investigación PvE](docs/investigacion-pve.md) para fechas, fuentes y discrepancias.

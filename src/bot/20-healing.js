@@ -253,6 +253,14 @@
     const link=[...document.querySelectorAll('a[href]')].find(a=>{try{const u=new URL(a.getAttribute('href'),location.href);return u.origin===location.origin&&u.pathname==='/game/index.php'&&u.searchParams.get('mod')==='guildMarket'&&u.searchParams.getAll('p').length===1&&u.searchParams.get('p')===String(target)&&[...u.searchParams.keys()].every(k=>allowed.includes(k))&&Object.keys(defaults).every(k=>(u.searchParams.get(k)??defaults[k])===(here.searchParams.get(k)??defaults[k]));}catch{return false;}});
     if(!visible(link))return false;state.message='Revisando página '+target+' de alimentos de alianza.';save();link.click();return true;
   }
+  function foodSupportConfirmed() {
+    state.foodSupportCount=(Number.isSafeInteger(state.foodSupportCount) && state.foodSupportCount>=0 ? state.foodSupportCount : 0)+1;
+    const done=state.foodSupportCount>=3;
+    state.foodSupportNeeded=!done;
+    if (done) state.goldSupportSweepDone=true;
+    state.message=done ? 'Tres alimentos comprados; continúo con el oro.' : 'Alimento comprado ('+state.foodSupportCount+'/3); revisaré más ofertas.';
+    log(state.message,'success');save();
+  }
   function foodMarketTick() {
     const tx=state.foodBuyTx;
     if (tx) {
@@ -292,7 +300,7 @@
         const expectedMatches=tx.support && Number.isSafeInteger(tx.baselineCount) ? tx.baselineCount+1 : 1;
         if(scan.matches!==expectedMatches)return deferFoodCheck('Compra de alimento sin identificar de forma única; volveré a comprobarla sin repetir.');
         const support=tx.support===true;state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;
-        if (support) { state.foodSupportNeeded=true; state.message='Compra de alimento confirmada; revisaré más ofertas.'; }
+        if (support) { foodSupportConfirmed(); return true; }
         else {state.packageFoodTrip=true;delete state.packageScan;state.message='Compra de alimento confirmada; recogiendo comida.';}
         log(state.message,'success');save();return true;
       }
@@ -313,7 +321,7 @@
         if(tx.support && Number(params.get('p')||'1')!==tx.offerPage){if(foodMarketGoPage(tx.offerPage))return true;state.message='Compra de alimento incierta; no repetiré.';save();return false;}
         const still=foodMarketOffers(tx.support===true).some(o=>o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.item.getAttribute('data-hash')===tx.offerHash&&o.food.item.getAttribute('data-item-id')===tx.offerId);
         if(/^\d+$/.test(tx.offerId||'')&&!still&&(tx.support===true || tx.baselineEmpty===true)&&tx.confirmed&&!tx.rejected&&Number.isSafeInteger(tx.balanceBefore)&&goldBalance()===tx.balanceBefore-tx.price){
-          if(tx.support){state.foodBuyTx=null;state.foodSupportNeeded=true;state.message='Compra de alimento confirmada en mercado; revisaré más ofertas.';log(state.message,'success');save();return true;}
+          if(tx.support){state.foodBuyTx=null;foodSupportConfirmed();return true;}
           tx.stage='verify';tx.at=now;delete tx.scan;delete tx.loadedAt;save();return true;
         }
         state.message='Compra de alimento incierta; no repetiré.';save();return false;

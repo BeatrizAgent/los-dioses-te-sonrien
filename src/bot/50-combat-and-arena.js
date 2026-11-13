@@ -152,7 +152,7 @@
     if (BUILD_CONFIG.modules.guildGold && BUILD_CONFIG.modules.foodMarket && !state.goldTx && !state.goldPreviousReview) {
       const balance=goldBalance();
       if (Number.isSafeInteger(balance) && balance<=200000 && state.goldSupportSweepDone) {state.goldSupportSweepDone=false;save();}
-      if (Number.isSafeInteger(balance) && balance>200000 && !state.goldSupportSweepDone && !state.foodSupportNeeded) {state.foodSupportNeeded=true;save();}
+      if (Number.isSafeInteger(balance) && balance>200000 && !state.goldSupportSweepDone && !state.foodSupportNeeded) {state.foodSupportNeeded=true;state.foodSupportCount=0;save();}
       if (state.foodSupportNeeded && Date.now()>=(state.foodBuyRetryAt||0) && foodMarketTick()) return;
     }
     if (!state.foodSupportNeeded) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
