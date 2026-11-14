@@ -54,9 +54,9 @@ El bot comprueba la zona y el control de ataque de la posición elegida antes de
 
 ## Publicación
 
-Web: https://beatrizagent.github.io/los-dioses-te-sonrien/
+Web: https://gladibot.yampi.eu/los-dioses-te-sonrien/
 
-GitHub Actions ejecuta `pnpm test`, genera el userscript y construye Astro antes de publicar `dist/` en GitHub Pages. La ruta base del proyecto está definida en `astro.config.mjs`.
+GitHub Actions ejecuta `pnpm test`, genera el userscript y construye Astro. La web pública se sirve desde el VPS; su despliegue todavía no está automatizado mediante Actions. La ruta base está definida en `astro.config.mjs`.
 
 ## Límites de seguridad
 
