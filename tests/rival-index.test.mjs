@@ -25,3 +25,15 @@ test('inserciones, reducción y reemplazo reconstruyen sin perder identidad estr
   records.pop(); index.sync(records); assert.equal(index.get(records[0]).total,1);
   index.sync([]); assert.equal(index.get(records[0]).total,0);
 });
+
+test('exportación local conserva resultados y excluye campos ajenos al historial',()=>{
+  const panel=readFileSync(new URL('../src/bot/60-panel.js',import.meta.url),'utf8');
+  const code=panel.slice(panel.indexOf('  function exportRivalHistory('),panel.indexOf('  function renderContent('));
+  let payload='',clicked=false,revoked=false,link;
+  const context={Blob:class {constructor(parts){payload=parts.join('');}}, URL:{createObjectURL:()=> 'blob:test',revokeObjectURL:()=>{revoked=true;}},
+    document:{createElement:()=>link={click:()=>{clicked=true;}}},setTimeout:fn=>fn()};
+  vm.createContext(context); vm.runInContext(code,context);
+  context.exportRivalHistory([{name:'Rival',server:'s1',mode:'arena',level:1,result:'win',source:'informe',at:'2026-01-01',extraPrivate:'not-exported'}]);
+  assert.deepEqual(JSON.parse(payload),{version:1,records:[{name:'Rival',server:'s1',mode:'arena',level:1,result:'win',source:'informe',at:'2026-01-01'}]});
+  assert.equal(link.download,'historial-rivales.json'); assert.equal(clicked,true); assert.equal(revoked,true);
+});

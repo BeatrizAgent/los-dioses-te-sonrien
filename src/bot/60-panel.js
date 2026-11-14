@@ -67,6 +67,13 @@
   $('.min').onclick = () => { const small = $('.shell').classList.toggle('minimized'); uiState.minimized=small; saveUI(uiState); $('.min').textContent = small ? '+' : '−'; $('.min').setAttribute('aria-label',small?'Abrir panel':'Minimizar panel'); };
   root.querySelectorAll('.tab').forEach(button => button.onclick = () => { resetConfirmation=false; tabName = button.dataset.tab; uiState.tab=tabName; saveUI(uiState); contentKey=''; root.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); renderContent(); });
   function textElement(tag, cls, text) { const node=document.createElement(tag); node.className=cls; node.textContent=text; return node; }
+  function exportRivalHistory(records) {
+    const fields=['name','server','mode','level','rivalLevel','result','gold','damageEstimate','experience','source','at'];
+    const entries=records.map(record=>Object.fromEntries(fields.filter(key=>Object.hasOwn(record,key)).map(key=>[key,record[key]])));
+    const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,records:entries},null,2)],{type:'application/json'}));
+    const link=document.createElement('a'); link.href=url; link.download='historial-rivales.json'; link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
   function renderContent() {
     const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
     const signature = JSON.stringify([tabName,data]);
@@ -133,6 +140,10 @@
       for (const item of state.logs) {const row=textElement('div','log','');row.append(textElement('span','time',new Date(item.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})),textElement('span','logtext',item.message));content.append(row);}
     } else {
       const items=rivals();
+      const exportButton=textElement('button','btn','Exportar historial');
+      exportButton.disabled=!state.records.length;
+      exportButton.onclick=()=>exportRivalHistory(state.records);
+      content.append(exportButton,textElement('p','small','La exportación contiene nombres de rivales y resultados; guárdala en un lugar privado.'));
       if (!items.length) { content.append(textElement('div','empty','Abre Circo Turma o Circo Provinciarum para ver los rivales de la lista actual.')); return; }
       const isLive=liveRivals().length > 0;
       content.append(textElement('p','small',isLive ? 'Lista actual. Resultados confirmados y anotaciones manuales; no garantizan victorias.' : `Última lista observada ${state.rivalSnapshot?.at ? new Date(state.rivalSnapshot.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) : ''}. La disponibilidad puede haber cambiado.`));

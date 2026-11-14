@@ -58,7 +58,7 @@ El bot comprueba la zona y el control de ataque de la posición elegida antes de
 
 Web: https://gladibot.yampi.eu/los-dioses-te-sonrien/
 
-El historial de rivales permanece en el almacenamiento local del navegador por personaje. El panel usa un índice temporal en memoria, reconstruido tras una recarga, y no elimina registros antiguos automáticamente. El reinicio total elimina el historial de ese personaje tras confirmación; todavía no hay exportación de historial.
+El historial de rivales permanece en el almacenamiento local del navegador por personaje. El panel usa un índice temporal en memoria, reconstruido tras una recarga, y no elimina registros antiguos automáticamente. En Rivales se puede exportar el historial a JSON: contiene nombres de rivales y resultados, por lo que debe tratarse como información privada. El reinicio total elimina el historial de ese personaje tras confirmación; exportar no lo borra.
 
 Para comparar el índice con el filtrado anterior sin datos de jugadores, ejecuta `node scripts/benchmark-rivals.mjs`. En Node 24.11.1 para Windows x64, con 100 rivales y mediana de siete ejecuciones, el filtrado y la creación del índice tardaron respectivamente 0,087/0,135 ms para 100 registros; 0,609/0,172 ms para 1.000; y 6,274/0,547 ms para 10.000. Son cifras locales, no mediciones del navegador ni una promesa de rendimiento en móviles.
 
