@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.2
+// @version      0.5.3
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -584,7 +584,14 @@
       if (params.get('mod')!=='auction') return navigate('#mainmenu a[href*="mod=auction"]','auction');
       return auctionTick();
     }
-    if (state.needGold && !state.scrollNeeded && goldClaimTick()) return;
+    // Los cobros del mercado de alianza se recogen exclusivamente a mano.
+    // Una transacción antigua aún se verifica arriba, pero nunca se inicia otra.
+    if (state.needGold && !state.scrollNeeded && !state.goldClaim && Date.now()>=(state.scrollRetryAt||0)) {
+      if (state.options.bid || state.options.bidUsable || state.options.smelt) {
+        state.scrollNeeded=true;state.phase='packages';state.packageFilterIndex=0;state.nextPackages=0;
+        note('Falta oro; buscando pergaminos. El dinero de alianza se recoge a mano.');
+      } else {state.needGold=false;save();}
+    }
     // Una lectura ya iniciada debe terminar antes de que otra tarea cambie la página.
     if(state.options.sell && state.marketCapacityScan && marketCapacityTick()) return;
     if(state.options.smelt && !state.suspendedSmelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
