@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.4.8
+// @version      0.4.9
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -292,11 +292,20 @@
       if (item && !remaining) { tx.stage=tx.kind==='sell'?'market':tx.kind==='scroll'?'npc':'forge';tx.at=Date.now();note('Paquete recibido: '+tx.name+'.');return true; }
       return waitItem(tx,'Traslado no confirmado; no se repetirá.');
     }
-    if (!tx && state.options.sell) {
+    if (!tx && state.options.sell && Date.now()>=(state.sellRetryAt||0)) {
       const bag=document.querySelector('#inventory_nav a[data-bag-number="512"]');
       if (visible(bag) && bag.getAttribute('data-available')==='true') {
         if (!selectBag('512')) return true;
-        const items=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(itemDetails).filter(item=>sellableUsable(item) && !state.blockedItems?.some(x=>x.hash===item.hash));
+        const inventory=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(itemDetails).filter(Boolean);
+        // Solo recuperar un intento anterior al envío, con precio conocido y objeto único presente.
+        // Una operación en etapa sold o un identificador compartido conserva el bloqueo.
+        const blocked=Array.isArray(state.blockedItems)?state.blockedItems:[];
+        const safe=blocked.find(x=>x.kind==='sell' && x.stage==='drop' && x.salePrice===SALE_PRICE &&
+          ['Objeto en mercado sin confirmar.','Tarifa de 24 h no verificable.','Formulario de venta no verificable.'].includes(x.problem) &&
+          blocked.filter(y=>y.hash===x.hash).length===1 && inventory.filter(y=>y.hash===x.hash).length===1 &&
+          inventory.some(y=>y.hash===x.hash && y.name===x.name && y.basis===x.basis && sellableUsable(y)));
+        if(safe){state.blockedItems=blocked.filter(x=>x!==safe);state.itemTx={...safe,stage:'market',at:Date.now()};delete state.itemTx.blocked;delete state.itemTx.problem;delete state.itemTx.marketScan;delete state.itemTx.before;note('Revisando venta no enviada: '+safe.name+'.');return true;}
+        const items=inventory.filter(item=>sellableUsable(item) && !state.blockedItems?.some(x=>x.hash===item.hash));
         const item=items.find(x=>items.filter(y=>y.hash===x.hash).length===1);
         if (item) {state.itemTx={...item,kind:'sell',salePrice:SALE_PRICE,bag:'512',stage:'market',at:Date.now()};note('Preparando venta del utilizable en baúl I: '+item.name+'.');return true;}
       }
@@ -306,7 +315,7 @@
     const scanKey=[params.get('f')||'0',params.get('page')||'1'].join(':');
     if(state.packageScan?.key!==scanKey){state.packageScan={key:scanKey,at:Date.now()};save();return true;}
     if(Date.now()-state.packageScan.at<3000)return true;
-    const filters=state.needGold && state.options.scroll ? [20] : PACKAGE_FILTERS.filter(f=>f===7 ? state.options.sell : f===20 ? false : state.options.smelt && state.forgeHasFree!==false);
+    const filters=state.needGold && state.options.scroll ? [20] : PACKAGE_FILTERS.filter(f=>f===7 ? state.options.sell && Date.now()>=(state.sellRetryAt||0) : f===20 ? false : state.options.smelt && state.forgeHasFree!==false);
     if (!filters.length) { state.nextPackages=Date.now()+120000;save();return false; }
     const filter=filters[(state.packageFilterIndex||0)%filters.length];
     if (params.get('f')!==String(filter)) {
@@ -501,6 +510,7 @@
     }
     if (state.itemTx?.blocked) {
       state.blockedItems=Array.isArray(state.blockedItems)?state.blockedItems:[];
+      if(state.itemTx.kind==='sell')state.sellRetryAt=Date.now()+120000;
       state.blockedItems.push(state.itemTx);state.itemTx=null;save();
     }
     if (state.goldClaim && goldClaimTick()) return;
