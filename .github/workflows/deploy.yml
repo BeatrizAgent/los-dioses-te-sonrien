@@ -78,11 +78,12 @@ jobs:
           set -eu
           config=$(curl -fsS --get "$DOKPLOY_URL/api/compose.one" --data-urlencode "composeId=$COMPOSE_ID" -H "x-api-key: $DOKPLOY_API_KEY")
           echo "$config" | jq -e '.sourceType == "github" and .owner == "BeatrizAgent" and .repository == "los-dioses-te-sonrien" and .branch == "ci/production" and .autoDeploy == false' >/dev/null
+          before=$(curl -fsS --get "$DOKPLOY_URL/api/deployment.allByCompose" --data-urlencode "composeId=$COMPOSE_ID" -H "x-api-key: $DOKPLOY_API_KEY" | jq -c '[.[].deploymentId]')
           payload=$(jq -nc --arg id "$COMPOSE_ID" --arg title "$DEPLOY_TITLE" '{composeId:$id,title:$title,description:"GitHub Actions: pruebas superadas"}')
           curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" -H "x-api-key: $DOKPLOY_API_KEY" -H 'Content-Type: application/json' --data "$payload" >/dev/null
           for attempt in $(seq 1 90); do
             result=$(curl -fsS --get "$DOKPLOY_URL/api/deployment.allByCompose" --data-urlencode "composeId=$COMPOSE_ID" -H "x-api-key: $DOKPLOY_API_KEY")
-            status=$(echo "$result" | jq -r --arg title "$DEPLOY_TITLE" '[.[] | select(.title == $title)] | first | .status // "queued"')
+            status=$(echo "$result" | jq -r --arg sha "$GITHUB_SHA" --argjson before "$before" '[.[] | select((.deploymentId as $id | $before | index($id) | not) and (.description == ("Commit: " + $sha) or .title == env.DEPLOY_TITLE))] | first | .status // "queued"')
             case "$status" in done) curl -fsS -o /dev/null https://gladibot.yampi.eu/los-dioses-te-sonrien/; exit 0;; error|failed) echo 'Dokploy informó de un error.' >&2; exit 1;; esac
             sleep 10
           done
