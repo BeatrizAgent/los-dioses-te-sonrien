@@ -59,3 +59,43 @@ test('recogida con baúl lleno no despacha ni crea operación pendiente', () => 
   assert.equal(state.pendingPackageFood, undefined);
   assert.match(skipped, /lleno|no verificable/);
 });
+
+test('con espacio despacha una vez y confirma recepción tras varios ciclos', () => {
+  const tick = source.slice(source.indexOf('  function packageFoodTick()'), source.indexOf('  function skipHealing('));
+  const inventory = bag(1, 1);
+  inventory.inv.querySelectorAll = () => inventory.items;
+  const attrs = {'data-hash':'food', 'data-measurement-x':'1', 'data-measurement-y':'1'};
+  let clicks = 0, now = 10000;
+  const food = {getAttribute: n => attrs[n] ?? null, hasAttribute: () => true, dispatchEvent: () => clicks++};
+  const selected = {classList:{contains: () => true}, getAttribute: () => '512'};
+  const state = {packageCollectTrip:true, packageScan:{key:'1:7',at:1}};
+  const context = {state, mod:'packages', params:new URLSearchParams('f=7'), Date:{now:()=>now}, window:{}, MouseEvent:class {},
+    document:{querySelector:n=>({'#inv':inventory.inv,'#packages':{querySelectorAll:()=>[food]},'#inventory_nav a':selected})[n] ?? null},
+    visible:x=>!!x, validItemHash:x=>!!x, packageUsable:item=>({item,name:'Comida'}),
+    skipHealing:()=>{}, log:()=>{}, save:()=>{}, BUILD_CONFIG:{modules:{foodMarket:false}}};
+  vm.createContext(context); vm.runInContext(code+tick,context);
+  context.packageFoodTick(); context.packageFoodTick();
+  assert.equal(clicks,1); assert.equal(state.pendingPackageFood.hash,'food');
+  const arrived=bag(1,1,[[0,0,1,1]]).items[0], get=arrived.getAttribute;
+  arrived.getAttribute=n=>n==='data-hash'?'food':n==='data-container-number'?'512':get(n);
+  inventory.items.push(arrived); now+=1000; context.packageFoodTick();
+  assert.equal(clicks,1); assert.equal(state.pendingPackageFood,null); assert.equal(state.packageCollectTrip,false);
+});
+
+test('traslado no confirmado queda excluido y no vuelve a despacharse', () => {
+  const remember=source.slice(source.indexOf('  function rememberUnknownPackageFood('),source.indexOf('  function packageFoodTick('));
+  const tick=source.slice(source.indexOf('  function packageFoodTick()'),source.indexOf('  function skipHealing('));
+  const inventory=bag(1,1); inventory.inv.querySelectorAll=()=>inventory.items;
+  const attrs={'data-hash':'food','data-measurement-x':'1','data-measurement-y':'1'};
+  let clicks=0, now=10000;
+  const food={getAttribute:n=>attrs[n]??null,hasAttribute:()=>true,dispatchEvent:()=>clicks++};
+  const selected={classList:{contains:()=>true},getAttribute:()=> '512'};
+  const state={packageCollectTrip:true,packageScan:{key:'1:7',at:1}};
+  const context={state,mod:'packages',params:new URLSearchParams('f=7'),Date:{now:()=>now},window:{},MouseEvent:class{},
+    document:{querySelector:n=>({'#inv':inventory.inv,'#packages':{querySelectorAll:()=>[food]},'#inventory_nav a':selected})[n]??null},
+    visible:x=>!!x,validItemHash:x=>!!x,packageUsable:item=>({item,name:'Comida'}),
+    skipHealing:()=>{},log:()=>{},save:()=>{},BUILD_CONFIG:{modules:{foodMarket:false}}};
+  vm.createContext(context); vm.runInContext(code+remember+tick,context);
+  context.packageFoodTick(); now+=16000; context.packageFoodTick(); context.packageFoodTick();
+  assert.equal(clicks,1); assert.equal(state.pendingPackageFood,null); assert.deepEqual(Array.from(state.unknownPackageFood),['food']);
+});

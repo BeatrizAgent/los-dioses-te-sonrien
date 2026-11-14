@@ -44,6 +44,8 @@ En 0.12.31, el módulo de oro seleccionado funciona al activar el bot sin otro i
 
 En 0.12.32, la compra de apoyo se limita a tres alimentos confirmados por ciclo de oro. Las compras inciertas no cuentan ni se repiten. La limitación está probada en simulación y pendiente de validación en juego.
 
+En 0.12.34, la curación reconoce alimentos por su efecto sin descartar los de nivel superior, y aplaza los errores de acceso a paquetes o baúl. Las curaciones sin confirmar no se repiten con el mismo objeto. La web explica las paradas y cómo detener el bot. Comprobado en simulación; pendiente de validar instalado en juego.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
@@ -127,4 +129,4 @@ La versión local calcula la cuadrícula lógica con las dimensiones de layout d
 
 Las nuevas ofertas de oro usan anillos de nivel 1 entre 100.000 y 1.000.000 y mantienen la reserva y la tarifa. Tras tres búsquedas sin rival reconocible, Turma Provinciarum se aplaza cinco minutos y las demás tareas continúan. Pendiente de validación en juego.
 
-Con curación activada, el bot revisa periódicamente la categoría Utilizable y traslada un objeto al baúl I cuando hay espacio verificable. La recogida no filtra por nivel ni consume el objeto; la curación sí exige un alimento compatible con el nivel del personaje. Los traslados inciertos no se repiten. Pendiente de validación del nuevo flujo en juego.
+Con curación activada, el bot revisa periódicamente la categoría Utilizable y traslada un objeto al baúl I cuando hay espacio verificable. La recogida no filtra por nivel ni consume el objeto; la curación identifica alimentos por su efecto, sin descartar niveles superiores; una curación incierta no se repite con el mismo objeto. Los traslados inciertos no se repiten. Pendiente de validación del nuevo flujo en juego.

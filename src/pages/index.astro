@@ -28,6 +28,7 @@ const dungeonCount = catalog.dungeons.length;
         <a href="#configurador">Generador</a>
         <a href="#catalogo">Catálogo PvE</a>
         <a href="#instalacion">Instalación</a>
+        <a href="#limites">Límites</a>
       </nav>
       <span class="edition"><span></span> USERSCRIPT · ES</span>
     </header>
@@ -74,6 +75,7 @@ const dungeonCount = catalog.dungeons.length;
             <p class="route-caveat">El bot valida la zona y el modo normal/avanzado que ve en el juego. Si la ruta o el enemigo no coinciden, espera y no inicia ese ataque.</p>
           </section>
 
+          <p class="route-caveat">El bot puede detenerse y algunas tareas necesitan revisión. <a href="#limites">Consulta cuándo y cómo pararlo</a>.</p>
           <div class="form-actions"><button class="generate-button" id="generate-button" type="submit">Generar userscript <span aria-hidden="true">↗</span></button><p>Se ensambla aquí, sin enviar tu configuración a un servidor.</p></div>
           <div class="result-box" id="generation-result" aria-live="polite" hidden>
             <div><span class="result-check">✓</span><p><b id="result-title">Userscript generado</b><small id="result-detail"></small></p></div>
@@ -110,6 +112,16 @@ const dungeonCount = catalog.dungeons.length;
         </div>
       </section>
 
+
+      <section class="install-section wrap" id="limites" aria-labelledby="limits-title">
+        <div class="section-head install-head"><div><p class="overline"><span class="rule"></span> ANTES DE USARLO</p><h2 id="limits-title">Cuándo puede<br /><i>detenerse.</i></h2></div><p>El bot intenta continuar con las demás tareas cuando puede. Algunas situaciones requieren revisión y no garantizamos que funcione sin supervisión.</p></div>
+        <div class="install-columns">
+          <article class="install-route"><span class="platform-label">01 · PARADA TOTAL</span><h3>Verificación o aviso</h3><p>Se detiene ante CAPTCHA, posible verificación, identidad no comprobada o un aviso que no puede retirar de forma segura. Si la reparación queda incierta también puede detenerse para proteger la pieza. Revisa el mensaje del panel y el juego.</p></article>
+          <article class="install-route"><span class="platform-label">02 · TAREA PENDIENTE</span><h3>Operaciones inciertas</h3><p>Una compra, traslado o fundición sin confirmar puede quedar pendiente sin repetirse. Algunas situaciones de reinicio de mazmorra también detienen el bot. Revisa el estado y la pestaña Actividad antes de continuar.</p></article>
+          <article class="install-route"><span class="platform-label">03 · TÚ DECIDES</span><h3>Detener el bot</h3><p>En el panel dentro de Gladiatus pulsa <b>Detener bot</b>. Para impedir que se ejecute al recargar, desactiva también el userscript en Violentmonkey o en tu gestor de scripts.</p></article>
+        </div>
+        <aside class="mobile-caution"><span>!</span><p>El navegador puede suspender la pestaña; el móvil y algunos ciclos no están validados en juego. Crazy Addon es necesario para varios traslados. Comprueba resultados y operaciones pendientes.</p></aside>
+      </section>
 
       <section class="catalog-section" id="catalogo" aria-labelledby="catalog-title">
         <div class="wrap">
@@ -163,6 +175,10 @@ const dungeonCount = catalog.dungeons.length;
           <div><p class="overline"><span class="rule"></span> QUÉ HACE</p><h2>Automatiza lo elegido.<br /><i>Explica lo observado.</i></h2></div>
           <div class="what-copy"><p>Los módulos compatibles revisan Arena y Circo Provinciarum, misiones, curación y el ciclo de paquetes de oro. En PvE, el generador fija un objetivo del catálogo: el bot comprueba que la zona, la posición y el control de ataque coinciden antes de actuar. Una acción ambigua queda sin confirmar.</p><p>El panel guarda actividad, rivales, estadísticas y preferencias en el navegador del personaje. Ciertas rutinas de traslado dependen de Crazy Addon. El userscript no invoca Forge Master; la convivencia no está validada.</p><a href="#configurador">Configurar una versión <span aria-hidden="true">↑</span></a></div>
         </div>
+      </section>
+      <section class="install-section wrap" id="beta-subasta" aria-labelledby="beta-title">
+        <div class="section-head install-head"><div><p class="overline"><span class="rule"></span> SCRIPT INDEPENDIENTE · BETA</p><h2 id="beta-title">Subasta y<br /><i>fundición.</i></h2></div><p>Elige qué pujar, recoge alimentos y gestiona la fundición desde su propio panel.</p></div>
+        <div class="install-route"><h3>Instalar beta para servidores españoles</h3><p>Abre el enlace con Violentmonkey o descarga el archivo y ábrelo en tu gestor de scripts. Entra después en Visión general del personaje para identificarlo. Sus opciones y operaciones se guardan por servidor y personaje.</p><p>Las pujas de equipo, pujas de utilizables, venta de alimentos y fundición se activan por separado. Alimentos: 5.000 de oro durante 24 horas. La fundición usa el baúl II y Crazy Addon. Los pergaminos están reservados y no se venden.</p><p>Es una beta: la puja y las ventas manuales se observaron en juego; los ciclos automáticos completos y el uso con otros personajes siguen pendientes de validación. No actives a la vez otro bot que controle el mismo personaje. Nunca gasta rubíes ni resuelve verificaciones.</p><a class="download-link" style="color:#fff9ed" href={`${base}subasta-fundicion-beta.user.js`}>Instalar userscript beta <span aria-hidden="true">↗</span></a></div>
       </section>
     </main>
 

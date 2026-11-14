@@ -82,8 +82,8 @@
     if (!state.pendingPackageFood && params.get('f') !== '7') {
       const filter=document.querySelector('#mainnav a[href*="mod=packages"][href*="f=7"]');
       if (!visible(filter)) { skipHealing('Filtro de paquetes no disponible; sigo con la cola.'); return true; }
-      let url; try { url=new URL(filter.getAttribute('href'),location.href); } catch { return stop('Filtro de paquetes no reconocible.'); }
-      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('f')!=='7') return stop('Filtro de paquetes no reconocido.');
+      let url; try { url=new URL(filter.getAttribute('href'),location.href); } catch { { skipHealing('Filtro de paquetes no reconocible. Curación aplazada; continúo con la cola.'); return true; } }
+      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('f')!=='7') { skipHealing('Filtro de paquetes no reconocido. Curación aplazada; continúo con la cola.'); return true; }
       state.packagePages=[]; save(); filter.click(); return true;
     }
     const bag=document.querySelector('#inventory_nav a');
@@ -109,11 +109,10 @@
       if (Date.now()-p.at>15000) { rememberUnknownPackageFood(); skipHealing('Traslado de alimento sin confirmar; sigo con la cola.'); }
       return true;
     }
-    const level=Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g,''));
     const pageKey=(params.get('page') || '1')+':'+params.get('f');
     if (state.packageScan?.key!==pageKey) { state.packageScan={key:pageKey,at:Date.now()}; state.message='Esperando los alimentos y el complemento de paquetes.'; save(); return true; }
     if (Date.now()-state.packageScan.at<5000) return true;
-    const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible).map(collecting ? packageUsable : healingFood).filter(x=>x && (collecting || x.level===null || (level>0 && x.level<=level)));
+    const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible).map(collecting ? packageUsable : healingFood).filter(Boolean);
     const available=candidates.filter(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && validItemHash(x.item.getAttribute('data-hash')) && !(Array.isArray(state.unknownPackageFood) && state.unknownPackageFood.includes(x.item.getAttribute('data-hash'))));
     const food=available.find(x=>inventorySpace({inv,items:inventory},{width:Number(x.item.getAttribute('data-measurement-x')),height:Number(x.item.getAttribute('data-measurement-y'))}));
     if (!food && available.length) { skipHealing('Baúl I lleno o espacio no verificable para '+(collecting?'utilizables':'alimentos')+'; revisaré después.'); return true; }
@@ -124,10 +123,10 @@
         if (!collecting && BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
         skipHealing(collecting ? 'Sin utilizables trasladables en paquetes; revisaré después.' : invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; revisaré el mercado de la alianza.'); return true;
       }
-      let url; try { url=new URL(next.getAttribute('href'),location.href); } catch { return stop('Paginación de paquetes no reconocible.'); }
+      let url; try { url=new URL(next.getAttribute('href'),location.href); } catch { { skipHealing('Paginación de paquetes no reconocible. Curación aplazada; continúo con la cola.'); return true; } }
       const pages=url.searchParams.getAll('page'), nextPage=Number(pages.at(-1)), currentPage=Number(params.get('page') || 1);
       const visited=Array.isArray(state.packagePages) ? state.packagePages : [];
-      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('f')!=='7' || !Number.isSafeInteger(nextPage) || nextPage<=currentPage || visited.includes(nextPage) || visited.length>=50) return stop('Paginación de paquetes no verificable.');
+      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('f')!=='7' || !Number.isSafeInteger(nextPage) || nextPage<=currentPage || visited.includes(nextPage) || visited.length>=50) { skipHealing('Paginación de paquetes no verificable. Curación aplazada; continúo con la cola.'); return true; }
       state.packagePages=[...visited,currentPage]; state.message='Revisando página '+nextPage+' de alimentos.'; save(); next.click(); return true;
     }
     const hash=food.item.getAttribute('data-hash');
@@ -198,35 +197,32 @@
         }
       }
       if (Date.now()-p.at > 15000) {
-        const target=document.querySelector('#avatar');
-        if ((p.attempt || 1) < 2 && p.refreshRequestedAt && p.bagIndex === 0 && selectedBag === 0 && item && visible(item) && visible(target) && healingFood(item)) {
-          p.attempt=2; p.at=Date.now(); p.before=current; p.bagIndex=0; delete p.refreshRequestedAt;
-          state.message='Segundo intento de curación con '+p.name+'.'; log(state.message,'action'); save(); if (!dragFood(item,target)) skipHealing('No se pudieron calcular las posiciones de curación.'); return true;
-        }
+        state.unknownHealFood=Array.isArray(state.unknownHealFood) ? state.unknownHealFood : [];
+        if (!state.unknownHealFood.includes(p.hash)) state.unknownHealFood.push(p.hash);
         skipHealing('Curación sin confirmar; continúo con la cola y revisaré más tarde.');
       }
       return true;
     }
     if (mod !== 'overview') {
       const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
-      if (!visible(link)) { stop('No se encuentra la entrada al baúl para curar.'); return true; }
+      if (!visible(link)) { skipHealing('No se encuentra la entrada al baúl para curar. Curación aplazada; continúo con la cola.'); return true; }
       if (!navigation(link, 'Volviendo al baúl para curar.')) {
         state.message='Esperando para abrir el baúl y curar.'; save();
       }
       return true;
     }
     const target=document.querySelector('#avatar');
-    const playerLevel=Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g,''));
-    const foods=[...document.querySelectorAll('#inv .ui-draggable[data-tooltip][data-hash]')].map(healingFood).filter(x=>x && validItemHash(x.item.getAttribute('data-hash')) && (x.level===null || (playerLevel>0 && x.level<=playerLevel)));
+    const foods=[...document.querySelectorAll('#inv .ui-draggable[data-tooltip][data-hash]')].map(healingFood).filter(x=>x && validItemHash(x.item.getAttribute('data-hash')) && !(Array.isArray(state.unknownHealFood) && state.unknownHealFood.includes(x.item.getAttribute('data-hash'))));
     foods.sort((a,b)=>Number(b.oneCell)-Number(a.oneCell) || Math.abs(maximum-current-a.amount)-Math.abs(maximum-current-b.amount));
     const food=foods[0], hash=food?.item.getAttribute('data-hash');
     if (!food) {
+      if ([...document.querySelectorAll('#inv .ui-draggable[data-tooltip][data-hash]')].some(x=>healingFood(x) && Array.isArray(state.unknownHealFood) && state.unknownHealFood.includes(x.getAttribute('data-hash')))) { skipHealing('Hay comida con curación pendiente de comprobar; sigo con la cola.'); return true; }
       const link=document.querySelector('#menue_packages');
-      if (!visible(link)) { stop('No se encuentra la entrada a paquetes.'); return true; }
+      if (!visible(link)) { skipHealing('No se encuentra la entrada a paquetes. Curación aplazada; continúo con la cola.'); return true; }
       state.packageFoodTrip=true; delete state.packageScan; delete state.packageWaitAt; save(); navigation(link,'Buscando alimentos en paquetes.'); return true;
     }
     if (!visible(target)) { skipHealing('No se reconoce el destino de curación; sigo con la cola.'); return true; }
-    if (selectedBag < 0) { stop('No se reconoce el baúl seleccionado para la curación.'); return true; }
+    if (selectedBag < 0) { skipHealing('No se reconoce el baúl seleccionado para la curación. Curación aplazada; continúo con la cola.'); return true; }
     state.pendingHeal={hash,name:food.name,before:current,bagIndex:selectedBag,attempt:1,at:Date.now()}; state.message='Intentando curar con ' + food.name + '.'; log(state.message,'action'); save();
     if (!dragFood(food.item,target,true)) skipHealing('No se pudo preparar el gesto de curación.');
     return true;
