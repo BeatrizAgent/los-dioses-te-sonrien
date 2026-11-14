@@ -208,14 +208,10 @@
       if (Date.now()-(state.lastListWarningAt || 0)>=60000) { state.lastListWarningAt=Date.now(); log(state.message,'warn'); }
       save(); return;
     }
+    rivalIndex.sync(state.records);
     const candidates = [...table.rows].slice(1).map(row => {
       const cells=[...row.cells], name=cells[0]?.innerText.trim(), rivalLevel=Number(cells[1]?.innerText.trim()), server=cells[2]?.innerText.trim(), button=row.querySelector('.attack');
-      const history=state.records.filter(r => r.name===name && r.server===server && r.mode===mode && r.level===level);
-      const wins=history.filter(r=>r.result==='win').length, losses=history.filter(r=>r.result==='loss').length;
-      const damages=history.map(r=>r.damageEstimate).filter(Number.isSafeInteger);
-      const damage=damages.length ? damages.reduce((a,b)=>a+b,0)/damages.length : null;
-      const experiences=history.map(r=>r.experience).filter(Number.isSafeInteger);
-      const experience=experiences.length ? experiences.reduce((a,b)=>a+b,0)/experiences.length : null;
+      const {wins,losses,damage,experience}=rivalIndex.combat({name,server,mode,level});
       return {name,rivalLevel,server,button,wins,losses,damage,experience};
     }).filter(r => realm && r.name && r.server && Number.isInteger(r.rivalLevel) && visible(r.button) && new RegExp('^startProvinciarumFight\\(this,\\s*' + type + ',\\s*\\d+,\\s*\\d+,\\s*[\'"]' + realm + '[\'"]\\);?$').test(r.button.getAttribute('onclick') || '') && !/(rub[ií]|diamant|premium)/i.test(r.button.outerHTML));
     candidates.sort((a,b) => (a.losses>0)-(b.losses>0) || (b.wins>0)-(a.wins>0) || (a.experience === null)-(b.experience === null) || (b.experience ?? 0)-(a.experience ?? 0) || (a.damage === null)-(b.damage === null) || (a.damage ?? 0)-(b.damage ?? 0) || a.rivalLevel-b.rivalLevel);

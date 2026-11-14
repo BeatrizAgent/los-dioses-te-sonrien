@@ -87,7 +87,7 @@
         if (!map.has(part)) { if (!create) return null; map.set(part,new Map()); }
         map=map.get(part);
       }
-      if (!map.has('counts') && create) map.set('counts',{wins:0,losses:0,total:0});
+      if (!map.has('counts') && create) map.set('counts',{wins:0,losses:0,total:0,damageSum:0,damageCount:0,experienceSum:0,experienceCount:0});
       return map.get('counts') || null;
     }
     return {
@@ -96,9 +96,12 @@
         while (indexed<rows.length) {
           const row=rows[indexed++], counts=leaf(row,true);
           counts.total++; if (row.result==='win') counts.wins++; else if (row.result==='loss') counts.losses++;
+          if (Number.isSafeInteger(row.damageEstimate)) { counts.damageSum+=row.damageEstimate; counts.damageCount++; }
+          if (Number.isSafeInteger(row.experience)) { counts.experienceSum+=row.experience; counts.experienceCount++; }
         }
       },
-      get(record) { return leaf(record,false) || {wins:0,losses:0,total:0}; },
+      get(record) { const c=leaf(record,false); return c ? {wins:c.wins,losses:c.losses,total:c.total} : {wins:0,losses:0,total:0}; },
+      combat(record) { const c=leaf(record,false); return c ? {wins:c.wins,losses:c.losses,damage:c.damageCount ? c.damageSum/c.damageCount : null,experience:c.experienceCount ? c.experienceSum/c.experienceCount : null} : {wins:0,losses:0,damage:null,experience:null}; },
     };
   }
   const rivalIndex=makeRivalIndex();

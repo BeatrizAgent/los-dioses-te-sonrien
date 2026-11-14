@@ -48,6 +48,8 @@ En 0.12.34, la curación reconoce alimentos por su efecto sin descartar los de n
 
 En 0.12.35, misiones puede visitar el Panteón sin activar Arena, y PvE no espera a Arena cuando ese módulo está desactivado. Las combinaciones están comprobadas en simulación; su funcionamiento en personajes de nivel bajo sigue pendiente de validar en juego.
 
+En 0.12.36, la selección de rivales reutiliza un índice en memoria para calcular victorias, derrotas, daño y experiencia, sin cambiar la ordenación ni los tiempos de espera del juego. Está comprobado en simulación; falta validarlo instalado.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
@@ -63,6 +65,8 @@ Web: https://gladibot.yampi.eu/los-dioses-te-sonrien/
 El historial de rivales permanece en el almacenamiento local del navegador por personaje. El panel usa un índice temporal en memoria, reconstruido tras una recarga, y no elimina registros antiguos automáticamente. En Rivales se puede exportar el historial a JSON: contiene nombres de rivales y resultados, por lo que debe tratarse como información privada. El reinicio total elimina el historial de ese personaje tras confirmación; exportar no lo borra.
 
 Para comparar el índice con el filtrado anterior sin datos de jugadores, ejecuta `node scripts/benchmark-rivals.mjs`. En Node 24.11.1 para Windows x64, con 100 rivales y mediana de siete ejecuciones, el filtrado y la creación del índice tardaron respectivamente 0,087/0,135 ms para 100 registros; 0,609/0,172 ms para 1.000; y 6,274/0,547 ms para 10.000. Son cifras locales, no mediciones del navegador ni una promesa de rendimiento en móviles.
+
+Para la selección de combate, `node scripts/benchmark-combat-rivals.mjs` compara los cálculos completos con el índice. En esta máquina, Node 24.11.1 y 100 rivales, la mediana con 10.000 registros fue 6,167 ms mediante filtrado, 2,019 ms creando el índice y 0,007 ms reutilizándolo. Es una medición sintética local, no mide tiempos de red ni de combate.
 
 GitHub Actions ejecuta `pnpm test`, genera el userscript y construye Astro. Después publica el commit comprobado en `ci/production`, solicita el despliegue a Dokploy, espera el resultado y comprueba la web. El despliegue directo por push de Dokploy debe seguir desactivado. El secreto `DOKPLOY_API_KEY` actual pertenece a la cuenta propietaria y caduca el 12 de febrero de 2027; sustituirlo por una credencial limitada al servicio cuando esté disponible. La ruta base está definida en `astro.config.mjs`.
 
