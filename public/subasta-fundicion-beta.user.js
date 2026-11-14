@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.4.3
+// @version      0.4.5
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -44,7 +44,7 @@
   state.options = Object.assign({bid:false,bidUsable:false,sell:false,smelt:false,scroll:true}, state.options);
   // Los pergaminos están reservados, incluso si una versión anterior activó su venta.
   state.options.scroll = false;
-  state.needGold = false;
+  state.needGold = state.needGold === true && Number.isSafeInteger(state.goldRequired) && state.goldRequired>0;
   if (state.itemTx && (state.itemTx.kind==='scroll' || state.itemTx.type===20 || ['npc','npcSold'].includes(state.itemTx.stage))) {
     state.itemTx.blocked=true;state.itemTx.problem='Pergamino reservado: operación anterior detenida para revisión.';
   }
@@ -58,6 +58,7 @@
   const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && getComputedStyle(e).display !== 'none';
   const number = text => /^\d[\d.\s]*$/.test(String(text || '').trim()) ? Number(String(text).replace(/[.\s]/g,'')) : NaN;
   const balance = () => number(document.querySelector('#sstat_gold_val')?.textContent);
+  const goldPageOpenedAt=Date.now();
   const verification = () => [...document.querySelectorAll('iframe[src*="captcha" i],iframe[src*="turnstile" i],.g-recaptcha,.h-captcha,.cf-turnstile,input[name*="captcha" i],[data-sitekey]')].some(visible);
   function note(text) { state.message=text; save(); render(); }
   function stop(text) { state.running=false; note(text); if (typeof releaseLock==='function') releaseLock(); }
@@ -128,8 +129,8 @@
     if (!allowedBidCategory(category,params.get('ttype')||'2')) return false;
     const candidate=[...document.querySelectorAll('form[id^="auctionForm"]')].map(f=>bidCandidate(f,category,balance())).find(Boolean);
     if (!candidate) {
-      const unaffordable=[...document.querySelectorAll('form[id^="auctionForm"]')].some(f=>bidCandidate(f,category,Number.MAX_SAFE_INTEGER));
-      if (unaffordable && state.options.scroll && Date.now()>=(state.scrollRetryAt||0)) {state.needGold=true;state.phase='packages';state.nextPackages=0;save();return true;}
+      const unaffordable=[...document.querySelectorAll('form[id^="auctionForm"]')].map(f=>bidCandidate(f,category,Number.MAX_SAFE_INTEGER)).find(Boolean);
+      if (unaffordable && !state.goldClaim && Date.now()>=(state.goldRetryAt||0)) {state.needGold=true;state.goldRequired=unaffordable.amount;state.goldVisited=[];state.phase='packages';state.nextPackages=0;save();return true;}
       return false;
     }
     state.pendingBid={id:candidate.id,name:candidate.name,amount:candidate.amount,balance:balance(),at:Date.now()};
@@ -150,12 +151,13 @@
     const colors=['green','blue','purple','orange','red'].filter(c=>classes.contains('item-i-'+c));
     const quality=colors.length===0?'standard':colors.length===1?colors[0]:null;
     const value=Number(el.getAttribute('data-price-gold'));
-    return {basis,type:Number(match[1]),hash,name:name.trim(),width,height,linked,quality,value:Number.isSafeInteger(value)&&value>0?value:null,food:/En uso:\s*Cura\s+[\d.\s]+\s+punto\(s\) de vida/i.test(text)};
+    return {basis,type:Number(match[1]),contentType:el.getAttribute('data-content-type'),hash,name:name.trim(),width,height,linked,quality,value:Number.isSafeInteger(value)&&value>0?value:null,food:/En uso:\s*Cura\s+[\d.\s]+\s+punto\(s\) de vida/i.test(text),reserved: /pergamino|receta|herramienta|material(?:es)? de forja|tintura|poci[oó]n(?:es)? de percepci[oó]n/i.test(text) || el.getAttribute('data-reserved')==='true'};
   }
+  function sellableUsable(item) { return !!item && item.type===7 && item.contentType==='64' && !item.linked && !item.reserved; }
   function packageKind(el) {
     const item=itemDetails(el);
     if (!item) return null;
-    if (state.options.sell && item.type===7 && item.food && !item.linked && (state.foodBatch||0)<3) return {...item,kind:'sell'};
+    if (state.options.sell && sellableUsable(item)) return {...item,kind:'sell'};
     // Los pergaminos tienen filtro propio; no se confunde su filtro con data-basis.
     if (state.options.scroll && state.needGold && params.get('f')==='20' && item.type===20 && /pergamino/i.test(item.name) && item.value) return {...item,kind:'scroll'};
     if (state.options.smelt && SMELT_TYPES.includes(item.type) && item.quality) return {...item,kind:'smelt'};
@@ -210,10 +212,68 @@
     if(!inv || [...inv.querySelectorAll('.ui-draggable')].some(e=>e.getAttribute('data-container-number') && e.getAttribute('data-container-number')!==number))return false;
     if(state.bagSwitch){delete state.bagSwitch;save();}return true;
   }
-  function finishItem(message) { if(state.itemTx?.kind==='sell' && state.itemTx.type===7)state.foodBatch=(state.foodBatch||0)+1; state.itemTx=null; state.nextPackages=Date.now()+3000; if(state.options.smelt)state.forgeDue=0; note(message); }
+  function finishItem(message) { state.itemTx=null; state.nextPackages=Date.now()+3000; if(state.options.smelt)state.forgeDue=0; note(message); }
   function waitItem(tx,message) {
     if (Date.now()-tx.at>25000) { tx.blocked=true; tx.problem=message; note(message); }
     return true;
+  }
+  function goldClaimTick() {
+    const now=Date.now(), claim=state.goldClaim;
+    if (claim && now<(claim.retryAt||0)) return false;
+    if (params.get('mod')!=='packages') return navigate('#menue_packages','packages');
+    if (params.get('f')!=='14') {
+      const link=[...document.querySelectorAll('#mainnav a[href]')].find(a=>{try{const u=new URL(a.href,location.href);return visible(a)&&u.origin===location.origin&&u.pathname==='/game/index.php'&&u.searchParams.get('mod')==='packages'&&u.searchParams.get('f')==='14'&&!u.searchParams.has('fq');}catch{return false;}});
+      if(!link){
+        const form=document.querySelector('#pf'),query=form?.querySelector('input[name="qry"]'),filter=form?.querySelector('select[name="f"]'),quality=form?.querySelector('select[name="fq"]'),submit=form?.querySelector('[type="submit"]');let url;
+        try {url=new URL(form?.getAttribute('action'),location.href);}catch{}
+        const option=[...(filter?.options||[])].find(o=>o.value==='14' && /^oro$/i.test(o.textContent.trim()));
+        if(!url || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('submod')!=='search' || String(form.method).toLowerCase()!=='post' || !query || !quality || !option || !visible(submit) || submit.disabled){state.goldRetryAt=now+120000;state.needGold=false;note('Filtro Oro no verificable; lo revisaré más tarde.');return false;}
+        if(now-(state.navigationAt||0)<5000)return true;
+        query.value='';filter.value='14';quality.value='-1';
+        if(filter.value!=='14'||quality.value!=='-1'){state.goldRetryAt=now+120000;state.needGold=false;note('Filtro Oro no disponible.');return false;}
+        state.navigationAt=now;save();submit.click();return true;
+      }
+      if(now-(state.navigationAt||0)<5000)return true;
+      state.navigationAt=now;save();link.click();return true;
+    }
+    const box=document.querySelector('#packages'), gold=balance();
+    if (!box || !Number.isSafeInteger(gold)) return true;
+    const key=[params.get('f'),params.get('page')||'1'].join(':');
+    if(state.goldScan?.key!==key){state.goldScan={key,at:now};save();return true;}
+    if(now-goldPageOpenedAt<3000 || now-state.goldScan.at<3000)return true;
+    const items=[...box.querySelectorAll('.packageItem .ui-draggable[data-hash]')];
+    if(claim){
+      if ((params.get('page')||'1')!==claim.page) {
+        claim.retryAt=now+120000;state.needGold=false;state.goldRetryAt=claim.retryAt;note('El cobro pendiente está en otra página; no se repetirá.');return false;
+      }
+      const matches=items.filter(e=>e.getAttribute('data-hash')===claim.hash);
+      if(matches.length===0 && gold===claim.balanceBefore+claim.amount){
+        state.goldClaim=null;delete state.goldScan;
+        state.needGold=Number.isSafeInteger(state.goldRequired) && gold<state.goldRequired;
+        if(!state.needGold) {state.goldRequired=null;state.goldRetryAt=0;}
+        note('Cobro de oro confirmado: '+claim.amount.toLocaleString('es-ES')+'.');return true;
+      }
+      if(now-claim.at>=25000){claim.retryAt=now+120000;state.needGold=false;state.goldRetryAt=claim.retryAt;note('Cobro de oro sin confirmar; no se repetirá.');return false;}
+      return true;
+    }
+    if(Number.isSafeInteger(state.goldRequired) && gold>=state.goldRequired){state.needGold=false;state.goldRequired=null;save();return false;}
+    const candidates=items.map(el=>{
+      const hash=el.getAttribute('data-hash'), price=Number(el.getAttribute('data-price-gold')), amount=Number(el.getAttribute('data-amount'));
+      const value=price*amount, origin=el.closest('.packageItem')?.textContent||'';
+      return visible(el) && /\bMercado\b/i.test(origin) && el.hasAttribute('data-gca-flag_double-click-event') && typeof hash==='string' && hash.length>0 && hash.length<=256 && !/[\x00-\x1f\x7f]/.test(hash) && Number.isSafeInteger(price) && price>0 && Number.isSafeInteger(amount) && amount>0 && value===5000 && Number.isSafeInteger(gold+value) ? {el,hash,amount:value} : null;
+    }).filter(Boolean);
+    const candidate=candidates.find(x=>items.filter(el=>el.getAttribute('data-hash')===x.hash).length===1);
+    if(!candidate){
+      const current=Number(params.get('page')||'1'),visited=Array.isArray(state.goldVisited)?state.goldVisited:[];
+      const next=[...document.querySelectorAll('.paging_right_step[href],.paging_right_step a[href]')].find(el=>{
+        try {const u=new URL(el.getAttribute('href'),location.href),page=Number(u.searchParams.get('page'));return visible(el)&&u.origin===location.origin&&u.pathname==='/game/index.php'&&u.searchParams.get('mod')==='packages'&&u.searchParams.get('f')==='14'&&u.searchParams.getAll('page').length===1&&Number.isSafeInteger(current)&&Number.isSafeInteger(page)&&page>current&&page<=100&&!visited.includes(page)&&![...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k));}catch{return false;}
+      });
+      if(next && visited.length<50){if(now-(state.navigationAt||0)<5000)return true;state.goldVisited=[...visited,current];state.navigationAt=now;save();next.click();return true;}
+      state.needGold=false;state.goldRetryAt=now+120000;state.goldVisited=[];note('Sin cobro de mercado verificable en el filtro Oro; revisaré más tarde.');return false;
+    }
+    state.goldClaim={hash:candidate.hash,amount:candidate.amount,balanceBefore:gold,page:params.get('page')||'1',at:now};
+    note('Recogiendo oro de mercado; esperando confirmación.');
+    candidate.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
   }
   function packageTick() {
     const tx=state.itemTx;
@@ -226,13 +286,22 @@
       if (item && !remaining) { tx.stage=tx.kind==='sell'?'market':tx.kind==='scroll'?'npc':'forge';tx.at=Date.now();note('Paquete recibido: '+tx.name+'.');return true; }
       return waitItem(tx,'Traslado no confirmado; no se repetirá.');
     }
+    if (!tx && state.options.sell) {
+      const bag=document.querySelector('#inventory_nav a[data-bag-number="512"]');
+      if (visible(bag) && bag.getAttribute('data-available')==='true') {
+        if (!selectBag('512')) return true;
+        const items=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(itemDetails).filter(item=>sellableUsable(item) && !state.blockedItems?.some(x=>x.hash===item.hash));
+        const item=items.find(x=>items.filter(y=>y.hash===x.hash).length===1);
+        if (item) {state.itemTx={...item,kind:'sell',bag:'512',stage:'market',at:Date.now()};note('Preparando venta del utilizable en baúl I: '+item.name+'.');return true;}
+      }
+    }
     // El DOM de paquetes y Crazy Addon llegan después de la navegación.
     // Una lista todavía sin cargar no es una página vacía.
     const scanKey=[params.get('f')||'0',params.get('page')||'1'].join(':');
     if(state.packageScan?.key!==scanKey){state.packageScan={key:scanKey,at:Date.now()};save();return true;}
     if(Date.now()-state.packageScan.at<3000)return true;
-    const filters=state.needGold && state.options.scroll ? [20] : PACKAGE_FILTERS.filter(f=>f===7 ? state.options.sell && (state.foodBatch||0)<3 : f===20 ? false : state.options.smelt && state.forgeHasFree!==false);
-    if (!filters.length) { state.nextPackages=Date.now()+120000;state.foodBatch=0;save();return false; }
+    const filters=state.needGold && state.options.scroll ? [20] : PACKAGE_FILTERS.filter(f=>f===7 ? state.options.sell : f===20 ? false : state.options.smelt && state.forgeHasFree!==false);
+    if (!filters.length) { state.nextPackages=Date.now()+120000;save();return false; }
     const filter=filters[(state.packageFilterIndex||0)%filters.length];
     if (params.get('f')!==String(filter)) {
       const link=[...document.querySelectorAll('#mainnav a[href]')].find(a=>{try{const u=new URL(a.href,location.href);return visible(a)&&u.origin===location.origin&&u.searchParams.get('mod')==='packages'&&u.searchParams.get('f')===String(filter)&&!u.searchParams.has('fq');}catch{return false;}});
@@ -246,7 +315,7 @@
       if (visible(next)) return navigate('.paging_right_step','packages');
       if(state.needGold){state.needGold=false;state.scrollRetryAt=Date.now()+120000;state.nextPackages=Date.now()+120000;note('Sin pergamino disponible; vuelvo a revisar más tarde.');return false;}
       state.packageFilterIndex=(state.packageFilterIndex||0)+1;
-      if(state.packageFilterIndex>=filters.length){state.packageFilterIndex=0;state.nextPackages=Date.now()+120000;state.foodBatch=0;save();return false;}
+      if(state.packageFilterIndex>=filters.length){state.packageFilterIndex=0;state.nextPackages=Date.now()+120000;save();return false;}
       save();return true;
     }
     const bag=candidate.item.kind==='smelt'?'513':'512';
@@ -281,7 +350,7 @@
     if (displayed?.getAttribute('data-hash')!==tx.hash) return waitItem(tx,'Arrastre a fundición sin confirmar.');
     const rent=document.querySelector('#slot-closed [data-rent="2"]'), cost=number(rent?.textContent), gold=balance();
     if (!visible(rent) || !rent.querySelector('.icon_gold') || rent.querySelector('.icon_rubies') || !Number.isSafeInteger(cost) || cost<=0 || !Number.isSafeInteger(gold) || !(document.querySelector('#forge_item_name')?.textContent||'').includes(tx.name)) return waitItem(tx,'Coste o equipo de fundición no verificable.');
-    if(cost>gold && state.options.scroll && Date.now()>=(state.scrollRetryAt||0)){tx.neededCost=cost;state.suspendedSmelt=tx;state.itemTx=null;state.needGold=true;state.phase='packages';state.nextPackages=0;note('Falta oro para fundir; buscando un pergamino.');return true;}
+    if(cost>gold && !state.goldClaim && Date.now()>=(state.goldRetryAt||0)){tx.neededCost=cost;state.suspendedSmelt=tx;state.itemTx=null;state.needGold=true;state.goldRequired=cost;state.goldVisited=[];state.phase='packages';state.nextPackages=0;note('Falta oro para fundir; buscando cobros de mercado.');return true;}
     if(cost>gold){state.forgeDue=Date.now()+60000;note('Falta oro para fundir.');return false;}
     tx.stage='rent';tx.at=Date.now();tx.cost=cost;save();rent.click();return true;
   }
@@ -315,14 +384,35 @@
   }
   function marketOwnCount(tx) {
     const table=document.querySelector('#market_item_table');
-    if (!table) return /No hay resultados/i.test(document.querySelector('#content')?.textContent || '') ? 0 : null;
+    const allowed=['mod','fl','fq','f','qry','seller','s','p','sh'];
+    if (Date.now()-goldPageOpenedAt<3000 || params.getAll('p').length>1 || [...params.keys()].some(k=>!allowed.includes(k)) || (params.get('f')||'0')!=='0' || (params.get('fq')||'-1')!=='-1' || (params.get('qry')||'') || (params.get('seller')||'')) return null;
+    if (!table) return (!params.has('p') || params.get('p')==='1') && /No hay resultados/i.test(document.querySelector('#content')?.textContent || '') ? 0 : null;
     const page=(document.querySelector('#content')?.textContent||'').match(/Página\s+(\d+)\s*\/\s*(\d+)/i);
-    if (page && (page[1]!=='1'||page[2]!=='1')) return null;
-    if (visible(document.querySelector('.paging_right_step'))) return null;
-    return [...table.querySelectorAll('tr')].filter(row=>{
+    const current=page ? Number(page[1]) : 1,total=page ? Number(page[2]) : 1;
+    const pageParams=params.getAll('p'),requested=pageParams.length ? Number(pageParams[0]) : 1;
+    if(!Number.isSafeInteger(current) || current!==requested || total<current || total>100 || (!page && visible(document.querySelector('.paging_right_step')))) return null;
+    const phase=tx.stage==='sold'?'verify':'baseline';
+    let scan=tx.marketScan;
+    if (!scan || scan.phase!==phase) scan=tx.marketScan={phase,pages:[],count:0,fingerprints:{}};
+    const go=target=>{
+      const here=new URL(location.href),defaults={fl:'0',fq:'-1',f:'0',qry:'',seller:'',s:''};
+      const link=[...document.querySelectorAll('a[href]')].find(a=>{try{const u=new URL(a.getAttribute('href'),location.href);return visible(a)&&u.origin===location.origin&&u.pathname==='/game/index.php'&&u.searchParams.get('mod')==='guildMarket'&&u.searchParams.getAll('p').length===1&&u.searchParams.get('p')===String(target)&&![...u.searchParams.keys()].some(k=>!allowed.includes(k))&&Object.keys(defaults).every(k=>(u.searchParams.get(k)??defaults[k])===(here.searchParams.get(k)??defaults[k]));}catch{return false;}});
+      if(!link || Date.now()-(state.navigationAt||0)<5000)return false;
+      state.navigationAt=Date.now();tx.at=Date.now();save();link.click();return true;
+    };
+    const expected=scan.pages.length ? scan.pages[scan.pages.length-1]+1 : 1;
+    if(current!==expected){go(expected);return null;}
+    const rows=[...table.querySelectorAll('tr')];
+    const fingerprint=rows.map(row=>{const cells=row.cells||[],item=cells[0]?.querySelector('[data-basis]');return [cells[1]?.textContent?.trim(),cells[2]?.textContent?.trim(),item?.getAttribute('data-item-id')||item?.getAttribute('data-hash')||''].join('|');}).filter(x=>x!=='||').join('\n');
+    if(fingerprint && Object.values(scan.fingerprints).includes(fingerprint)) return null;
+    if(fingerprint)scan.fingerprints[current]=fingerprint;
+    scan.count+=rows.filter(row=>{
       const cells=row.cells || [], item=itemDetails(cells[0]?.querySelector('[data-basis]'));
       return item?.name===tx.name && item.basis===tx.basis && normal(cells[1]?.textContent)===normal(accountName) && number(cells[2]?.textContent)===5000;
     }).length;
+    scan.pages.push(current);tx.at=Date.now();save();
+    if(current<total){go(current+1);return null;}
+    const count=scan.count;delete tx.marketScan;save();return count;
   }
   function marketTick(tx) {
     if (params.get('mod')!=='guildMarket') return navigate('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket');
@@ -335,11 +425,11 @@
     const target=document.querySelector('#market_sell .ui-droppable'), form=document.querySelector('#sellForm');
     if (tx.stage==='market') {
       const count=marketOwnCount(tx), item=inventoryHash(tx.hash), details=itemDetails(item);
-      if (!Number.isInteger(count) || !details || details.name!==tx.name || details.basis!==tx.basis || details.linked || !visible(target) || target.querySelector('[data-basis]')) return waitItem(tx,'Mercado u objeto no verificable antes de anunciar.');
+      if (!Number.isInteger(count) || !sellableUsable(details) || details.name!==tx.name || details.basis!==tx.basis || !visible(target) || target.querySelector('[data-basis]')) return waitItem(tx,'Mercado u objeto no verificable antes de anunciar.');
       tx.before=count;tx.stage='drop';tx.at=Date.now();save();if(!drag(item,target)){tx.blocked=true;note('No se pudo arrastrar al mercado.');}return true;
     }
     const displayed=itemDetails(target?.querySelector('[data-basis]')), sellid=form?.querySelector('input[name="sellid"]');
-    if (!displayed || displayed.name!==tx.name || displayed.basis!==tx.basis || !sellid?.value) return waitItem(tx,'Objeto en mercado sin confirmar.');
+    if (!sellableUsable(displayed) || displayed.name!==tx.name || displayed.basis!==tx.basis || !sellid?.value) return waitItem(tx,'Objeto en mercado sin confirmar.');
     const price=document.querySelector('#preis'), duration=document.querySelector('#dauer'), fee=document.querySelector('#marktgebuehren'), submit=form?.querySelector('input[name="anbieten"]');
     let url;try {url=new URL(form?.getAttribute('action'),location.href);}catch{return waitItem(tx,'Formulario de venta no verificable.');}
     if (!price || !duration || !fee || !visible(submit) || submit.disabled || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || /rub[ií]|diamant|premium/i.test(submit.outerHTML)) return waitItem(tx,'Formulario de venta no verificable.');
@@ -403,9 +493,10 @@
       state.blockedItems=Array.isArray(state.blockedItems)?state.blockedItems:[];
       state.blockedItems.push(state.itemTx);state.itemTx=null;save();
     }
+    if (state.goldClaim) { goldClaimTick(); return; }
     if(!state.itemTx && state.suspendedSmelt && !state.needGold) {
       if(Number.isSafeInteger(balance()) && balance()>=state.suspendedSmelt.neededCost){state.itemTx=state.suspendedSmelt;state.itemTx.stage='forge';state.itemTx.at=Date.now();delete state.itemTx.dragAt;delete state.suspendedSmelt;save();}
-      else if(state.options.scroll && Date.now()>=(state.scrollRetryAt||0)){state.needGold=true;state.phase='packages';state.nextPackages=0;save();}
+      else if(!state.goldClaim && Date.now()>=(state.goldRetryAt||0)){state.needGold=true;state.goldRequired=state.suspendedSmelt.neededCost;state.goldVisited=[];state.phase='packages';state.nextPackages=0;save();}
     }
     const tx=state.itemTx;
     if (tx) {
@@ -420,7 +511,8 @@
       if (params.get('mod')!=='auction') return navigate('#mainmenu a[href*="mod=auction"]','auction');
       return auctionTick();
     }
-    if(state.options.smelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
+    if (state.needGold && goldClaimTick()) return;
+    if(state.options.smelt && !state.suspendedSmelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
       if(forgeReviewTick()) return;
     }
     if(!state.options.bid && !state.options.bidUsable && state.phase==='auction') {state.phase='packages';save();}
@@ -453,7 +545,7 @@
   const panel=document.createElement('aside');
   panel.id='gladibot-auction-beta';
   panel.style.cssText='position:fixed;bottom:12px;right:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;border-radius:8px;font:14px sans-serif;max-width:310px';
-  panel.innerHTML='<strong>Subasta y fundición · BETA</strong><div><label><input type="checkbox" data-option="bid"> Pujar equipo</label></div><div><label><input type="checkbox" data-option="bidUsable"> Pujar utilizables</label></div><div><label><input type="checkbox" data-option="sell"> Alimentos al mercado de alianza</label></div><div><label><input type="checkbox" data-option="smelt"> Fundición de equipo</label></div><button type="button" data-action="run">Iniciar</button><p data-message></p>';
+  panel.innerHTML='<strong>Subasta y fundición · BETA</strong><div><label><input type="checkbox" data-option="bid"> Pujar equipo</label></div><div><label><input type="checkbox" data-option="bidUsable"> Pujar utilizables</label></div><div><label><input type="checkbox" data-option="sell"> Utilizables al mercado de alianza</label></div><div><label><input type="checkbox" data-option="smelt"> Fundición de equipo</label></div><button type="button" data-action="run">Iniciar</button><p data-message></p>';
   document.body.append(panel);
   function render() {
     for (const input of panel.querySelectorAll('[data-option]')) input.checked=!!state.options[input.dataset.option];
