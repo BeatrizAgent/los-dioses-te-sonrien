@@ -64,6 +64,8 @@ Para comparar el índice con el filtrado anterior sin datos de jugadores, ejecut
 
 GitHub Actions ejecuta `pnpm test`, genera el userscript y construye Astro. Después publica el commit comprobado en `ci/production`, solicita el despliegue a Dokploy, espera el resultado y comprueba la web. El despliegue directo por push de Dokploy debe seguir desactivado. El secreto `DOKPLOY_API_KEY` actual pertenece a la cuenta propietaria y caduca el 12 de febrero de 2027; sustituirlo por una credencial limitada al servicio cuando esté disponible. La ruta base está definida en `astro.config.mjs`.
 
+El flujo se ejecuta al hacer push a `main` y también puede iniciarse manualmente desde la pestaña Actions.
+
 ## Límites de seguridad
 
 - No gasta rubíes/diamantes ni usa opciones premium o reduce tiempo.
