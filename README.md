@@ -46,6 +46,8 @@ En 0.12.32, la compra de apoyo se limita a tres alimentos confirmados por ciclo 
 
 En 0.12.34, la curación reconoce alimentos por su efecto sin descartar los de nivel superior, y aplaza los errores de acceso a paquetes o baúl. Las curaciones sin confirmar no se repiten con el mismo objeto. La web explica las paradas y cómo detener el bot. Comprobado en simulación; pendiente de validar instalado en juego.
 
+En 0.12.35, misiones puede visitar el Panteón sin activar Arena, y PvE no espera a Arena cuando ese módulo está desactivado. Las combinaciones están comprobadas en simulación; su funcionamiento en personajes de nivel bajo sigue pendiente de validar en juego.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
