@@ -1,0 +1,12 @@
+services:
+  web:
+    image: gladibot-web:production
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+networks:
+  dokploy-network:
+    external: true
