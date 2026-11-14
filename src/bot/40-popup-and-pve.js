@@ -37,11 +37,11 @@
   }
   function recordDungeonOutcome(p, result, rival, reportId) {
     const dungeonId=p.dungeonId, enemy=String(rival || '').normalize('NFKC').trim().toLocaleLowerCase('es');
-    if (!dungeonId || !/^\d+$/.test(reportId || '') || !enemy || !['win','loss'].includes(result)) { state.dungeonLosses=null; return; }
+    if (!dungeonId || !/^\d+$/.test(reportId || '') || !enemy || !['win','loss'].includes(result)) return;
     const prev=state.dungeonLosses;
     if (prev?.lastReport===reportId) return;
-    if (result==='win') { state.dungeonLosses=null; return; }
-    const count=prev?.dungeonId===dungeonId && prev.enemy===enemy ? prev.count+1 : 1;
+    if (result==='win') { if (prev?.dungeonId===dungeonId && prev.enemy===enemy) state.dungeonLosses=null; return; }
+    const count=prev?.dungeonId===dungeonId && prev.enemy===enemy && !prev.uncertain ? prev.count+1 : 1;
     state.dungeonLosses={dungeonId,enemy,count,lastReport:reportId};
     const limit=Number.isInteger(BUILD_CONFIG.dungeon?.lossLimit) ? BUILD_CONFIG.dungeon.lossLimit : 3;
     if (count>=limit) state.dungeonReset={dungeonId,phase:'needed'};
@@ -50,7 +50,7 @@
     const definitions={expedition:{mod:'location',bar:'#cooldown_bar_expedition',points:'#expeditionpoints_value',label:'expedición'},dungeon:{mod:'dungeon',bar:'#cooldown_bar_dungeon',points:'#dungeonpoints_value',label:'mazmorra'}};
     const choices=[];
     if (BUILD_CONFIG.modules.expedition && BUILD_CONFIG.expedition) choices.push('expedition');
-    if (BUILD_CONFIG.modules.dungeon && BUILD_CONFIG.dungeon && Date.now()>=(state.dungeonRouteRetryAt||0)) choices.push('dungeon');
+    if (BUILD_CONFIG.modules.dungeon && BUILD_CONFIG.dungeon && !state.dungeonCombatUnknown && Date.now()>=(state.dungeonRouteRetryAt||0)) choices.push('dungeon');
     if (!choices.length) { if (state.pveTarget==='dungeon') { state.pveTarget=null; save(); } return false; }
     const ready=key=>{const d=definitions[key],bar=document.querySelector(d.bar),text=document.querySelector(d.points)?.textContent.trim() || '',match=text.match(/^(\d+)(?:\s*\/\s*\d+)?$/),points=match ? Number(match[1]) : NaN;return Number.isSafeInteger(points)&&points>0&&cooldownSeconds(bar?.textContent)===0&&visible(bar?.querySelector('a'));};
     let selected=choices.includes(state.pveTarget) ? state.pveTarget : null;
@@ -66,8 +66,12 @@
     const d=definitions[selected],link=document.querySelector(d.bar+' a');
     const chosen=selected==='expedition' ? BUILD_CONFIG.expedition : BUILD_CONFIG.dungeon;
     const area=chosen?.area;
-    if (!area?.id || !area?.name || !Number.isInteger(area.entryLevel) || area.entryLevel>BUILD_CONFIG.playerLevel) {
-      state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Configuración PvE incompleta o por encima del nivel declarado.'; log(state.message,'warn'); save(); return true;
+    const levelText=(document.querySelector('#header_values_level')?.textContent || '').trim();
+    const realLevel=/^\d+$/.test(levelText) ? Number(levelText) : NaN;
+    const required=selected==='dungeon' ? chosen?.entryLevel : area?.entryLevel;
+    if (!area?.id || !area?.name || !Number.isInteger(area.entryLevel) || !Number.isInteger(required) || !Number.isSafeInteger(realLevel) || realLevel<1 || realLevel<area.entryLevel || realLevel<required) {
+      state.pveTarget=null; state.lastPveAt=Date.now(); if (selected==='dungeon') state.dungeonRouteRetryAt=Date.now()+300000;
+      state.message='PvE aplazado: nivel real ausente o insuficiente, o configuración incompleta.'; log(state.message,'warn'); save(); return false;
     }
     const links=[...document.querySelectorAll('#mainnav a, #mainmenu a')];
     const sameName=value=>String(value||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLocaleLowerCase('es');
@@ -127,8 +131,9 @@
       const onclick=button?.getAttribute('onclick') || '';
       const call=onclick.match(/^\s*attack\(null,\s*(['"])(\d+)\1,\s*(\d+),\s*0,\s*(['"])[^'"]*\4(?:,\s*(['"])[^'"]*\5)?\)\s*;?\s*$/);
       const safeCall=call?.[2]===loc && Number(call?.[3])===position;
-      if (!enemy?.name || !safeCall || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
-        state.pveTarget=null; state.lastPveAt=Date.now(); state.message='No hay un ataque válido en la posición elegida; no atacaré.'; log(state.message,'warn'); save(); return true;
+      const enemyName=value=>sameName(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if (!enemy?.name || !rival || enemyName(rival)!==enemyName(enemy.name) || !safeCall || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
+        state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Expedición aplazada: enemigo o ataque no coincide con la posición elegida.'; log(state.message,'warn'); save(); return false;
       }
       state.pendingPve={mode:selected,at:Date.now(),target:rival || enemy.name,area:area.name,spawn:[enemy.levelMin,enemy.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
       state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve';

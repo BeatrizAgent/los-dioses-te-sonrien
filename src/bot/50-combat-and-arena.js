@@ -120,13 +120,14 @@
         const result=attackerOK && winnerName && normal(winnerName)===normal(accountName) ? 'win' : attackerOK && defender && winnerName && normal(winnerName)===normal(defender) && normal(defender)!==normal(accountName) ? 'loss' : null;
         const confirmed=!!result;
         if (p.mode==='dungeon') recordDungeonOutcome(p,result,defender,params.get('reportId'));
+        if (p.mode==='dungeon' && !confirmed) { state.dungeonCombatUnknown={dungeonId:p.dungeonId,at:p.at,reason:'Informe no concluyente'}; if (state.dungeonLosses) state.dungeonLosses.uncertain=true; }
         const gold=confirmed ? reportGold(document.querySelector('#content')?.innerText) : null;
         state.statsEvents.push({kind:'pve',mode:p.mode,at:Date.now(),confirmed,result,gold});
         log((p.mode==='expedition'?'Expedición':'Mazmorra')+': '+(result==='win'?'victoria':result==='loss'?'derrota':'resultado desconocido')+'.',confirmed?'success':'warn');
         state.pendingPve=null; state.pendingLoot=null; save(); return;
       }
       if (Date.now()-p.at<30000) return;
-      if (p.mode==='dungeon') state.dungeonLosses=null;
+      if (p.mode==='dungeon') { state.dungeonCombatUnknown={dungeonId:p.dungeonId,at:p.at,reason:'Informe no recibido a tiempo'}; if (state.dungeonLosses) state.dungeonLosses.uncertain=true; }
       log('Resultado de '+(p.mode==='expedition'?'expedición':'mazmorra')+' desconocido.','warn'); state.pendingPve=null; save(); return;
     }
     if (state.foodBuyTx && foodMarketTick()) return;

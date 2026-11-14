@@ -31,8 +31,8 @@ export function eligibleDungeons(catalog, playerLevel, region = null) {
 
 export function normalizeBuildConfig(input, catalog) {
   const playerLevel = Number(input.playerLevel);
-  if (!Number.isInteger(playerLevel) || playerLevel < 20 || playerLevel > 99) {
-    throw new RangeError('El nivel de personaje debe estar entre 20 y 99.');
+  if (!Number.isInteger(playerLevel) || playerLevel < 1 || playerLevel > 99) {
+    throw new RangeError('El nivel de personaje debe estar entre 1 y 99.');
   }
 
   const modules = Object.fromEntries(MODULE_KEYS.map(key => [key, input.modules?.[key] === true]));

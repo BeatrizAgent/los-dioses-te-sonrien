@@ -12,7 +12,7 @@ test('genera un userscript completo desde los ocho módulos y sustituye la confi
   const config = normalizeBuildConfig(DEFAULT_CONFIG, catalog);
   const result = buildUserscript(config, fragments);
   assert.match(result, /@name\s+Los Dioses Te Sonríen/);
-  assert.match(result, /@version\s+0\.12\.36/);
+  assert.match(result, /@version\s+0\.12\.37/);
   assert.match(result, /const BUILD_CONFIG = Object\.freeze\(\{"playerLevel":20/);
   assert.ok(result.trimEnd().endsWith('})();'));
   assert.ok(!result.includes('__BUILD_CONFIG__'));
@@ -33,7 +33,7 @@ test('la configuración conserva la posición elegida del enemigo', () => {
 
 test('genera expediciones y mazmorras accesibles por debajo de nivel 92', () => {
   for (const area of catalog.expeditions.filter(item => item.entryLevel < 92)) {
-    const level = Math.max(20, area.entryLevel);
+    const level = Math.max(1, area.entryLevel);
     for (const enemy of area.enemies) {
       const config = normalizeBuildConfig({ playerLevel: level, campaignRegion: area.region, modules: { expedition: true }, expeditionAreaId: area.id, expeditionEnemyId: enemy.id }, catalog);
       assert.equal(config.expedition.enemy.position, enemy.position);
@@ -41,7 +41,7 @@ test('genera expediciones y mazmorras accesibles por debajo de nivel 92', () => 
     }
   }
   for (const dungeon of catalog.dungeons.filter(item => item.entryLevel < 92)) {
-    const config = normalizeBuildConfig({ playerLevel: Math.max(20, dungeon.entryLevel), campaignRegion: dungeon.region, modules: { dungeon: true }, dungeonId: dungeon.id }, catalog);
+    const config = normalizeBuildConfig({ playerLevel: Math.max(1, dungeon.entryLevel), campaignRegion: dungeon.region, modules: { dungeon: true }, dungeonId: dungeon.id }, catalog);
     assert.equal(config.dungeon.id, dungeon.id);
     assert.equal(config.dungeon.difficulty, dungeon.difficulty);
     assert.doesNotThrow(() => new vm.Script(buildUserscript(config, fragments)));
@@ -49,7 +49,7 @@ test('genera expediciones y mazmorras accesibles por debajo de nivel 92', () => 
 });
 
 test('rechaza nivel, zona, objetivo y mazmorra fuera del catálogo accesible', () => {
-  assert.throws(() => normalizeBuildConfig({ ...DEFAULT_CONFIG, playerLevel: 100 }, catalog), /entre 20 y 99/);
+  assert.throws(() => normalizeBuildConfig({ ...DEFAULT_CONFIG, playerLevel: 100 }, catalog), /entre 1 y 99/);
   assert.throws(() => normalizeBuildConfig({
     playerLevel: 20,
     modules: { ...DEFAULT_CONFIG.modules, expedition: true },

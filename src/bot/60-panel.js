@@ -75,7 +75,7 @@
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   function renderContent() {
-    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
+    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,state.dungeonCombatUnknown,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
     const signature = JSON.stringify([tabName,data]);
     if (signature === contentKey || (root.activeElement && $('.content').contains(root.activeElement))) return;
     contentKey=signature;
@@ -89,6 +89,12 @@
       const dungeon=document.querySelector('#cooldown_bar_dungeon')?.textContent.trim() || 'No disponible';
       content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Circo: '+ct),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
       content.append(textElement('div','sectionlabel','Ubicación'),textElement('div','card name',current));
+      if (state.dungeonCombatUnknown) {
+        content.append(textElement('p','small','Mazmorra pausada: resultado de combate desconocido. Revisa el informe y la instancia antes de continuar; las demás tareas siguen activas.'));
+        const reviewed=textElement('button','btn','Ya revisé el combate de mazmorra');
+        reviewed.onclick=()=>{if(!verified()||captcha()||!state.dungeonCombatUnknown)return;state.dungeonCombatUnknown=null;log('El jugador revisó el combate de mazmorra; se conservan las derrotas anteriores.','warn');save();contentKey='';reviewed.blur();renderContent();};
+        content.append(reviewed);
+      }
       content.append(textElement('div','sectionlabel','Paquetes de oro'),textElement('p','small',state.goldPreviousReview ? 'Hay una revisión anterior pendiente.' : state.goldTx?.manualReview ? 'Revisa y resuelve la operación de oro manualmente: '+(state.goldTx.problem||'resultado desconocido') : state.goldTx?.blocked ? 'Operación pendiente: volveré a comprobarla automáticamente.' : state.goldTx ? 'Operación en curso: '+state.goldTx.stage : BUILD_CONFIG.modules.guildGold ? 'Automático con el bot activo. Anillos de 100.000 a 1.000.000; reserva 100.000 más tarifa. Anuncios a 24 horas.' : 'Módulo no seleccionado en esta configuración.'));
       if (state.foodBuyTx?.stage==='buy' || (state.foodBuyTx && !['baseline','readyBuy','verify'].includes(state.foodBuyTx.stage))) {
         content.append(textElement('p','small','Compra de alimento sin confirmar: '+state.foodBuyTx.name+' · '+state.foodBuyTx.price.toLocaleString('es-ES')+' de oro. Revisa mercado y paquetes antes de continuar.'));

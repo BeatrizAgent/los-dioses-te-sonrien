@@ -6,7 +6,7 @@ Web de configuración y generación de un userscript para Gladiatus, hecha con A
 
 - Explica las funciones del bot, sus dependencias y sus límites.
 - Permite elegir módulos con casillas y genera un `.user.js` descargable.
-- Deja declarar un nivel de personaje entre 20 y 99 y filtra zonas/mazmorras por requisito de acceso.
+- Deja declarar un nivel de personaje entre 1 y 99 y filtra zonas/mazmorras por requisito de acceso.
 - Usa una única región PvE para expedición y mazmorra, con listas filtradas por Italia, África o Germania.
 - Permite escoger el enemigo de expedición, la mazmorra y su modo normal o avanzado.
 - Muestra por separado el nivel de acceso y el rango de aparición del enemigo o jefe.
@@ -49,6 +49,8 @@ En 0.12.34, la curación reconoce alimentos por su efecto sin descartar los de n
 En 0.12.35, misiones puede visitar el Panteón sin activar Arena, y PvE no espera a Arena cuando ese módulo está desactivado. Las combinaciones están comprobadas en simulación; su funcionamiento en personajes de nivel bajo sigue pendiente de validar en juego.
 
 En 0.12.36, la selección de rivales reutiliza un índice en memoria para calcular victorias, derrotas, daño y experiencia, sin cambiar la ordenación ni los tiempos de espera del juego. Está comprobado en simulación; falta validarlo instalado.
+
+En 0.12.37, el generador acepta niveles 1–99; PvE exige nivel real visible suficiente y la expedición comprueba el nombre y la posición del enemigo. Si no coinciden, se aplaza. Un informe de mazmorra desconocido pausa ese módulo hasta revisión y conserva la última cuenta de derrotas sin usarla como una racha continua. Pruebas simuladas; pendiente de validación instalada y de comprobar variantes reales de nombres y navegación.
 
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 

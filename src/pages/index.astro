@@ -43,7 +43,7 @@ const dungeonCount = catalog.dungeons.length;
 
         <form id="bot-form" class="forge-form" style={`--module-icons: url("${base}images/module-icons.png")`}>
           <div class="form-topline"><span>CONFIGURACIÓN DE GENERACIÓN</span><span>LOCAL EN TU NAVEGADOR</span></div>
-          <label class="level-field" for="player-level"><span><b>Nivel de personaje</b><small>20–99 · requisito de acceso</small></span><input id="player-level" name="playerLevel" type="number" min="20" max="99" value="20" required /></label>
+          <label class="level-field" for="player-level"><span><b>Nivel de personaje</b><small>1–99 · requisito de acceso</small></span><input id="player-level" name="playerLevel" type="number" min="1" max="99" value="20" required /></label>
           <fieldset class="module-list">
             <legend>Módulos <small>· marca los que quieres incluir activos</small></legend>
             <label class="module-row"><input type="checkbox" name="arenaCircus" checked /><span class="module-glyph icon-arena" aria-hidden="true"></span><span><b>Arena y Circo Provinciarum</b><small>Busca rivales y registra informes reconocidos.</small></span><span class="checkmark" aria-hidden="true"></span></label>
@@ -129,7 +129,7 @@ const dungeonCount = catalog.dungeons.length;
             <div><p class="overline"><span class="rule"></span> DATOS CON PROCEDENCIA</p><h2 id="catalog-title">El mapa PvE,<br /><i>sin adivinar.</i></h2></div>
             <p>El nivel que eliges es tu nivel de personaje. El rango de aparición corresponde al bicho o al jefe. Algunos enemigos pueden aparecer por encima de tu nivel, aunque la zona sí tenga requisito de acceso válido.</p>
           </div>
-          <div class="catalog-stat-row"><div><b>20</b><span>zonas hasta acceso 99</span></div><div><b>{expeditionCount}</b><span>enemigos catalogados</span></div><div><b>{dungeonCount}</b><span>mazmorras hasta nivel de acceso 99</span></div><div><b>20–99</b><span>nivel de personaje del formulario</span></div></div>
+          <div class="catalog-stat-row"><div><b>20</b><span>zonas hasta acceso 99</span></div><div><b>{expeditionCount}</b><span>enemigos catalogados</span></div><div><b>{dungeonCount}</b><span>mazmorras hasta nivel de acceso 99</span></div><div><b>1–99</b><span>nivel de personaje del formulario</span></div></div>
           <div class="catalog-accordion">
             <details>
               <summary><span>Expediciones · Italia, África y Germania</span><span class="summary-count">80 ENEMIGOS <i>＋</i></span></summary>
