@@ -1,4 +1,4 @@
-name: Comprobar web
+name: Comprobar y desplegar web
 
 on:
   push:
@@ -8,9 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      deploy_enabled: ${{ steps.deploy_config.outputs.enabled }}
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v6
@@ -29,3 +35,55 @@ jobs:
         run: pnpm test
       - name: Generar la web
         run: pnpm build
+      - name: Comprobar configuración de despliegue
+        id: deploy_config
+        env:
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+        run: |
+          if [ -n "$DOKPLOY_API_KEY" ]; then echo 'enabled=true' >> "$GITHUB_OUTPUT"; else echo 'enabled=false' >> "$GITHUB_OUTPUT"; fi
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.deploy_enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    environment:
+      name: production
+      url: https://gladibot.yampi.eu/los-dioses-te-sonrien/
+    steps:
+      - name: Descargar commit comprobado
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Publicar referencia verificada
+        run: |
+          set -eu
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo 'Main avanzó; este commit no se desplegará.'
+            echo 'SKIP_DEPLOY=true' >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git push origin "$GITHUB_SHA:refs/heads/ci/production"
+      - name: Desplegar commit verificado en VPS
+        if: env.SKIP_DEPLOY != 'true'
+        env:
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_URL: https://dockploy.yampi.eu
+          COMPOSE_ID: TLmOA6qbC8Wz_YhAKk6Qk
+          DEPLOY_TITLE: github-actions-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -eu
+          config=$(curl -fsS --get "$DOKPLOY_URL/api/compose.one" --data-urlencode "composeId=$COMPOSE_ID" -H "x-api-key: $DOKPLOY_API_KEY")
+          echo "$config" | jq -e '.sourceType == "github" and .owner == "BeatrizAgent" and .repository == "los-dioses-te-sonrien" and .branch == "ci/production" and .autoDeploy == false' >/dev/null
+          payload=$(jq -nc --arg id "$COMPOSE_ID" --arg title "$DEPLOY_TITLE" '{composeId:$id,title:$title,description:"GitHub Actions: pruebas superadas"}')
+          curl -fsS -X POST "$DOKPLOY_URL/api/compose.deploy" -H "x-api-key: $DOKPLOY_API_KEY" -H 'Content-Type: application/json' --data "$payload" >/dev/null
+          for attempt in $(seq 1 90); do
+            result=$(curl -fsS --get "$DOKPLOY_URL/api/deployment.allByCompose" --data-urlencode "composeId=$COMPOSE_ID" -H "x-api-key: $DOKPLOY_API_KEY")
+            status=$(echo "$result" | jq -r --arg title "$DEPLOY_TITLE" '[.[] | select(.title == $title)] | first | .status // "queued"')
+            case "$status" in done) curl -fsS -o /dev/null https://gladibot.yampi.eu/los-dioses-te-sonrien/; exit 0;; error|failed) echo 'Dokploy informó de un error.' >&2; exit 1;; esac
+            sleep 10
+          done
+          echo 'Tiempo agotado esperando el despliegue.' >&2; exit 1
