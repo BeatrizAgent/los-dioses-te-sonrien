@@ -136,11 +136,11 @@
       if (!items.length) { content.append(textElement('div','empty','Abre Circo Turma o Circo Provinciarum para ver los rivales de la lista actual.')); return; }
       const isLive=liveRivals().length > 0;
       content.append(textElement('p','small',isLive ? 'Lista actual. Resultados confirmados y anotaciones manuales; no garantizan victorias.' : `Última lista observada ${state.rivalSnapshot?.at ? new Date(state.rivalSnapshot.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) : ''}. La disponibilidad puede haber cambiado.`));
+      rivalIndex.sync(state.records);
       for (const r of items) {
-        const records=state.records.filter(x=>x.name===r.name && x.server===r.server && x.mode===r.mode && x.level===r.level);
-        const wins=records.filter(x=>x.result==='win').length, losses=records.filter(x=>x.result==='loss').length;
+        const {wins,losses,total}=rivalIndex.get(r);
         const card=textElement('div','card',''), row=textElement('div','row',''), info=textElement('div','','');
-        info.append(textElement('div','name',r.name),textElement('div','meta',`Nivel ${r.rivalLevel} · Provincia ${r.server}`)); row.append(info,textElement('span','tag',records.length?`${wins}V · ${losses}D · ${records.length} muestra${records.length===1?'':'s'}`:'Sin datos')); card.append(row);
+        info.append(textElement('div','name',r.name),textElement('div','meta',`Nivel ${r.rivalLevel} · Provincia ${r.server}`)); row.append(info,textElement('span','tag',total?`${wins}V · ${losses}D · ${total} muestra${total===1?'':'s'}`:'Sin datos')); card.append(row);
         const actions=textElement('div','record','');
         for(const [label,result] of [['+ Victoria','win'],['+ Derrota','loss']]) {const b=textElement('button','',label);b.onclick=()=>{if(!verified()||captcha())return stop('Identidad no verificada o CAPTCHA.');state.records.push({...r,result,source:'manual',at:new Date().toISOString()});log(`${label.slice(2)} registrada: ${r.name}.`);save();contentKey='';b.blur();renderContent();};actions.append(b);}
         card.append(actions);content.append(card);

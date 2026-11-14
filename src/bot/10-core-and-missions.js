@@ -78,6 +78,30 @@
     const knownPve=pve.filter(e=>e.confirmed===true && Number.isSafeInteger(e.gold) && e.gold>=0);
     return {wins:rows.filter(r=>r.result==='win').length+pve.filter(e=>e.confirmed && e.result==='win').length,losses:rows.filter(r=>r.result==='loss').length+pve.filter(e=>e.confirmed && e.result==='loss').length,combatGold:known.reduce((n,r)=>n+r.gold,0)+knownPve.reduce((n,e)=>n+e.gold,0),missionGold:knownClaims.reduce((n,e)=>n+e.gold,0),unknown:rows.length-known.length+claims.length-knownClaims.length+pve.length-knownPve.length,rows,claims};
   }
+  // El historial solo recibe inserciones; sustituirlo o reducirlo invalida el índice.
+  function makeRivalIndex() {
+    let records = null, indexed = 0, names = new Map();
+    function leaf(record, create) {
+      let map=names;
+      for (const part of [record.name,record.server,record.mode,record.level]) {
+        if (!map.has(part)) { if (!create) return null; map.set(part,new Map()); }
+        map=map.get(part);
+      }
+      if (!map.has('counts') && create) map.set('counts',{wins:0,losses:0,total:0});
+      return map.get('counts') || null;
+    }
+    return {
+      sync(rows) {
+        if (records!==rows || rows.length<indexed) { records=rows; indexed=0; names=new Map(); }
+        while (indexed<rows.length) {
+          const row=rows[indexed++], counts=leaf(row,true);
+          counts.total++; if (row.result==='win') counts.wins++; else if (row.result==='loss') counts.losses++;
+        }
+      },
+      get(record) { return leaf(record,false) || {wins:0,losses:0,total:0}; },
+    };
+  }
+  const rivalIndex=makeRivalIndex();
   function act(el, fingerprint) {
     state.pending = fingerprint; state.message = 'Esperando confirmación del juego…'; log(({accept:'Aceptando misión',restart:'Reiniciando misión',claim:'Cobrando misión',reroll:'Solicitando misiones nuevas'})[fingerprint.kind] + (fingerprint.title ? ': ' + fingerprint.title : ''), 'action'); save(); el.click();
   }

@@ -58,6 +58,8 @@ El bot comprueba la zona y el control de ataque de la posición elegida antes de
 
 Web: https://gladibot.yampi.eu/los-dioses-te-sonrien/
 
+El historial de rivales permanece en el almacenamiento local del navegador por personaje. El panel usa un índice temporal en memoria, reconstruido tras una recarga, y no elimina registros antiguos automáticamente. El reinicio total elimina el historial de ese personaje tras confirmación; todavía no hay exportación de historial.
+
 GitHub Actions ejecuta `pnpm test`, genera el userscript y construye Astro. La web pública se sirve desde el VPS; su despliegue todavía no está automatizado mediante Actions. La ruta base está definida en `astro.config.mjs`.
 
 ## Límites de seguridad
