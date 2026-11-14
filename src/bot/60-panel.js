@@ -54,7 +54,7 @@
     setText('.message', !verified() ? 'Visita Visión general para verificar el personaje.' : state.message || (state.running ? 'Revisando misiones disponibles.' : 'Activa la revisión cuando quieras comenzar.'));
     setText('.toggle', state.running ? 'Detener bot' : 'Activar bot');
     $('.go').classList.toggle('hidden', mod === 'quests');
-    renderContent();
+    if (!uiState.minimized) renderContent();
   }
   $('.toggle').onclick = () => {
     if (!ownerActive) return;
@@ -64,7 +64,7 @@
     setTimeout(combatTick, 300);
   };
   $('.go').onclick = () => { const link = document.querySelector('#mainmenu a[href*="mod=quests"]'); if (link && visible(link) && !captcha() && verified()) link.click(); else stop('No se pudo abrir el Panteón. Verifica la cuenta.'); };
-  $('.min').onclick = () => { const small = $('.shell').classList.toggle('minimized'); uiState.minimized=small; saveUI(uiState); $('.min').textContent = small ? '+' : '−'; $('.min').setAttribute('aria-label',small?'Abrir panel':'Minimizar panel'); };
+  $('.min').onclick = () => { const small = $('.shell').classList.toggle('minimized'); uiState.minimized=small; saveUI(uiState); $('.min').textContent = small ? '+' : '−'; $('.min').setAttribute('aria-label',small?'Abrir panel':'Minimizar panel'); if (!small) renderContent(); };
   root.querySelectorAll('.tab').forEach(button => button.onclick = () => { resetConfirmation=false; tabName = button.dataset.tab; uiState.tab=tabName; saveUI(uiState); contentKey=''; root.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); renderContent(); });
   function textElement(tag, cls, text) { const node=document.createElement(tag); node.className=cls; node.textContent=text; return node; }
   function exportRivalHistory(records) {
