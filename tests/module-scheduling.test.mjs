@@ -15,7 +15,7 @@ test('PvE continúa después de un combate cuando Arena está desactivada', () =
   const context = { state, Date, URL, Number, String, params: new URLSearchParams('mod=overview'), mod: 'overview',
     location: { href: 'https://s1-es.gladiatus.gameforge.com/game/index.php?mod=overview', origin: 'https://s1-es.gladiatus.gameforge.com' },
     BUILD_CONFIG: { playerLevel: 20, modules: { expedition: true, arenaCircus: false }, expedition: { area: { id: 'zone', name: 'Zona', entryLevel: 20 } } },
-    document: { querySelector: s => s.includes('points_value') ? { textContent: '1' } : s.includes('cooldown_bar') ? bar : null, querySelectorAll: () => [link] },
+    document: { querySelector: s => s==='#header_values_level' ? {textContent:'20'} : s.includes('points_value') ? { textContent: '1' } : s.includes('cooldown_bar') ? bar : null, querySelectorAll: () => [link] },
     visible: x => !!x, cooldownSeconds: () => 0, save() {}, log() {}, navigation() { navigated = true; return true; } };
   vm.runInNewContext(pve + '\npveTick()', context);
   assert.equal(navigated, true);

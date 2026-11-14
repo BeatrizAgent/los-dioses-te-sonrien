@@ -1,7 +1,7 @@
 {
   "catalogVersion": 1,
   "scope": {
-    "playerLevelMin": 20,
+    "playerLevelMin": 1,
     "playerLevelMax": 99,
     "regions": ["Italia", "África", "Germania"],
     "note": "Se muestran zonas y mazmorras cuyo nivel de acceso de personaje es 99 o menos. El nivel que aparece junto a cada enemigo es el rango de aparición de la criatura y puede superar el nivel del personaje."

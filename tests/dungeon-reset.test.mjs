@@ -9,9 +9,13 @@ const p={dungeonId:'dungeon-test'};
 test('tres derrotas confirmadas del mismo enemigo solicitan reinicio una sola vez',()=>{
  const c=setup();c.recordDungeonOutcome(p,'loss','Jefe','101');c.recordDungeonOutcome(p,'loss','Jefe','101');assert.equal(c.state.dungeonLosses.count,1);c.recordDungeonOutcome(p,'loss','Jefe','102');assert.equal(c.state.dungeonReset,undefined);c.recordDungeonOutcome(p,'loss','Jefe','103');assert.equal(c.state.dungeonReset.phase,'needed');
 });
-test('victoria, resultado desconocido o cambio de rival impiden acumular derrotas distintas',()=>{
- const c=setup();c.recordDungeonOutcome(p,'loss','Jefe','101');c.recordDungeonOutcome(p,'loss','Otro','102');assert.equal(c.state.dungeonLosses.count,1);c.recordDungeonOutcome(p,null,'Otro','103');assert.equal(c.state.dungeonLosses,null);c.recordDungeonOutcome(p,'loss','Otro','104');c.recordDungeonOutcome(p,'win','Otro','105');assert.equal(c.state.dungeonLosses,null);
+test('resultado desconocido conserva derrotas y victoria limpia solo el mismo rival',()=>{
+ const c=setup();c.recordDungeonOutcome(p,'loss','Jefe','101');c.recordDungeonOutcome(p,'loss','Otro','102');assert.equal(c.state.dungeonLosses.count,1);c.recordDungeonOutcome(p,null,'Otro','103');assert.equal(c.state.dungeonLosses.count,1);c.recordDungeonOutcome(p,'win','Jefe','104');assert.equal(c.state.dungeonLosses.count,1);c.recordDungeonOutcome(p,'win','Otro','105');assert.equal(c.state.dungeonLosses,null);
 });
 test('el umbral elegido cambia cuándo se solicita el reinicio',()=>{
  const c=setup();c.BUILD_CONFIG.dungeon.lossLimit=2;c.recordDungeonOutcome(p,'loss','Jefe','101');assert.equal(c.state.dungeonReset,undefined);c.recordDungeonOutcome(p,'loss','Jefe','102');assert.equal(c.state.dungeonReset.phase,'needed');
+});
+test('una laguna desconocida rompe la racha sin borrar el contador anterior hasta una nueva derrota',()=>{
+ const c=setup();c.recordDungeonOutcome(p,'loss','Jefe','101');c.recordDungeonOutcome(p,'loss','Jefe','102');c.state.dungeonLosses.uncertain=true;
+ assert.equal(c.state.dungeonLosses.count,2);c.recordDungeonOutcome(p,'loss','Jefe','103');assert.equal(c.state.dungeonLosses.count,1);assert.equal(c.state.dungeonReset,undefined);
 });

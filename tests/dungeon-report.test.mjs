@@ -10,4 +10,10 @@ function run(winner,defender='Aldeano',attacker='CassiusFerox'){
  vm.runInNewContext(`(function(){${code}})()`,context);return {state,observed};
 }
 test('derrota exige atacante y ganador coincidente con defensor',()=>{let r=run('Aldeano');assert.equal(r.state.statsEvents[0].result,'loss');assert.equal(r.observed[0][1],'loss');assert.equal(r.observed[0][2],'Aldeano');});
-test('resultado ambiguo no cuenta como derrota',()=>{for(const [winner,defender,attacker] of [['Otro','Aldeano','CassiusFerox'],['Aldeano','','CassiusFerox'],['Aldeano','Aldeano','Otro']]){let r=run(winner,defender,attacker);assert.equal(r.state.statsEvents[0].result,null);assert.equal(r.observed[0][1],null);}});
+test('resultado ambiguo no cuenta como derrota y pausa solo mazmorra',()=>{for(const [winner,defender,attacker] of [['Otro','Aldeano','CassiusFerox'],['Aldeano','','CassiusFerox'],['Aldeano','Aldeano','Otro']]){let r=run(winner,defender,attacker);assert.equal(r.state.statsEvents[0].result,null);assert.equal(r.observed[0][1],null);assert.equal(r.state.dungeonCombatUnknown.dungeonId,'route');}});
+test('timeout conserva derrotas y bloquea nueva acción de mazmorra',()=>{
+ const state={pendingPve:{mode:'dungeon',dungeonId:'route',at:Date.now()-31000},dungeonLosses:{dungeonId:'route',enemy:'jefe',count:2},statsEvents:[]};
+ const context={state,mod:'overview',sub:'',params:new URLSearchParams(),Date,log(){},save(){}};
+ vm.runInNewContext(`(function(){${code}})()`,context);
+ assert.equal(state.dungeonCombatUnknown.dungeonId,'route');assert.equal(state.dungeonLosses.count,2);assert.equal(state.pendingPve,null);
+});
