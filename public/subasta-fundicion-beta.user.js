@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.4.6
+// @version      0.4.8
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -315,8 +315,15 @@
       state.navigationAt=Date.now();save();link.click();return true;
     }
     const candidates=[...box.querySelectorAll('.packageItem .ui-draggable[data-hash]')].map(el=>({el,item:packageKind(el)})).filter(x=>x.item && !state.blockedItems?.some(y=>y.hash===x.item.hash) && x.el.hasAttribute('data-gca-flag_double-click-event'));
-    const candidate=candidates.find(x=>candidates.filter(y=>y.item.hash===x.item.hash).length===1);
+    const bag=String(filter)==='7'?'512':'513';
+    if (candidates.length && !selectBag(bag)) return true;
+    // Un objeto sin hueco o con identidad repetida no debe bloquear otros paquetes.
+    const candidate=candidates.find(x=>x.item.kind===(bag==='512'?'sell':'smelt') &&
+      candidates.filter(y=>y.item.hash===x.item.hash).length===1 &&
+      ![...inv.querySelectorAll('.ui-draggable[data-hash]')].some(el=>el.getAttribute('data-hash')===x.item.hash) &&
+      bagSpace(inv,x.item.width,x.item.height));
     if (!candidate) {
+      if (candidates.length) note('Sin paquete seguro con espacio en baúl '+(bag==='512'?'I':'II')+'; revisando siguiente tarea.');
       const next=document.querySelector('.paging_right_step');
       if (visible(next)) return navigate('.paging_right_step','packages');
       if(state.needGold){state.needGold=false;state.scrollRetryAt=Date.now()+120000;state.nextPackages=Date.now()+120000;note('Sin pergamino disponible; vuelvo a revisar más tarde.');return false;}
@@ -324,9 +331,6 @@
       if(state.packageFilterIndex>=filters.length){state.packageFilterIndex=0;state.nextPackages=Date.now()+120000;save();return false;}
       save();return true;
     }
-    const bag=candidate.item.kind==='smelt'?'513':'512';
-    if (!selectBag(bag)) return true;
-    if (!bagSpace(inv,candidate.item.width,candidate.item.height) || inventoryHash(candidate.item.hash)) { state.nextPackages=Date.now()+120000; note('Baúl sin espacio o identificación ambigua.'); return false; }
     state.itemTx={...candidate.item,...(candidate.item.kind==='sell'?{salePrice:SALE_PRICE}:{}),bag,stage:'transfer',at:Date.now()};
     note('Trasladando paquete de subasta: '+candidate.item.name+'.');
     candidate.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window})); return true;
@@ -342,7 +346,7 @@
     }
     if (tx.stage==='forge') {
       const slot=slots.findIndex(e=>e.classList.contains('forge_closed'));
-      if (slot<0) { note('Sin huecos libres en fundición.'); return false; }
+      if (slot<0) { state.itemTx=null;state.forgeHasFree=false;state.forgeDue=Date.now()+60000;note('Fundición ocupada; revisaré más tarde y seguiré con otras tareas.');return false; }
       tx.slot=slot;tx.stage='place';tx.at=Date.now();save();return true;
     }
     if (active!==tx.slot) { slots[tx.slot].click(); return true; }
@@ -357,7 +361,7 @@
     const rent=document.querySelector('#slot-closed [data-rent="2"]'), cost=number(rent?.textContent), gold=balance();
     if (!visible(rent) || !rent.querySelector('.icon_gold') || rent.querySelector('.icon_rubies') || !Number.isSafeInteger(cost) || cost<=0 || !Number.isSafeInteger(gold) || !(document.querySelector('#forge_item_name')?.textContent||'').includes(tx.name)) return waitItem(tx,'Coste o equipo de fundición no verificable.');
     if(cost>gold && !state.goldClaim && Date.now()>=(state.goldRetryAt||0)){tx.neededCost=cost;state.suspendedSmelt=tx;state.itemTx=null;state.needGold=true;state.goldRequired=cost;state.goldVisited=[];state.phase='packages';state.nextPackages=0;note('Falta oro para fundir; buscando cobros de mercado.');return true;}
-    if(cost>gold){state.forgeDue=Date.now()+60000;note('Falta oro para fundir.');return false;}
+    if(cost>gold){tx.neededCost=cost;state.suspendedSmelt=tx;state.itemTx=null;state.forgeDue=Date.now()+60000;note('Falta oro para fundir; continuaré con otras tareas.');return false;}
     tx.stage='rent';tx.at=Date.now();tx.cost=cost;save();rent.click();return true;
   }
   function forgeReviewTick() {
@@ -499,7 +503,7 @@
       state.blockedItems=Array.isArray(state.blockedItems)?state.blockedItems:[];
       state.blockedItems.push(state.itemTx);state.itemTx=null;save();
     }
-    if (state.goldClaim) { goldClaimTick(); return; }
+    if (state.goldClaim && goldClaimTick()) return;
     if(!state.itemTx && state.suspendedSmelt && !state.needGold) {
       if(Number.isSafeInteger(balance()) && balance()>=state.suspendedSmelt.neededCost){state.itemTx=state.suspendedSmelt;state.itemTx.stage='forge';state.itemTx.at=Date.now();delete state.itemTx.dragAt;delete state.suspendedSmelt;save();}
       else if(!state.goldClaim && Date.now()>=(state.goldRetryAt||0)){state.needGold=true;state.goldRequired=state.suspendedSmelt.neededCost;state.goldVisited=[];state.phase='packages';state.nextPackages=0;save();}
