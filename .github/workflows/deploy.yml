@@ -1,4 +1,4 @@
-name: Publicar en GitHub Pages
+name: Comprobar web
 
 on:
   push:
@@ -7,10 +7,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -33,23 +29,3 @@ jobs:
         run: pnpm test
       - name: Generar la web
         run: pnpm build
-      - name: Configurar Pages
-        uses: actions/configure-pages@v5
-      - name: Subir el sitio estático
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Publicar en GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
