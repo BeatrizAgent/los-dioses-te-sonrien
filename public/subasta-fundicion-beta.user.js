@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.4.5
+// @version      0.4.6
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -37,6 +37,7 @@
     try {const previous=JSON.parse(localStorage.getItem(legacyKey));if(previous && typeof previous==='object') {previous.running=false;localStorage.setItem(KEY,JSON.stringify(previous));}}catch{}
   }
   const CATEGORIES = [8, 4, 5, 2, 3];
+  const SALE_PRICE = 500;
   const PACKAGE_FILTERS = [1, 2, 3, 4, 5, 8, 7, 20];
   const SMELT_TYPES = [1, 2, 3, 4, 5, 8];
   let state;
@@ -45,6 +46,11 @@
   // Los pergaminos están reservados, incluso si una versión anterior activó su venta.
   state.options.scroll = false;
   state.needGold = state.needGold === true && Number.isSafeInteger(state.goldRequired) && state.goldRequired>0;
+  if (state.itemTx?.kind==='sell' && !Number.isSafeInteger(state.itemTx.salePrice)) {
+    if (state.itemTx.stage==='sold') state.itemTx.salePrice=5000;
+    else if (state.itemTx.stage==='drop') {state.itemTx.blocked=true;state.itemTx.problem='Anuncio anterior a la actualización pendiente de revisión.';}
+    else {state.itemTx.salePrice=SALE_PRICE;delete state.itemTx.before;delete state.itemTx.marketScan;}
+  }
   if (state.itemTx && (state.itemTx.kind==='scroll' || state.itemTx.type===20 || ['npc','npcSold'].includes(state.itemTx.stage))) {
     state.itemTx.blocked=true;state.itemTx.problem='Pergamino reservado: operación anterior detenida para revisión.';
   }
@@ -260,7 +266,7 @@
     const candidates=items.map(el=>{
       const hash=el.getAttribute('data-hash'), price=Number(el.getAttribute('data-price-gold')), amount=Number(el.getAttribute('data-amount'));
       const value=price*amount, origin=el.closest('.packageItem')?.textContent||'';
-      return visible(el) && /\bMercado\b/i.test(origin) && el.hasAttribute('data-gca-flag_double-click-event') && typeof hash==='string' && hash.length>0 && hash.length<=256 && !/[\x00-\x1f\x7f]/.test(hash) && Number.isSafeInteger(price) && price>0 && Number.isSafeInteger(amount) && amount>0 && value===5000 && Number.isSafeInteger(gold+value) ? {el,hash,amount:value} : null;
+      return visible(el) && /\bMercado\b/i.test(origin) && el.hasAttribute('data-gca-flag_double-click-event') && typeof hash==='string' && hash.length>0 && hash.length<=256 && !/[\x00-\x1f\x7f]/.test(hash) && Number.isSafeInteger(price) && price>0 && Number.isSafeInteger(amount) && amount>0 && [SALE_PRICE,5000].includes(value) && Number.isSafeInteger(gold+value) ? {el,hash,amount:value} : null;
     }).filter(Boolean);
     const candidate=candidates.find(x=>items.filter(el=>el.getAttribute('data-hash')===x.hash).length===1);
     if(!candidate){
@@ -292,7 +298,7 @@
         if (!selectBag('512')) return true;
         const items=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(itemDetails).filter(item=>sellableUsable(item) && !state.blockedItems?.some(x=>x.hash===item.hash));
         const item=items.find(x=>items.filter(y=>y.hash===x.hash).length===1);
-        if (item) {state.itemTx={...item,kind:'sell',bag:'512',stage:'market',at:Date.now()};note('Preparando venta del utilizable en baúl I: '+item.name+'.');return true;}
+        if (item) {state.itemTx={...item,kind:'sell',salePrice:SALE_PRICE,bag:'512',stage:'market',at:Date.now()};note('Preparando venta del utilizable en baúl I: '+item.name+'.');return true;}
       }
     }
     // El DOM de paquetes y Crazy Addon llegan después de la navegación.
@@ -321,7 +327,7 @@
     const bag=candidate.item.kind==='smelt'?'513':'512';
     if (!selectBag(bag)) return true;
     if (!bagSpace(inv,candidate.item.width,candidate.item.height) || inventoryHash(candidate.item.hash)) { state.nextPackages=Date.now()+120000; note('Baúl sin espacio o identificación ambigua.'); return false; }
-    state.itemTx={...candidate.item,bag,stage:'transfer',at:Date.now()};
+    state.itemTx={...candidate.item,...(candidate.item.kind==='sell'?{salePrice:SALE_PRICE}:{}),bag,stage:'transfer',at:Date.now()};
     note('Trasladando paquete de subasta: '+candidate.item.name+'.');
     candidate.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window})); return true;
   }
@@ -408,7 +414,7 @@
     if(fingerprint)scan.fingerprints[current]=fingerprint;
     scan.count+=rows.filter(row=>{
       const cells=row.cells || [], item=itemDetails(cells[0]?.querySelector('[data-basis]'));
-      return item?.name===tx.name && item.basis===tx.basis && normal(cells[1]?.textContent)===normal(accountName) && number(cells[2]?.textContent)===5000;
+      return item?.name===tx.name && item.basis===tx.basis && normal(cells[1]?.textContent)===normal(accountName) && number(cells[2]?.textContent)===tx.salePrice;
     }).length;
     scan.pages.push(current);tx.at=Date.now();save();
     if(current<total){go(current+1);return null;}
@@ -419,7 +425,7 @@
     if (!selectBag('512')) return true;
     if (tx.stage==='sold') {
       const count=marketOwnCount(tx);
-      if (Number.isInteger(count) && count>tx.before && !inventoryHash(tx.hash)) { finishItem('Anuncio confirmado: '+tx.name+' por 5.000 durante 24 h.'); return true; }
+      if (Number.isInteger(count) && count>tx.before && !inventoryHash(tx.hash)) { finishItem('Anuncio confirmado: '+tx.name+' por '+tx.salePrice.toLocaleString('es-ES')+' durante 24 h.'); return true; }
       return waitItem(tx,'Venta sin confirmar; no se repetirá.');
     }
     const target=document.querySelector('#market_sell .ui-droppable'), form=document.querySelector('#sellForm');
@@ -433,10 +439,10 @@
     const price=document.querySelector('#preis'), duration=document.querySelector('#dauer'), fee=document.querySelector('#marktgebuehren'), submit=form?.querySelector('input[name="anbieten"]');
     let url;try {url=new URL(form?.getAttribute('action'),location.href);}catch{return waitItem(tx,'Formulario de venta no verificable.');}
     if (!price || !duration || !fee || !visible(submit) || submit.disabled || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || /rub[ií]|diamant|premium/i.test(submit.outerHTML)) return waitItem(tx,'Formulario de venta no verificable.');
-    duration.value='3';price.value='5000';fee.textContent='';
+    duration.value='3';price.value=String(tx.salePrice);fee.textContent='';
     for(const [el,type] of [[duration,'change'],[price,'keyup']]) {const event=document.createEvent('Event');event.initEvent(type,true,false);el.dispatchEvent(event);}
     const cost=number(fee.textContent), gold=balance();
-    if (duration.value!=='3' || !/^24\s*h/i.test(duration.selectedOptions?.[0]?.textContent||'') || price.value!=='5000' || !Number.isSafeInteger(cost) || cost<=0 || !Number.isSafeInteger(gold) || cost>gold) return waitItem(tx,'Tarifa de 24 h no verificable.');
+    if (duration.value!=='3' || !/^24\s*h/i.test(duration.selectedOptions?.[0]?.textContent||'') || tx.salePrice!==SALE_PRICE || price.value!==String(SALE_PRICE) || !Number.isSafeInteger(cost) || cost<=0 || !Number.isSafeInteger(gold) || cost>gold) return waitItem(tx,'Tarifa de 24 h no verificable.');
     tx.stage='sold';tx.at=Date.now();tx.fee=cost;save();submit.click();return true;
   }
   function npcScrollTick(tx) {
