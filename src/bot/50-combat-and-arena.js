@@ -161,15 +161,19 @@
       if (packageFoodTick()) return;
     }
     if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
-    if (mod === 'quests' && BUILD_CONFIG.modules.missions) {
+    if (mod === 'quests' && BUILD_CONFIG.modules.missions && (BUILD_CONFIG.modules.arenaCircus || state.pending || Date.now() - (state.lastQuestVisit || 0) >= 30000)) {
       questTick();
+      if (!state.running) return;
       if (state.running && !state.pending) {
         state.lastQuestVisit = Date.now(); save();
-        navigation(document.querySelector('#cooldown_bar_ct a'), 'Volviendo a Circo Provinciarum.');
+        if (BUILD_CONFIG.modules.arenaCircus) navigation(document.querySelector('#cooldown_bar_ct a'), 'Volviendo a Circo Provinciarum.');
       }
-      return;
+      if (BUILD_CONFIG.modules.arenaCircus || state.pending) return;
     }
     if (pveTick()) return;
+    if (BUILD_CONFIG.modules.missions && !BUILD_CONFIG.modules.arenaCircus && mod !== 'quests' && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
+      if (navigation(document.querySelector('#mainmenu a[href*="mod=quests"]'), 'Revisando misiones del Panteón.')) return;
+    }
     if (!BUILD_CONFIG.modules.arenaCircus) { state.message='Esperando disponibilidad de los módulos elegidos.'; save(); return; }
     const identity = JSON.parse(sessionStorage.getItem(ID) || '{}');
     if (Date.now() - identity.at > 12 * 60 * 1000 && mod !== 'overview') {

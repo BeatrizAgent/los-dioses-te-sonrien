@@ -56,7 +56,7 @@
     let selected=choices.includes(state.pveTarget) ? state.pveTarget : null;
     if (state.dungeonReset && choices.includes('dungeon')) selected='dungeon';
     if (!selected || (!ready(selected) && !(selected==='dungeon' && state.dungeonReset))) {
-      const arenaReady=cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0 || cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0;
+      const arenaReady=BUILD_CONFIG.modules.arenaCircus && (cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0 || cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0);
       if ((arenaReady && state.lastAction==='pve') || Date.now()-(state.lastPveAt||0)<20000) return false;
       const options=choices.filter(ready);
       selected=options.find(x=>x!==state.lastPveMode) || options[0];
