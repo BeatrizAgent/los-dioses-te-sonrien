@@ -26,6 +26,23 @@ test('inserciones, reducción y reemplazo reconstruyen sin perder identidad estr
   index.sync([]); assert.equal(index.get(records[0]).total,0);
 });
 
+test('estadísticas para combate coinciden con filtrado e ignoran valores no enteros seguros',()=>{
+  const records=Array.from({length:10000},(_,i)=>({name:'rival'+i%37,server:i%2?'s1':'s2',mode:i%3?'turma':'arena',level:i%5,result:i%4?'win':'loss',damageEstimate:i%5===0?null:i%7===0?1.5:i,experience:i%6===0?undefined:i%11===0?Number.MAX_SAFE_INTEGER+1:i%20}));
+  const index=make(); index.sync(records);
+  for (const rival of records.filter((_,i)=>i%97===0)) {
+    const rows=records.filter(x=>x.name===rival.name&&x.server===rival.server&&x.mode===rival.mode&&x.level===rival.level);
+    const average=key=>{const values=rows.map(x=>x[key]).filter(Number.isSafeInteger);return values.length ? values.reduce((a,b)=>a+b,0)/values.length : null;};
+    assert.deepEqual(plain(index.combat(rival)),{wins:rows.filter(x=>x.result==='win').length,losses:rows.filter(x=>x.result==='loss').length,damage:average('damageEstimate'),experience:average('experience')});
+  }
+  assert.deepEqual(plain(index.combat({name:'ausente'})),{wins:0,losses:0,damage:null,experience:null});
+  records.push({...records[1],damageEstimate:2,experience:4}); index.sync(records);
+  const rows=records.filter(x=>x.name===records[1].name&&x.server===records[1].server&&x.mode===records[1].mode&&x.level===records[1].level);
+  const damages=rows.map(x=>x.damageEstimate).filter(Number.isSafeInteger);
+  assert.equal(index.combat(records[1]).damage,damages.reduce((a,b)=>a+b,0)/damages.length);
+  records.splice(0); index.sync(records);
+  assert.equal(index.combat({name:'rival1'}).damage,null);
+});
+
 test('exportación local conserva resultados y excluye campos ajenos al historial',()=>{
   const panel=readFileSync(new URL('../src/bot/60-panel.js',import.meta.url),'utf8');
   const code=panel.slice(panel.indexOf('  function exportRivalHistory('),panel.indexOf('  function renderContent('));
