@@ -1,4 +1,19 @@
   const noticeAttempts=new WeakMap();
+  function dismissCompletionNotice(dialog) {
+    if (!['blackoutDialognotification','blackoutDialog','blackoutDialogLoginBonus'].includes(dialog?.id)) return false;
+    const text=String(dialog.textContent || '').normalize('NFKC');
+    if (/captcha|turnstile|verificaci[oó]n|verificar|rub[ií]|diamant|premium|comprar|pagar|coste|precio|gastar/i.test(text)) return false;
+    const header=String(dialog.querySelector('#header_notification, #header_, .blackoutDialog_header')?.textContent || '').normalize('NFKC').replace(/\s+/g,' ').trim();
+    if (!/^(?:objetivo\s+(?:alcanzado|completado)|(?:nuevo\s+)?logro(?:\s+(?:alcanzado|conseguido|desbloqueado))?|(?:nuevo\s+)?t[ií]tulo(?:\s+(?:conseguido|desbloqueado))?|(?:nuevo\s+)?(?:ba[uú]l|cofre)(?:\s+(?:conseguido|recibido|desbloqueado|abierto))?)\s*[!¡.:]*$/i.test(header)) return false;
+    const buttons=[...(dialog.querySelectorAll?.('.blackoutDialog_buttons input, .blackoutDialog_buttons button') || [])];
+    const candidates=buttons.filter(b=>visible(b) && !b.disabled && !b.form && /^(?:aceptar|cerrar|continuar|ok)$/i.test(String(b.value || b.textContent || '').trim()) && /^(?:INPUT|BUTTON)$/.test(b.tagName || '') && !/rub[ií]|diamant|premium|comprar|pagar|gastar/i.test(b.outerHTML || ''));
+    if (candidates.length!==1) return false;
+    const button=candidates[0],handler=button.getAttribute('onclick') || '';
+    if (handler && !/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler)) return false;
+    const previous=noticeAttempts.get(dialog);
+    if (previous && Date.now()-previous<15000) return true;
+    noticeAttempts.set(dialog,Date.now());state.message='Cerrando aviso: '+header+'.';log(state.message);save();button.click();return true;
+  }
   function dismissInformationalNotice(dialog) {
     const text=String(dialog?.textContent || '').normalize('NFKC');
     if (!/\b(?:logro|logros|t[ií]tulo|t[ií]tulos|nivel)\b/i.test(text) || /captcha|turnstile|verificaci[oó]n|rub[ií]|diamant|premium|comprar|pagar|coste|precio/i.test(text)) return false;
@@ -40,7 +55,7 @@
     if (captcha() || /captcha|turnstile|verificaci[oó]n|verificar.{0,30}(?:humano|identidad|cuenta)|security\s*check|human\s*verification/i.test(text)) {
       stop('Posible verificación detectada. Intervención humana requerida.'); return true;
     }
-    if (dismissInformationalNotice(dialog)) return true;
+    if (dismissCompletionNotice(dialog) || dismissInformationalNotice(dialog)) return true;
     return recoverPopup(kind);
   }
   function lootTick() {

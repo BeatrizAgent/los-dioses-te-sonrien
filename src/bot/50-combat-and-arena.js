@@ -33,8 +33,11 @@
       if (/(?:subid[oa]|alcanzad[oa]|nuevo).{0,40}nivel|nivel.{0,40}(?:subid[oa]|alcanzad[oa]|nuevo)/i.test(levelDialog.textContent || '') && !/rub[ií]|diamant|premium|reducir tiempo/i.test(levelDialog.textContent || '')) return recoverUnexpectedPopup(levelDialog,'nivel');
       return recoverUnexpectedPopup(levelDialog,'notificación desconocida');
     }
-    const unknownDialog=document.querySelector('#blackoutDialog');
-    if (visible(unknownDialog)) return recoverUnexpectedPopup(unknownDialog,'aviso desconocido');
+    for (const selector of ['#blackoutDialog','#blackoutDialogLoginBonus']) {
+      const dialog=document.querySelector(selector);
+      if (dialog && !visible(dialog)) noticeAttempts.delete(dialog);
+      if (visible(dialog)) return recoverUnexpectedPopup(dialog,'aviso desconocido');
+    }
     if (mod === 'overview' && params.has('doll') && params.get('doll') !== '0') {
       navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Volviendo al personaje principal.'); return;
     }

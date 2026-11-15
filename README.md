@@ -174,3 +174,5 @@ Con curación activada, el bot revisa periódicamente la categoría Utilizable y
 En 0.12.50, las revisiones manuales de operaciones inciertas ceden automáticamente. Los resultados desconocidos no se cuentan como éxitos; la pieza de reparación pendiente y las ofertas identificadas se conservan para evitar repeticiones. CAPTCHA e identidad siguen deteniendo el bot. Probado en simulación; autonomía prolongada en el juego pendiente.
 
 En 0.12.51, el aviso de subida de nivel observado puede aceptarse aunque su botón no tenga un atributo onclick; la prueba reproduce su estructura y contenido. Pendiente de confirmar el cierre en el juego real.
+
+En 0.12.52, avisos reconocidos de objetivos, logros, títulos y baúles se cierran con Aceptar, Cerrar, Continuar u OK. La estructura del aviso de objetivo se ha simulado a partir de la captura; selectores y textos de avisos reales pendientes de comprobar.
