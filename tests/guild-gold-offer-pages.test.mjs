@@ -34,3 +34,11 @@ test('rechaza paginación contradictoria, filtros y parámetros duplicados',()=>
   for(const query of ['&p=2','&f=6','&seller=alguien','&s=x&s=y']) {const x=fixture({query});assert.equal(x.context.goldOfferPage(),null);assert.equal(x.context.goldTick(),false);assert.equal(x.location.destination,undefined);}
   const x=fixture();x.context.document.body.innerText='Página 2 / 2';assert.equal(x.context.goldOfferPage(),null);
 });
+test('reutiliza espacio y tarifa durante la lectura de ofertas equivalentes',()=>{
+  const x=fixture({total:1});let spaces=0,fees=0;
+  x.context.goldOffers=()=>Array.from({length:3},()=>({price:100000,item:{width:1,height:1}}));
+  x.context.goldSpace=()=>{spaces++;return true;};
+  x.context.goldFee=()=>{fees++;return null;};
+  assert.equal(x.context.goldTick(),false);
+  assert.equal(spaces,1);assert.equal(fees,1);
+});

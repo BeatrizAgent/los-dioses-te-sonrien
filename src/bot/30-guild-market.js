@@ -19,12 +19,13 @@
     const soul=el.getAttribute('data-soulbound-to'), basis=el.getAttribute('data-basis');
     if (!name || !/^\d+-\d+$/.test(basis||'') || (binding ? !owner || !/^\d+$/.test(soul||'') : !!soul)) return null;
     const width=Number(el.getAttribute('data-measurement-x')), height=Number(el.getAttribute('data-measurement-y'));
-    if (el.getAttribute('data-level')!=='1' || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1 || width>8 || height>8) return null;
+    const level=el.getAttribute('data-level');
+    if (!/^\d+$/.test(level || '') || !Number.isSafeInteger(Number(level)) || Number(level)<1 || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1 || width>8 || height>8) return null;
     // Materiales, pergaminos y herramientas nunca se manipulan como paquetes de oro.
-    if (/^(?:1[2-8])-/.test(basis) || /pergamino|receta|herramienta|material de forja/i.test(name)) return null;
-    return {name,owner,soul:soul || null,basis,width,height};
+    if (/^(?:1[2-8])-/.test(basis) || /pergamino|receta|herramienta|material de forja|bot[ií]n reservado/i.test(name)) return null;
+    return {name,owner,soul:soul || null,basis,level:Number(level),width,height};
   }
-  function goldSame(a,b) { return !!a && !!b && ['name','owner','soul','basis'].every(k=>a[k]===b[k]) && (b.width==null || (a.width===b.width && a.height===b.height)); }
+  function goldSame(a,b) { return !!a && !!b && ['name','owner','soul','basis'].every(k=>a[k]===b[k]) && (b.level==null || a.level===b.level) && (b.width==null || (a.width===b.width && a.height===b.height)); }
   function goldBalance() { return parseGold(document.querySelector('#sstat_gold_val')?.textContent); }
   function goldBag(requireFree=true) {
     const inv=document.querySelector('#inv'), bag=document.querySelector('#inventory_nav a');
@@ -96,7 +97,7 @@
       const cells=[...(row.cells||[])], seller=cells[1]?.textContent.trim(), price=parseGold(cells[2]?.textContent), item=goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]'));
       const button=row.querySelector('input[name="buy"]'), form=button?.form;
       let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
-      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || !/^6-\d+$/.test(item.basis) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || !visible(button) || button.disabled || button.value!=='Comprar') return null;
       const notice=form.getAttribute('data-confirm-message');
       if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (item.owner ? notice!=='Este objeto está vinculado al alma' : notice!==null) || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
       return {seller,price,item,button};
@@ -155,7 +156,7 @@
     scan.count+=goldOwnCount(tx.item,tx.price);scan.pages.push(page);tx.at=now;save();
     if (page<total) { if (!go(page+1)) goldPause('No se pudo abrir la siguiente página del mercado.'); return true; }
     if (phase==='baseline') {tx.ownBefore=scan.count;tx.ownCountScope='all-pages-v2';delete tx.saleScan;tx.at=now;save();return true;}
-    if (scan.count>tx.ownBefore) {log('Anuncio confirmado: '+tx.price.toLocaleString('es-ES')+' durante 24 horas.','success');state.goldTx=null;state.goldSupportSweepDone=false;state.goldCheckAt=now+60000;state.message='Paquete anunciado; esperando siguiente revisión.';save();return false;}
+    if (scan.count>tx.ownBefore) {log('Anuncio confirmado: '+tx.price.toLocaleString('es-ES')+' durante 24 horas.','success');state.goldTx=null;state.goldSupportSweepDone=false;state.goldCheckAt=now+5000;state.message='Paquete anunciado; esperando siguiente revisión.';save();return false;}
     delete tx.saleScan; goldPause('Anuncio no confirmado tras revisar el mercado completo.'); return false;
   }
   function goldTick(pendingOnly=false) {
@@ -207,11 +208,16 @@
         state.goldCheckAt=now+60000; state.message='Baúl I sin espacio verificable; revisaré el oro más tarde.'; save(); return false;
       }
       let chosen=null, fee=null;
+      // La geometría del baúl no cambia durante esta lectura síncrona.
+      const spaceBySize=new Map(), feeByPrice=new Map();
       for (const offer of goldOffers()) {
-        if (!goldSpace(availableBag,offer.item)) continue;
+        const size=offer.item.width+'x'+offer.item.height;
+        if (!spaceBySize.has(size)) spaceBySize.set(size,goldSpace(availableBag,offer.item));
+        if (!spaceBySize.get(size)) continue;
         if (Array.isArray(state.goldUnresolved) && state.goldUnresolved.some(x=>goldSame(x.item,offer.item))) continue;
         if (balance-offer.price<100000) continue;
-        const cost=goldFee(offer.price);
+        if (!feeByPrice.has(offer.price)) feeByPrice.set(offer.price,goldFee(offer.price));
+        const cost=feeByPrice.get(offer.price);
         if (cost!==null && balance-offer.price-cost>=100000) { chosen=offer; fee=cost; break; }
       }
       if (!chosen) {
@@ -278,6 +284,11 @@
       // El filtro del juego puede incluir otros nombres. Nunca tratar esa inclusión
       // como identidad: comparar los datos completos y el origen de cada objeto.
       const matches=listed.filter(el=>goldSame(goldItem(el),tx.item) && /\bMercado\b/i.test(el.closest('.packageItem')?.textContent||''));
+      // Una coincidencia previa ya descarta la compra: no hace falta recorrer
+      // las páginas restantes para demostrar que la línea base no está vacía.
+      if (tx.stage==='baseline' && matches.length) {
+        state.goldTx=null;state.goldCheckAt=now+60000;state.message='Ya existe un paquete igual; omito esta oferta.';save();return false;
+      }
       if (!matches.length && /^\s*No hay paquetes\s*$/i.test(packages.textContent || '') && (params.get('page')||'1')==='1') {
         if(packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
         if(tx.stage==='baseline'){tx.baselineEmpty=true;tx.stage='readyBuy';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;}

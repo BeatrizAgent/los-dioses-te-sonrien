@@ -60,6 +60,8 @@ En 0.12.40, la búsqueda de ofertas de oro recorre páginas del mercado cuando n
 
 En 0.12.41, si falta el enlace a Circo tras visitar misiones, el planificador deja continuar a PvE y espera antes de volver a revisar el Panteón. Si los temporizadores de Arena no se reconocen, también puede visitar misiones sin asumir que hay un combate disponible. Una búsqueda de alimentos de apoyo aplazada deja continuar al oro, salvo que exista una compra pendiente. Estas correcciones están probadas en simulación; no se ha confirmado que expliquen un atasco observado ni se han validado instaladas. Ante CAPTCHA o verificación sigue deteniéndose y requiere intervención humana.
 
+En 0.12.42, la búsqueda de oro admite objetos individuales identificables de cualquier nivel y tipo permitido, con hueco suficiente, salvo materiales de forja, pergaminos, herramientas y botín reservado. Conserva el rango de 100.000 a 1.000.000, la reserva y las verificaciones de compra y reventa. La búsqueda previa se detiene al hallar un paquete idéntico y reutiliza cálculos de espacio y tarifa. Tras confirmar el anuncio espera cinco segundos antes de revisar de nuevo, en lugar de un minuto; no acorta las esperas de confirmación. Probado en simulación; sin medición de velocidad ni validación instalada de objetos adicionales.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.
@@ -149,6 +151,6 @@ La versión local calcula la cuadrícula lógica con las dimensiones de layout d
 
 ## Cambios locales: oro y Turma
 
-Las nuevas ofertas de oro usan anillos de nivel 1 entre 100.000 y 1.000.000 y mantienen la reserva y la tarifa. Tras tres búsquedas sin rival reconocible, Turma Provinciarum se aplaza cinco minutos y las demás tareas continúan. Pendiente de validación en juego.
+En la versión histórica 0.12.31, las nuevas ofertas de oro usaban anillos de nivel 1 entre 100.000 y 1.000.000 y mantenían la reserva y la tarifa. Tras tres búsquedas sin rival reconocible, Turma Provinciarum se aplaza cinco minutos y las demás tareas continúan. Pendiente de validación en juego.
 
 Con curación activada, el bot revisa periódicamente la categoría Utilizable y traslada un objeto al baúl I cuando hay espacio verificable. La recogida no filtra por nivel ni consume el objeto; la curación identifica alimentos por su efecto, sin descartar niveles superiores; una curación incierta no se repite con el mismo objeto. Los traslados inciertos no se repiten. Pendiente de validación del nuevo flujo en juego.

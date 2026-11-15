@@ -13,5 +13,6 @@ function run({phase='baseline',page=1,total=2,scan=null,count=0,before=0,scope='
 }
 test('recorre páginas antes de guardar referencia y acumula anuncios',()=>{const a=run({count:1});assert.equal(a.clicked,1);assert.equal(a.tx.ownCountScope,'all-pages-v2');const b=run({page:2,scan:a.tx.saleScan,count:2});assert.equal(b.tx.ownBefore,3);assert.equal(b.tx.saleScan,undefined);});
 test('confirma solo incremento tras revisar todas las páginas',()=>{const a=run({phase:'verify',before:1,count:0});assert.equal(a.clicked,1);assert.ok(a.state.goldTx);const b=run({phase:'verify',page:2,scan:a.tx.saleScan,before:1,count:2});assert.equal(b.state.goldTx,null);});
+test('anuncio confirmado permite nueva búsqueda tras cinco segundos',()=>{const before=Date.now();const x=run({phase:'verify',page:1,total:1,before:0,count:1});assert.equal(x.state.goldTx,null);assert.ok(x.state.goldCheckAt>=before+5000 && x.state.goldCheckAt<=Date.now()+5000);});
 test('sin incremento conserva operación y no repite venta',()=>{const x=run({phase:'verify',page:1,total:1,before:1,count:1});assert.ok(x.state.goldTx);assert.match(x.pause,/no confirmado/);});
 test('paginación contradictoria exige revisión',()=>{const x=run({bad:true});assert.match(x.review,/contradictoria/);assert.equal(x.clicked,0);});
