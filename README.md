@@ -74,6 +74,8 @@ En 0.12.46, la curación y la recogida de utilizables esperan como máximo 15 se
 
 En 0.12.47, cuando curación está activada y la vida es del 40 % o menos, el bot espera a recuperarla antes de iniciar nuevos combates, incluso si la curación está aplazada. Misiones y operaciones independientes pueden seguir. Probado en simulación; pendiente de validación en juego.
 
+En 0.12.48, tras seleccionar el baúl I, curación espera cinco segundos antes de leerlo, incluso si la pestaña se marca activa inmediatamente. Esto reduce el riesgo de usar datos de la pestaña anterior. Probado en simulación; carga y contenido reales pendientes de validación en juego.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.

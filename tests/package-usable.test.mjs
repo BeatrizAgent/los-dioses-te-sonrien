@@ -65,3 +65,12 @@ test('baúl que no cambia se aplaza sin repetir clic ni perder operaciones incie
   now+=5000;context.selectHealingBag(bag);assert.equal(clicks,1);assert.equal(state.running,true);assert.equal(state.pendingHeal,null);assert.equal(state.pendingPackageFood,null);
   assert.deepEqual(Array.from(state.unknownHealFood),['heal']);assert.deepEqual(Array.from(state.unknownPackageFood),['package']);assert.ok(state.healSkipUntil>now);
 });
+test('tras cambiar baúl espera carga antes de usar alimento',()=>{
+  const healing=source.slice(source.indexOf('  function healingFood('),source.indexOf('  function packageUsable('));
+  const tick=source.slice(source.indexOf('  function healTick('),source.indexOf('  // La compra de alimento'));
+  let now=10000,drags=0;const state={healBagSwitchAt:now};
+  const attrs={'data-content-type':'64','data-hash':'pan','data-measurement-x':'1','data-measurement-y':'1','data-tooltip':JSON.stringify([[['Pan','white'],['En uso: Cura 500 punto(s) de vida','green']]])};
+  const item={getAttribute:k=>attrs[k]??null},bag={classList:{contains:()=>true}},target={};
+  const c={state,accountName:'CassiusFerox',mod:'overview',Date:{now:()=>now},Number,String,document:{querySelectorAll:s=>s==='#inventory_nav a'?[bag]:s.startsWith('#inv ')?[item]:[],querySelector:s=>s==='#avatar'?target:null},validItemHash:x=>!!x,visible:x=>!!x,save(){},log(){},dragFood:()=>{drags++;return true;}};
+  vm.createContext(c);vm.runInContext(healing+'\n'+tick,c);c.healTick(1000,10000);assert.equal(drags,0);now+=5000;c.healTick(1000,10000);assert.equal(drags,1);assert.equal(state.pendingHeal.hash,'pan');
+});
