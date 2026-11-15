@@ -278,6 +278,16 @@
     const tx=state.foodBuyTx;
     if (tx) {
       const now=Date.now();
+      if (['buy','verify'].includes(tx.stage) || !['baseline','readyBuy'].includes(tx.stage)) {
+        if (!Number.isFinite(tx.unknownSince)) { tx.unknownSince=Number.isFinite(tx.at) ? tx.at : now; save(); }
+        if (now-tx.unknownSince>=60000) {
+          if (!Array.isArray(state.foodUnknownOffers)) state.foodUnknownOffers=[];
+          if (tx.offerId && tx.offerHash) state.foodUnknownOffers.push({id:tx.offerId,hash:tx.offerHash});
+          state.foodBuyTx=null; state.foodBuyNeeded=false; state.foodSupportNeeded=false; state.goldSupportSweepDone=true;
+          state.foodBuyRetryAt=now+60000; state.healSkipUntil=0;
+          state.message=tx.offerId && tx.offerHash ? 'Compra de alimento sin confirmar; continúo sin repetir esa oferta.' : 'Compra de alimento antigua sin confirmar; continúo sin identificar la oferta.'; log(state.message,'warn'); save(); return false;
+        }
+      }
       if (!['baseline','readyBuy','buy','verify'].includes(tx.stage)) return false;
       if (Number.isFinite(tx.retryAt)) {
         if (now<tx.retryAt) return false;
@@ -324,7 +334,7 @@
         const offers=foodMarketOffers(tx.support===true).filter(o=>o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.amount===tx.amount&&o.food.level===tx.level&&o.food.item.getAttribute('data-basis')===tx.basis&&o.food.item.getAttribute('data-hash')===tx.offerHash&&/^\d+$/.test(tx.offerId||'')&&o.food.item.getAttribute('data-item-id')===tx.offerId);
         const balance=goldBalance();if(offers.length!==1||!Number.isSafeInteger(balance)||balance<tx.price){state.foodBuyTx=null;state.foodBuyRetryAt=now+60000;save();return false;}
         const offer=offers[0],original=window.confirm; if(typeof original!=='function')return false;
-        tx.stage='buy';tx.at=now;tx.balanceBefore=balance;tx.confirmed=!offer.notice;save();
+        tx.stage='buy';tx.at=now;tx.unknownSince=now;tx.balanceBefore=balance;tx.confirmed=!offer.notice;save();
         try {window.confirm=message=>{if(offer.notice&&!tx.confirmed&&/^Este objeto está vinculado al alma\s+¿Realmente quieres comprar este objeto\?$/.test(String(message).trim())){tx.confirmed=true;save();return true;}tx.rejected=true;save();return false;};offer.button.click();}
         catch {state.message='Compra de alimento incierta; no repetiré.';save();} finally {window.confirm=original;} return true;
       }
@@ -347,7 +357,7 @@
       return true;
     }
     if (Date.now()-goldPageOpenedAt<5000) return true;
-    const balance=goldBalance(), offer=foodMarketOffers(support).find(x=>Number.isSafeInteger(balance) && x.price<=balance);
+    const balance=goldBalance(), offer=foodMarketOffers(support).find(x=>Number.isSafeInteger(balance) && x.price<=balance && !(state.foodUnknownOffers||[]).some(u=>u.id===x.food.item.getAttribute('data-item-id') && u.hash===x.food.item.getAttribute('data-hash')));
     if (!offer) {
       if (support) {const page=Number(params.get('p')||'1'),text=document.body?.innerText||'',match=text.match(/Página\s+(\d+)\s*\/\s*(\d+)/i);if(!match || Number(match[1])!==page){state.foodBuyRetryAt=Date.now()+60000;state.message='Paginación de alimentos no verificable.';save();return false;}if(page<Number(match[2])) {if(foodMarketGoPage(page+1))return true;state.foodBuyRetryAt=Date.now()+60000;state.message='No se pudo revisar la siguiente página de alimentos.';save();return false;}state.foodSupportNeeded=false;state.goldSupportSweepDone=true;state.message='Alimentos asequibles revisados; continúo con el oro.';save();return false;}
       state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; state.message='Sin alimento asequible y verificable en la alianza.'; log(state.message,'warn'); save(); return false; }

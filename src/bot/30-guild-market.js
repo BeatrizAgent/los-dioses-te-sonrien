@@ -85,12 +85,12 @@
     return navigation(link,purpose);
   }
   function goldPause(message) {
-    if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.problem=message; state.goldTx.retryAt=Date.now()+60000; }
+    if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.problem=message; state.goldTx.unresolvedSince ||= Date.now(); state.goldTx.retryAt=Date.now()+60000; }
     state.message='Oro: '+message+' Volveré a comprobarlo.'; log(state.message,'warn'); save();
   }
   function goldReview(message) {
-    if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.manualReview=true; state.goldTx.problem=message; }
-    state.goldEnabled=false; state.message='Oro: '+message+' Revisión manual necesaria.'; log(state.message,'warn'); save();
+    if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.manualReview=true; state.goldTx.problem=message; state.goldTx.reviewAt=Date.now()+30000; }
+    state.goldEnabled=false; state.message='Oro: '+message+' Continuaré automáticamente si no se puede verificar.'; log(state.message,'warn'); save();
   }
   function goldOffers(includeIneligible=false) {
     const rows=[...document.querySelectorAll('#market_item_table tr')];
@@ -162,7 +162,8 @@
   }
   function goldTick(pendingOnly=false) {
     const tx=state.goldTx;
-    if (state.goldPreviousReview===true || state.foodBuyTx) return false;
+    if (state.goldPreviousReview===true) { state.goldPreviousReview=false; state.message='Operación antigua de oro sin confirmar; continúo sin atribuirle un resultado.'; log(state.message,'warn'); save(); }
+    if (state.foodBuyTx) return false;
     const now=Date.now(), balance=goldBalance();
     // Las operaciones anteriores pueden haberse resuelto fuera del bot.
     if (state.goldPackageGuardV129!==true) {
@@ -176,7 +177,12 @@
       if (tx) { goldReview('Operación anterior a la actualización: comprueba el mercado y los paquetes.'); return false; }
       save();
     }
-    if (tx?.manualReview) return false;
+    if (tx?.manualReview || (tx?.unresolvedSince && now-tx.unresolvedSince>=120000)) {
+      if (tx.manualReview && Number.isFinite(tx.reviewAt) && now<tx.reviewAt) return false;
+      if (!Array.isArray(state.goldUnresolved)) state.goldUnresolved=[];
+      state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldEnabled=true; state.goldCheckAt=now+60000;
+      state.message='Operación de oro sin confirmar; continuaré excluyendo el objeto pendiente.'; log(state.message,'warn'); save(); return false;
+    }
     if (tx?.blocked) {
       // Compatibilidad con operaciones bloqueadas por versiones anteriores.
       if (!Number.isFinite(tx.retryAt)) tx.retryAt=now;
@@ -305,7 +311,6 @@
         if(tx.stage==='baseline'){tx.baselineEmpty=true;tx.stage='readyBuy';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;}
         if(tx.stage==='verifyBuy'){goldPause('Compra aún sin paquete verificable; volveré a comprobarla sin repetir.');return false;}
         if (!Array.isArray(state.goldUnresolved)) state.goldUnresolved=[];
-        if (state.goldUnresolved.length>=20) { goldPause('Demasiadas operaciones antiguas sin resolver.'); return false; }
         state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldCheckAt=now+60000;
         state.message='Objeto anterior ausente en la búsqueda; operación archivada sin confirmar. Se excluyen objetos iguales.'; log(state.message,'warn'); save(); return false;
       }
@@ -533,7 +538,7 @@
   function repairBlock(message) {
     if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;}
     if (repairAcknowledge(true)) { state.message='Reparación aplazada: '+message+' Pieza verificada en su ranura; continúo con las demás tareas.';log(state.message,'warn');save();return; }
-    stop('Reparación: '+message+' Revisa la pieza antes de continuar.');
+    state.message='Reparación sin confirmar: '+message+' Continúo con las demás tareas.'; log(state.message,'warn'); save();
   }
   function repairRestore(message) { state.repairTx.stage='restore';state.repairTx.reason=message;state.repairTx.at=Date.now();save();return true; }
   function repairAcknowledge(allowRunning=false) {
@@ -547,7 +552,7 @@
   function repairTick() {
     let tx=state.repairTx; const now=Date.now();
     if (!BUILD_CONFIG.modules.repair && !tx) return false;
-    if (tx?.blocked) { stop('Reparación pendiente: '+tx.problem); return true; }
+    if (tx?.blocked) { repairAcknowledge(true); return false; }
     if (!tx) {
       if (now<(state.repairNextAt||0) || state.goldTx || state.smeltTx || state.pendingFight || state.pendingPve || state.pending) return false;
       if (!Number.isSafeInteger(goldBalance()) || goldBalance()<101000) {state.repairNextAt=now+300000;save();return false;}

@@ -170,3 +170,5 @@ La versión local calcula la cuadrícula lógica con las dimensiones de layout d
 En la versión histórica 0.12.31, las nuevas ofertas de oro usaban anillos de nivel 1 entre 100.000 y 1.000.000 y mantenían la reserva y la tarifa. Tras tres búsquedas sin rival reconocible, Turma Provinciarum se aplaza cinco minutos y las demás tareas continúan. Pendiente de validación en juego.
 
 Con curación activada, el bot revisa periódicamente la categoría Utilizable y traslada un objeto al baúl I cuando hay espacio verificable. La recogida no filtra por nivel ni consume el objeto; la curación identifica alimentos por su efecto, sin descartar niveles superiores; una curación incierta no se repite con el mismo objeto. Los traslados inciertos no se repiten. Pendiente de validación del nuevo flujo en juego.
+
+En 0.12.50, las revisiones manuales de operaciones inciertas ceden automáticamente. Los resultados desconocidos no se cuentan como éxitos; la pieza de reparación pendiente y las ofertas identificadas se conservan para evitar repeticiones. CAPTCHA e identidad siguen deteniendo el bot. Probado en simulación; autonomía prolongada en el juego pendiente.

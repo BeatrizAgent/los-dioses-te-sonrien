@@ -62,7 +62,7 @@
     const count=prev?.dungeonId===dungeonId && prev.enemy===enemy && !prev.uncertain ? prev.count+1 : 1;
     state.dungeonLosses={dungeonId,enemy,count,lastReport:reportId};
     const limit=Number.isInteger(BUILD_CONFIG.dungeon?.lossLimit) ? BUILD_CONFIG.dungeon.lossLimit : 3;
-    if (count>=limit) state.dungeonReset={dungeonId,phase:'needed'};
+    if (count>=limit && state.dungeonUnresolvedReset?.dungeonId!==dungeonId) state.dungeonReset={dungeonId,phase:'needed'};
   }
   function pveTick() {
     function deferDungeon(message,uncertain=false) {
@@ -70,6 +70,10 @@
       if (uncertain) state.dungeonCombatUnknown={dungeonId:BUILD_CONFIG.dungeon?.id,at:Date.now(),reason:message};
       else state.dungeonRouteRetryAt=Date.now()+300000;
       state.message='Mazmorra aplazada: '+message+' Las demás tareas continúan.';log(state.message,'warn');save();return false;
+    }
+    if (state.dungeonCombatUnknown && Date.now()-(state.dungeonCombatUnknown.at||0)>=60000) {
+      if (state.dungeonReset?.phase==='submitted') { state.dungeonUnresolvedReset=state.dungeonReset; state.dungeonReset=null; }
+      state.dungeonCombatUnknown=null; state.message='Resultado de mazmorra desconocido; continuaré automáticamente.'; log(state.message,'warn'); save();
     }
     const definitions={expedition:{mod:'location',bar:'#cooldown_bar_expedition',points:'#expeditionpoints_value',label:'expedición'},dungeon:{mod:'dungeon',bar:'#cooldown_bar_dungeon',points:'#dungeonpoints_value',label:'mazmorra'}};
     const choices=[];
