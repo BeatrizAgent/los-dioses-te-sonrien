@@ -4,9 +4,14 @@
     if (!/\b(?:logro|logros|t[ií]tulo|t[ií]tulos|nivel)\b/i.test(text) || /captcha|turnstile|verificaci[oó]n|rub[ií]|diamant|premium|comprar|pagar|coste|precio/i.test(text)) return false;
     const button=dialog.querySelector('#breakDiv, #linknotification');
     const handler=button?.getAttribute('onclick') || '';
-    if (!visible(button) || button.disabled || button.form || !/^(?:BUTTON|INPUT|DIV|SPAN)$/.test(button.tagName || '') || !/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler)) return false;
+    const levelHeader=dialog.querySelector('#header_notification')?.textContent?.trim() || '';
+    const levelBody=dialog.querySelector('#dialogTxtnotification')?.textContent || '';
+    // El juego asigna el manejador de este botón por JavaScript, sin atributo onclick.
+    const levelNotice=dialog.id==='blackoutDialognotification' && /^Nivel\s+\d+$/i.test(levelHeader) && /has subido al nivel\s+\d+/i.test(levelBody) && button?.id==='linknotification' && button.tagName==='INPUT' && button.type==='submit' && button.value==='Aceptar' && !handler;
+    const closeHandler=/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler);
+    if (!visible(button) || button.disabled || button.form || !/^(?:BUTTON|INPUT|DIV|SPAN)$/.test(button.tagName || '') || (!closeHandler && !levelNotice)) return false;
     const previous=noticeAttempts.get(dialog);
-    if (previous) return Date.now()-previous<15000;
+    if (previous && Date.now()-previous<15000) return true;
     noticeAttempts.set(dialog,Date.now());state.message='Cerrando aviso informativo del juego.';save();button.click();return true;
   }
   function recoverPopup(kind) {
