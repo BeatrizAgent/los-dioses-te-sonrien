@@ -28,6 +28,7 @@
     if (!verified()) { if (renewIdentity()) return; return stop('Identidad sin verificar. Abre Visión general del personaje y reactiva.'); }
     if (!state.repairTx && lootTick()) return;
     const levelDialog=document.querySelector('#blackoutDialognotification');
+    if (levelDialog && !visible(levelDialog)) noticeAttempts.delete(levelDialog);
     if (visible(levelDialog)) {
       if (/(?:subid[oa]|alcanzad[oa]|nuevo).{0,40}nivel|nivel.{0,40}(?:subid[oa]|alcanzad[oa]|nuevo)/i.test(levelDialog.textContent || '') && !/rub[ií]|diamant|premium|reducir tiempo/i.test(levelDialog.textContent || '')) return recoverUnexpectedPopup(levelDialog,'nivel');
       return recoverUnexpectedPopup(levelDialog,'notificación desconocida');

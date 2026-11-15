@@ -1,3 +1,14 @@
+  const noticeAttempts=new WeakMap();
+  function dismissInformationalNotice(dialog) {
+    const text=String(dialog?.textContent || '').normalize('NFKC');
+    if (!/\b(?:logro|logros|t[ií]tulo|t[ií]tulos|nivel)\b/i.test(text) || /captcha|turnstile|verificaci[oó]n|rub[ií]|diamant|premium|comprar|pagar|coste|precio/i.test(text)) return false;
+    const button=dialog.querySelector('#breakDiv, #linknotification');
+    const handler=button?.getAttribute('onclick') || '';
+    if (!visible(button) || button.disabled || button.form || !/^(?:BUTTON|INPUT|DIV|SPAN)$/.test(button.tagName || '') || !/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler)) return false;
+    const previous=noticeAttempts.get(dialog);
+    if (previous) return Date.now()-previous<15000;
+    noticeAttempts.set(dialog,Date.now());state.message='Cerrando aviso informativo del juego.';save();button.click();return true;
+  }
   function recoverPopup(kind) {
     if (captcha()) { stop('CAPTCHA detectado. Intervención humana requerida.'); return true; }
     const reportId=params.get('reportId'), type=params.get('t');
@@ -18,6 +29,7 @@
     if (captcha() || /captcha|turnstile|verificaci[oó]n|verificar.{0,30}(?:humano|identidad|cuenta)|security\s*check|human\s*verification/i.test(text)) {
       stop('Posible verificación detectada. Intervención humana requerida.'); return true;
     }
+    if (dismissInformationalNotice(dialog)) return true;
     return recoverPopup(kind);
   }
   function lootTick() {

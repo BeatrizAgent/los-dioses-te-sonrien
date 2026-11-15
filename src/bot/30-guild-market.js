@@ -22,7 +22,7 @@
     const level=el.getAttribute('data-level');
     if (!/^\d+$/.test(level || '') || !Number.isSafeInteger(Number(level)) || Number(level)<1 || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1 || width>8 || height>8) return null;
     // Materiales, pergaminos y herramientas nunca se manipulan como paquetes de oro.
-    if (/^(?:1[2-8])-/.test(basis) || /pergamino|receta|herramienta|material de forja|bot[ií]n reservado/i.test(name)) return null;
+    if (/^(?:1[2-9])-/.test(basis) || /pergamino|receta|herramienta|material de forja|bot[ií]n reservado/i.test(name)) return null;
     const usable=/^7-\d+$/.test(basis) && el.getAttribute('data-content-type')==='64';
     return {name,owner,soul:soul || null,basis,level:Number(level),usable,width,height};
   }
@@ -183,7 +183,7 @@
       if (now<tx.retryAt) return false;
       tx.blocked=false; tx.at=now; delete tx.retryAt; delete tx.loadedAt;
       if (tx.stage==='drop') tx.stage='market'; // El arrastre no publica ni consume oro.
-      if (tx.stage==='packages') delete tx.packageScan; // Volver a comprobar todas las páginas.
+      if (tx.stage==='packages' || tx.stage==='verifyBuy') delete tx.packageScan; // Volver a comprobar todas las páginas.
       state.goldEnabled=true; state.message='Revisando la operación de oro pendiente.'; log(state.message); save();
     }
     // La casilla del generador controla el módulo; no existe una segunda activación.
@@ -255,14 +255,24 @@
     }
     if (tx.stage==='buy') {
       if(mod==='guildMarket' && (now-goldPageOpenedAt<5000 || now-tx.at<5000)) return true;
-      if (mod==='guildMarket' && tx.offerPage) { const page=goldOfferPage(); if (!page || tx.offerPage>page.total || (params.get('s')||'')!==tx.offerSort || (params.get('fl')||'0')!==tx.offerFl) { state.message='Compra incierta; página de oferta no verificable.';save();return false; } if (page.page!==tx.offerPage) { if (!goldOfferGo(tx.offerPage)) return false; return true; } }
-      const offerStillPresent=mod==='guildMarket' && goldOffers(true).some(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
-      if (mod==='guildMarket' && now-goldPageOpenedAt>=5000 && /^\d+$/.test(tx.offerId||'') && !offerStillPresent && tx.baselineEmpty===true && tx.confirmed && !tx.rejected && Number.isSafeInteger(tx.balanceBefore) && balance===tx.balanceBefore-tx.price) {
+      let marketComparable=mod==='guildMarket';
+      if (marketComparable && tx.offerPage) { const page=goldOfferPage(); if (!page || tx.offerPage>page.total || (params.get('s')||'')!==tx.offerSort || (params.get('fl')||'0')!==tx.offerFl) marketComparable=false; else if (page.page!==tx.offerPage) { if (!goldOfferGo(tx.offerPage)) return false; return true; } }
+      const offerStillPresent=marketComparable && goldOffers(true).some(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
+      if (marketComparable && now-goldPageOpenedAt>=5000 && /^\d+$/.test(tx.offerId||'') && !offerStillPresent && tx.baselineEmpty===true && tx.confirmed && !tx.rejected && Number.isSafeInteger(tx.balanceBefore) && balance===tx.balanceBefore-tx.price) {
         tx.stage='packages';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;
+      }
+      if (!offerStillPresent && now-tx.at>=5000 && /^\d+$/.test(tx.offerId||'') && tx.baselineEmpty===true && tx.confirmed && !tx.rejected) {
+        tx.stage='verifyBuy';tx.at=now;delete tx.packageScan;delete tx.loadedAt;
+        state.message='Comprobando automáticamente la compra en paquetes.';save();return true;
+      }
+      if (offerStillPresent && now-tx.at>=10000 && now-(tx.buyRefreshAt||0)>=30000) {
+        tx.buyRefreshAt=now;save();
+        if (goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Actualizando mercado para comprobar la compra.')) return true;
+        delete tx.buyRefreshAt;save();
       }
       state.message='Compra incierta; no repetiré la operación.'; save(); return false;
     }
-    if (tx.stage==='packages' || tx.stage==='baseline') {
+    if (tx.stage==='packages' || tx.stage==='baseline' || tx.stage==='verifyBuy') {
       if (mod!=='packages') { goldNav('#menue_packages','packages','Abriendo paquetes de la alianza.'); return true; }
       if (!tx.item?.name) { goldPause('Falta el nombre del objeto pendiente.'); return false; }
       if (!tx.packageFilter) {tx.packageFilter=packageSearchPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;save();}
@@ -280,7 +290,7 @@
       if (!tx.loadedAt) { tx.loadedAt=now; save(); return true; }
       if (now-tx.loadedAt<5000) return true;
       const pageValues=params.getAll('page');
-      if (pageValues.length>1 || (pageValues.length===1 && !/^[1-9]\d*$/.test(pageValues[0]))) { goldReview('Paginación de paquetes ambigua.'); return false; }
+      if (pageValues.length>1 || (pageValues.length===1 && !/^[1-9]\d*$/.test(pageValues[0]))) { if (tx.stage==='verifyBuy') goldPause('Paginación de paquetes ambigua.'); else goldReview('Paginación de paquetes ambigua.'); return false; }
       const listed=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible);
       // El filtro del juego puede incluir otros nombres. Nunca tratar esa inclusión
       // como identidad: comparar los datos completos y el origen de cada objeto.
@@ -293,6 +303,7 @@
       if (!matches.length && /^\s*No hay paquetes\s*$/i.test(packages.textContent || '') && (params.get('page')||'1')==='1') {
         if(packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
         if(tx.stage==='baseline'){tx.baselineEmpty=true;tx.stage='readyBuy';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;}
+        if(tx.stage==='verifyBuy'){goldPause('Compra aún sin paquete verificable; volveré a comprobarla sin repetir.');return false;}
         if (!Array.isArray(state.goldUnresolved)) state.goldUnresolved=[];
         if (state.goldUnresolved.length>=20) { goldPause('Demasiadas operaciones antiguas sin resolver.'); return false; }
         state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldCheckAt=now+60000;
@@ -302,7 +313,7 @@
       const scan=tx.packageScan || (tx.packageScan={pages:[],matches:[],complete:false});
       const fingerprint=listed.map(el=>el.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
       if (!scan.fingerprints) scan.fingerprints={};
-      if (fingerprint && Object.entries(scan.fingerprints).some(([p,value])=>Number(p)!==page && value===fingerprint)) { goldReview('La misma página de paquetes se ha repetido.'); return false; }
+      if (fingerprint && Object.entries(scan.fingerprints).some(([p,value])=>Number(p)!==page && value===fingerprint)) { if (tx.stage==='verifyBuy') goldPause('La misma página de paquetes se ha repetido.'); else goldReview('La misma página de paquetes se ha repetido.'); return false; }
       if (fingerprint) scan.fingerprints[page]=fingerprint;
       const goPage=number=>{
         let u; try { u=new URL(location.href); } catch { return false; }
@@ -322,9 +333,10 @@
           if(scan.matches.length){state.goldTx=null;state.goldCheckAt=now+60000;state.message='Ya existe un paquete igual; omito esta oferta.';save();return false;}
           tx.baselineEmpty=true;tx.stage='readyBuy';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;
         }
-        if (scan.matches.length!==1) { goldReview('Objeto comprado aún no identificable de forma única en paquetes.'); return false; }
+        if (scan.matches.length!==1) { if (tx.stage==='verifyBuy') goldPause('Compra aún sin paquete único verificable; volveré a comprobarla sin repetir.'); else goldReview('Objeto comprado aún no identificable de forma única en paquetes.'); return false; }
         scan.complete=true; save();
       }
+      if (tx.stage==='verifyBuy') { tx.stage='packages';tx.at=now;log('Compra confirmada por paquete único tras búsqueda previa vacía.','success');save(); }
       const found=scan.matches[0];
       if (page!==found.page) { if (!goPage(found.page)) goldPause('No se pudo volver al objeto de oro.'); return true; }
       const item=matches.find(x=>x.getAttribute('data-hash')===found.hash), hash=found.hash;

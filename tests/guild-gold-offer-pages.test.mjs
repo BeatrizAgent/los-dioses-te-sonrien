@@ -21,8 +21,8 @@ test('busca siguiente página y vuelve a empezar tras última',()=>{
 test('retorna a página original antes de verificar compra',()=>{
   const x=fixture({stage:'buy'});assert.equal(x.context.goldTick(),true);assert.equal(new URL(x.location.destination).searchParams.get('p'),'2');assert.equal(x.state.goldTx.stage,'buy');
 });
-test('orden distinto mantiene compra incierta sin repetirla',()=>{
-  const x=fixture({stage:'buy',query:'&s=pd'});assert.equal(x.context.goldTick(),false);assert.equal(x.state.goldTx.stage,'buy');assert.equal(x.location.destination,undefined);
+test('orden distinto comprueba paquetes sin repetir compra',()=>{
+  const x=fixture({stage:'buy',query:'&s=pd'});assert.equal(x.context.goldTick(),true);assert.equal(x.state.goldTx.stage,'verifyBuy');assert.equal(x.location.destination,undefined);
 });
 test('vuelve a la página seleccionada antes de intentar comprar',()=>{
   const x=fixture({stage:'readyBuy'});assert.equal(x.context.goldTick(),true);assert.equal(new URL(x.location.destination).searchParams.get('p'),'2');assert.equal(x.state.goldTx.stage,'readyBuy');

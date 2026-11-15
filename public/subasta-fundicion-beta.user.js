@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.3
+// @version      0.5.4
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -69,6 +69,23 @@
   const balance = () => number(document.querySelector('#sstat_gold_val')?.textContent);
   const goldPageOpenedAt=Date.now();
   const verification = () => [...document.querySelectorAll('iframe[src*="captcha" i],iframe[src*="turnstile" i],.g-recaptcha,.h-captcha,.cf-turnstile,input[name*="captcha" i],[data-sitekey]')].some(visible);
+  const noticeAttempts=new WeakMap();
+  function handleNotice(dialog) {
+    if (!visible(dialog)) { if (dialog) noticeAttempts.delete(dialog); return false; }
+    const text=String(dialog.textContent||'').normalize('NFKC');
+    if (/captcha|turnstile|verificaci[oó]n|verificar.{0,30}(?:humano|identidad|cuenta)|security\s*check/i.test(text)) { stop('Posible verificación detectada. Intervención humana requerida.'); return true; }
+    const button=dialog.querySelector('#breakDiv, #linknotification'), handler=button?.getAttribute('onclick')||'';
+    if (/\b(?:logro|logros|t[ií]tulo|t[ií]tulos|nivel)\b/i.test(text) && !/rub[ií]|diamant|premium|comprar|pagar|coste|precio/i.test(text) && visible(button) && !button.disabled && !button.form && /^(?:BUTTON|INPUT|DIV|SPAN)$/.test(button.tagName||'') && /^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler)) {
+      const previous=noticeAttempts.get(dialog);
+      if (!previous) {noticeAttempts.set(dialog,Date.now());note('Cerrando aviso informativo del juego.');button.click();return true;}
+      if (Date.now()-previous<15000) return true;
+    }
+    if (Date.now()>=(state.noticeRetryAt||0) && Date.now()-(state.navigationAt||0)>=5000) {
+      state.noticeRetryAt=Date.now()+300000;save();
+      navigate('#mainmenu a[href*="mod=overview"]','overview');
+    }
+    return true;
+  }
   function note(text) { state.message=text; save(); render(); }
   function stop(text) { state.running=false; note(text); if (typeof releaseLock==='function') releaseLock(); }
   function sameAccount() {
@@ -560,6 +577,7 @@
       if(overview)return stop('No se pudo verificar el personaje.');
       return navigate('#mainmenu a[href*="mod=overview"]','overview');
     }
+    if (handleNotice(document.querySelector('#blackoutDialognotification'))) return;
     if (state.itemTx?.blocked) {
       state.blockedItems=Array.isArray(state.blockedItems)?state.blockedItems:[];
       if(state.itemTx.kind==='sell')state.sellRetryAt=Date.now()+120000;

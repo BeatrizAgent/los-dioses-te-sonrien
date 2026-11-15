@@ -64,6 +64,10 @@ En 0.12.42, históricamente se admitieron objetos individuales identificables de
 
 En 0.12.43, las ofertas nuevas se limitan a objetos de nivel 1 o utilizables identificados de cualquier nivel. Las operaciones iniciadas en versiones anteriores conservan su comprobación de identidad para permitir terminarlas. Mantiene reserva, tarifa y exclusiones de materiales y botín reservado. Comprobado en simulación, pendiente de validación instalada.
 
+En 0.12.44, si la compra de oro no se confirma por saldo y mercado, el bot comprueba automáticamente los paquetes sin volver a comprar. Solo continúa si había una búsqueda previa vacía y aparece una coincidencia única del mercado; si sigue sin poder identificarla, aplaza la comprobación. Esto depende de que la búsqueda del juego muestre el objeto y no garantiza resolver todas las ambigüedades. Probado en simulación; pendiente de validación instalada.
+
+También intenta cerrar avisos informativos de logro, título o nivel cuando el control presenta una función de cierre reconocible. No automatiza cofres ni selección de recompensas; si el aviso no coincide, usa la recuperación anterior. Controles probados en simulación, pendientes de observar en juego. Las herramientas de forja de tipo 19 quedan excluidas de los paquetes de oro.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.

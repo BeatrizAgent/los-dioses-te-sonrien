@@ -114,15 +114,7 @@
         const checkedFood=textElement('button','btn','Ya revisé la compra de alimento');
         checkedFood.onclick=()=>{if(!verified()||captcha()||!state.foodBuyTx)return;state.foodBuyTx=null;state.foodBuyNeeded=false;state.foodBuyRetryAt=Date.now()+60000;state.healSkipUntil=0;log('El jugador revisó la compra de alimento.','warn');save();contentKey='';checkedFood.blur();renderContent();};content.append(checkedFood);
       }
-      if (state.goldTx?.stage==='buy') {
-        content.append(textElement('p','small','Comprueba en el juego que la compra se realizó antes de continuar.'));
-        const checked=textElement('button','btn','He comprobado que la compra se realizó');
-        checked.onclick=()=>{
-          if (!verified() || captcha() || state.goldTx?.stage!=='buy') return;
-          const tx=state.goldTx; tx.stage='packages'; tx.at=Date.now(); tx.blocked=false; delete tx.manualReview; delete tx.problem; delete tx.retryAt; delete tx.loadedAt; delete tx.packageScan;
-          state.message='Compra comprobada por el jugador; buscando el objeto en paquetes.'; log(state.message,'warn'); save(); contentKey=''; checked.blur(); renderContent();
-        }; content.append(checked);
-      }
+      if (['buy','verifyBuy'].includes(state.goldTx?.stage)) content.append(textElement('p','small','Compra pendiente: comprobaré automáticamente mercado y paquetes sin repetirla.'));
       if (state.goldTx?.manualReview) { const resolved=textElement('button','btn','Ya resolví la operación de oro'); resolved.onclick=()=>{if (!verified()||captcha()||!state.goldTx?.manualReview) return;state.goldTx=null;state.goldEnabled=false;state.goldCheckAt=Date.now()+60000;log('El jugador confirmó la resolución manual de la operación de oro.');save();contentKey='';resolved.blur();renderContent();};content.append(resolved); }
       if (BUILD_CONFIG.modules.smelting || state.smeltTx) content.append(textElement('div','sectionlabel','Fundición'),textElement('p','small',state.smeltTx?.blocked ? 'Bloqueada: '+state.smeltTx.problem : state.smeltTx ? 'Etapa: '+state.smeltTx.stage : 'Activa: '+(BUILD_CONFIG.smeltingPriority==='crystal'?'prioridad cristal':BUILD_CONFIG.smeltingPriority==='stamina'?'prioridad tintura':'equipo verde o azul')+'.'));
       if (BUILD_CONFIG.modules.repair || state.repairTx) content.append(textElement('div','sectionlabel','Reparación'),textElement('p','small',state.repairTx?.blocked ? 'Revisión necesaria: '+state.repairTx.problem : state.repairTx ? 'Pieza pendiente: '+state.repairTx.item.name+' · '+state.repairTx.stage : 'Vigila refinamiento del personaje y usa baúl III.'));

@@ -31,7 +31,7 @@ test('verifica hueco rectangular para objetos grandes y rechaza posiciones ambig
 });
 const itemFn=market.slice(market.indexOf('  function goldItem('),market.indexOf('  function goldSame('));
 function item(name,basis,width,height,level='1',contentType=null){const attrs={'data-tooltip':JSON.stringify([[[name,'white']]]),'data-basis':basis,'data-level':level,'data-content-type':contentType,'data-measurement-x':String(width),'data-measurement-y':String(height)};return vm.runInNewContext(`${itemFn}\ngoldItem(el)`,{el:{getAttribute:k=>attrs[k]??null},Number,JSON,Array});}
-test('admite objetos de varias casillas y protege materiales reservados',()=>{assert.equal(item('Armadura','3-1',2,3)?.height,3);assert.equal(item('Material de forja','12-1',1,1),null);});
+test('admite objetos de varias casillas y protege materiales y herramientas reservadas',()=>{assert.equal(item('Armadura','3-1',2,3)?.height,3);assert.equal(item('Material de forja','12-1',1,1),null);assert.equal(item('Yunque','19-1',1,1),null);});
 test('admite niveles superiores y rechaza nivel inválido o bienes reservados',()=>{
  assert.equal(item('Armadura','3-1',2,3,'100')?.height,3);
  for(const level of ['','0','1.5','desconocido'])assert.equal(item('Armadura','3-1',2,3,level),null);
