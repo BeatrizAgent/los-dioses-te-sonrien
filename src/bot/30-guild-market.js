@@ -23,7 +23,8 @@
     if (!/^\d+$/.test(level || '') || !Number.isSafeInteger(Number(level)) || Number(level)<1 || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1 || width>8 || height>8) return null;
     // Materiales, pergaminos y herramientas nunca se manipulan como paquetes de oro.
     if (/^(?:1[2-8])-/.test(basis) || /pergamino|receta|herramienta|material de forja|bot[ií]n reservado/i.test(name)) return null;
-    return {name,owner,soul:soul || null,basis,level:Number(level),width,height};
+    const usable=/^7-\d+$/.test(basis) && el.getAttribute('data-content-type')==='64';
+    return {name,owner,soul:soul || null,basis,level:Number(level),usable,width,height};
   }
   function goldSame(a,b) { return !!a && !!b && ['name','owner','soul','basis'].every(k=>a[k]===b[k]) && (b.level==null || a.level===b.level) && (b.width==null || (a.width===b.width && a.height===b.height)); }
   function goldBalance() { return parseGold(document.querySelector('#sstat_gold_val')?.textContent); }
@@ -91,13 +92,13 @@
     if (state.goldTx) { state.goldTx.blocked=true; state.goldTx.manualReview=true; state.goldTx.problem=message; }
     state.goldEnabled=false; state.message='Oro: '+message+' Revisión manual necesaria.'; log(state.message,'warn'); save();
   }
-  function goldOffers() {
+  function goldOffers(includeIneligible=false) {
     const rows=[...document.querySelectorAll('#market_item_table tr')];
     return rows.map(row=>{
       const cells=[...(row.cells||[])], seller=cells[1]?.textContent.trim(), price=parseGold(cells[2]?.textContent), item=goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]'));
       const button=row.querySelector('input[name="buy"]'), form=button?.form;
       let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
-      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || (!includeIneligible && item.level!==1 && !item.usable) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
       const notice=form.getAttribute('data-confirm-message');
       if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (item.owner ? notice!=='Este objeto está vinculado al alma' : notice!==null) || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
       return {seller,price,item,button};
@@ -255,7 +256,7 @@
     if (tx.stage==='buy') {
       if(mod==='guildMarket' && (now-goldPageOpenedAt<5000 || now-tx.at<5000)) return true;
       if (mod==='guildMarket' && tx.offerPage) { const page=goldOfferPage(); if (!page || tx.offerPage>page.total || (params.get('s')||'')!==tx.offerSort || (params.get('fl')||'0')!==tx.offerFl) { state.message='Compra incierta; página de oferta no verificable.';save();return false; } if (page.page!==tx.offerPage) { if (!goldOfferGo(tx.offerPage)) return false; return true; } }
-      const offerStillPresent=mod==='guildMarket' && goldOffers().some(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
+      const offerStillPresent=mod==='guildMarket' && goldOffers(true).some(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
       if (mod==='guildMarket' && now-goldPageOpenedAt>=5000 && /^\d+$/.test(tx.offerId||'') && !offerStillPresent && tx.baselineEmpty===true && tx.confirmed && !tx.rejected && Number.isSafeInteger(tx.balanceBefore) && balance===tx.balanceBefore-tx.price) {
         tx.stage='packages';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;
       }
