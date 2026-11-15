@@ -1,4 +1,15 @@
   const noticeAttempts=new WeakMap();
+  function dismissCostumeNotice(dialog) {
+    if (dialog?.id!=='blackoutDialognotification') return false;
+    const header=String(dialog.querySelector('#header_notification')?.textContent || '').normalize('NFKC').trim();
+    const body=String(dialog.querySelector('#dialogTxtnotification')?.textContent || '').normalize('NFKC').replace(/\s+/g,' ').trim();
+    if (!/^¡?Enhorabuena!?$/i.test(header) || !/^Has encontrado parte de un disfraz:\s*.+?\s*¿Ver disfraces\?$/i.test(body) || /captcha|turnstile|verificaci[oó]n|rub[ií]|diamant|premium|comprar|pagar|coste|precio|gastar/i.test(body)) return false;
+    const button=dialog.querySelector('#linkcancelnotification');
+    if (!visible(button) || button.disabled || button.form || button.tagName!=='INPUT' || button.type!=='submit' || button.value!=='No' || !/^\s*blackoutDialog\(\s*false\s*\)\s*;?\s*$/.test(button.getAttribute('onclick') || '')) return false;
+    const previous=noticeAttempts.get(dialog);
+    if (previous && Date.now()-previous<15000) return true;
+    noticeAttempts.set(dialog,Date.now());state.message='Disfraz encontrado; cerrando aviso y continuando.';log(state.message);save();button.click();return true;
+  }
   function dismissCompletionNotice(dialog) {
     if (!['blackoutDialognotification','blackoutDialog','blackoutDialogLoginBonus'].includes(dialog?.id)) return false;
     const text=String(dialog.textContent || '').normalize('NFKC');
@@ -55,7 +66,7 @@
     if (captcha() || /captcha|turnstile|verificaci[oó]n|verificar.{0,30}(?:humano|identidad|cuenta)|security\s*check|human\s*verification/i.test(text)) {
       stop('Posible verificación detectada. Intervención humana requerida.'); return true;
     }
-    if (dismissCompletionNotice(dialog) || dismissInformationalNotice(dialog)) return true;
+    if (dismissCostumeNotice(dialog) || dismissCompletionNotice(dialog) || dismissInformationalNotice(dialog)) return true;
     return recoverPopup(kind);
   }
   function lootTick() {
