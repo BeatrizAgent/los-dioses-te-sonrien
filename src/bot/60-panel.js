@@ -60,10 +60,10 @@
   observer.observe(document.body, {childList:true});
   observer.observe(document.documentElement, {childList:true});
   function renderStatus() {
-    $('.dot').classList.toggle('on', !!state.running && verified());
+    $('.dot').classList.toggle('on', ownerActive && !!state.running && verified());
     const setText = (selector, value) => { const node=$(selector); if (node.textContent !== value) node.textContent=value; };
-    setText('.status-title', !state.running ? 'Misiones detenidas' : !verified() ? 'Identidad pendiente' : 'Misiones y combate activos');
-    setText('.message', !verified() ? 'Visita Visión general para verificar el personaje.' : state.message || (state.running ? 'Revisando misiones disponibles.' : 'Activa la revisión cuando quieras comenzar.'));
+    setText('.status-title', !ownerActive ? 'En pausa: beta controla la cuenta' : !state.running ? 'Misiones detenidas' : !verified() ? 'Identidad pendiente' : 'Misiones y combate activos');
+    setText('.message', !ownerActive ? 'El bot principal retomará el control al detener la beta.' : !verified() ? 'Visita Visión general para verificar el personaje.' : state.message || (state.running ? 'Revisando misiones disponibles.' : 'Activa la revisión cuando quieras comenzar.'));
     setText('.toggle', state.running ? 'Detener bot' : 'Activar bot');
     $('.go').classList.toggle('hidden', mod === 'quests');
     if (!uiState.minimized) renderContent();

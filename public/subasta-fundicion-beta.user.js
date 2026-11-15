@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.5
+// @version      0.5.7
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -48,6 +48,7 @@
   state.options = Object.assign({bid:false,bidUsable:false,sell:false,smelt:false,scroll:true}, state.options);
   // Solo se permite vender pergaminos al alquimista como respaldo cuando falta oro.
   state.options.scroll = false;
+  state.options.sell = false; // La beta solo ejecuta subasta y fundición.
   state.needGold = state.needGold === true && Number.isSafeInteger(state.goldRequired) && state.goldRequired>0;
   if (state.itemTx?.kind==='sell' && !Number.isSafeInteger(state.itemTx.salePrice)) {
     if (state.itemTx.stage==='sold') state.itemTx.salePrice=5000;
@@ -87,7 +88,7 @@
     return true;
   }
   function note(text) { state.message=text; save(); render(); }
-  function stop(text) { state.running=false; note(text); if (typeof releaseLock==='function') releaseLock(); }
+  function stop(text) { state.running=false; note(text); releaseControl(); }
   function sameAccount() {
     const node=nameNode(), name=node?.getClientRects().length ? node.textContent.trim() : '';
     if (overview && name) {
@@ -303,13 +304,24 @@
     note('Recogiendo oro de mercado; esperando confirmación.');
     candidate.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
   }
+  function scrollInventoryTick() {
+    if (!state.needGold || !state.scrollNeeded || state.itemTx || state.suspendedScroll) return false;
+    const inv=document.querySelector('#inv'),bag=document.querySelector('#inventory_nav a[data-bag-number="512"]');
+    if (!inv || !visible(bag) || bag.getAttribute('data-available')!=='true') return false;
+    if (!selectBag('512')) return true;
+    const entries=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(el=>({el,item:itemDetails(el)})).filter(x=>x.item && x.item.type===20 && /^pergaminos?\b/i.test(x.item.name) && x.item.width===1 && x.item.height===1 && x.item.value && x.el.getAttribute('data-reserved')!=='true' && !state.blockedItems?.some(y=>y.hash===x.item.hash));
+    const selected=entries.find(x=>entries.filter(y=>y.item.hash===x.item.hash).length===1 && inventoryHash(x.item.hash));
+    if (!selected) return false;
+    state.itemTx={...selected.item,kind:'scroll',authorizedScroll:true,bag:'512',stage:'npc',at:Date.now()};
+    note('Pergamino localizado en baúl I: '+selected.item.name+'. Buscando vendedor.'); return true;
+  }
   function packageTick() {
     const tx=state.itemTx;
     if (params.get('mod')!=='packages') return navigate('#menue_packages','packages');
     const inv=document.querySelector('#inv'), box=document.querySelector('#packages');
-    if (!inv || !box) return true;
+    if (!inv || !box) {if(tx)return waitItem(tx,'Paquetes o baúl no disponibles.');return false;}
     if (tx?.stage==='transfer') {
-      if (!selectBag(tx.bag)) return true;
+      if (!selectBag(tx.bag)) return waitItem(tx,'No se pudo abrir el baúl del paquete.');
       const item=inventoryHash(tx.hash), remaining=[...box.querySelectorAll('[data-hash]')].some(e=>e.getAttribute('data-hash')===tx.hash);
       if (item && !remaining) { tx.stage=tx.kind==='sell'?'market':tx.kind==='scroll'?'npc':'forge';tx.at=Date.now();note('Paquete recibido: '+tx.name+'.');return true; }
       return waitItem(tx,'Traslado no confirmado; no se repetirá.');
@@ -527,17 +539,20 @@
     tx.stage='sold';tx.at=Date.now();tx.fee=cost;save();submit.click();return true;
   }
   function npcScrollTick(tx) {
-    const page=params.get('mod')==='inventory' && params.get('sub')==='4';
+    const vendors=[...document.querySelectorAll('#mainmenu a[href]')].map(e=>{try{const u=new URL(e.href,location.href),name=normal(e.textContent).replace(/\s+/g,' ');if(!visible(e)||!['alquimista','armero','herrero','mercenarios','mercenario','maléfica','malefica'].includes(name)||u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='inventory'||!/^\d+$/.test(u.searchParams.get('sub')||'')||u.searchParams.has('action'))return null;return {el:e,sub:u.searchParams.get('sub')};}catch{return null;}}).filter(Boolean);
+    if(!tx.vendorSub) tx.vendorSub=vendors.find(v=>params.get('mod')==='inventory'&&params.get('sub')===v.sub)?.sub || vendors.find(v=>v.sub==='4')?.sub || vendors[0]?.sub || '4';
+    const page=params.get('mod')==='inventory' && params.get('sub')===tx.vendorSub;
     if(!page) {
-      const link=[...document.querySelectorAll('#mainmenu a[href]')].find(e=>{try{const u=new URL(e.href,location.href);return visible(e)&&u.origin===location.origin&&u.pathname==='/game/index.php'&&u.searchParams.get('mod')==='inventory'&&u.searchParams.get('sub')==='4';}catch{return false;}});
-      if(!link){note('No encuentro al alquimista.');return false;}
-      if(Date.now()-(state.navigationAt||0)<5000)return true;state.navigationAt=Date.now();save();link.click();return true;
+      const vendor=vendors.find(v=>v.sub===tx.vendorSub) || vendors[0];
+      if(!vendor){if(navigate('#mainmenu a.submenuswitch[href*="submod=city"]','map','city'))return true;return waitItem(tx,'Ruta al vendedor no disponible; se aplaza la venta.');}
+      tx.vendorSub=vendor.sub;
+      if(Date.now()-(state.navigationAt||0)<5000)return true;state.navigationAt=Date.now();save();vendor.el.click();return true;
     }
     if(params.get('subsub')!=='2') {
-      const link=[...document.querySelectorAll('#shop_nav a[href]')].find(e=>{try{const u=new URL(e.href,location.href);return visible(e)&&u.origin===location.origin&&u.searchParams.get('mod')==='inventory'&&u.searchParams.get('sub')==='4'&&u.searchParams.get('subsub')==='2';}catch{return false;}});
-      if(!link){note('Pestaña de venta del alquimista no verificable.');return false;}if(Date.now()-(state.navigationAt||0)<5000)return true;state.navigationAt=Date.now();save();link.click();return true;
+      const link=[...document.querySelectorAll('#shop_nav a[href]')].find(e=>{try{const u=new URL(e.href,location.href);return visible(e)&&u.origin===location.origin&&u.searchParams.get('mod')==='inventory'&&u.searchParams.get('sub')===tx.vendorSub&&u.searchParams.get('subsub')==='2';}catch{return false;}});
+      if(!link)return waitItem(tx,'Pestaña de venta del alquimista no verificable; se aplaza la venta.');if(Date.now()-(state.navigationAt||0)<5000)return true;state.navigationAt=Date.now();save();link.click();return true;
     }
-    if(!selectBag('512'))return true;
+    if(!selectBag('512'))return waitItem(tx,'Baúl I no disponible para vender el pergamino.');
     const shop=document.querySelector('#shop');
     if(!visible(shop)||shop.getAttribute('data-container-number')!=='322')return waitItem(tx,'Zona de venta del alquimista no verificable.');
     if(tx.stage==='npcSold') {
@@ -546,7 +561,7 @@
         state.itemTx=null;state.scrollNeeded=false;state.scrollRetryAt=0;state.goldRetryAt=0;
         state.needGold=Number.isSafeInteger(state.goldRequired) && balance()<state.goldRequired;
         if(!state.needGold){state.goldRequired=null;if(state.suspendedSmelt){state.itemTx=state.suspendedSmelt;state.itemTx.stage='forge';state.itemTx.at=Date.now();delete state.itemTx.dragAt;delete state.suspendedSmelt;}}
-        note('Pergamino vendido al alquimista por '+tx.value.toLocaleString('es-ES')+' de oro.');return true;
+        note('Pergamino vendido al vendedor por '+tx.value.toLocaleString('es-ES')+' de oro.');return true;
       }
       return waitItem(tx,'Venta al alquimista sin confirmar; no se repetirá.');
     }
@@ -578,6 +593,14 @@
       return navigate('#mainmenu a[href*="mod=overview"]','overview');
     }
     if (handleNotice(document.querySelector('#blackoutDialognotification'))) return;
+    if (state.itemTx?.kind==='sell' && !state.itemTx.blocked) {state.itemTx.blocked=true;state.itemTx.problem='Venta de alianza desactivada en esta versión.';save();}
+    if (state.itemTx?.blocked && state.itemTx.kind==='scroll' && state.itemTx.stage==='npc') {
+      state.suspendedScroll=state.itemTx;state.suspendedScroll.retryAt=Date.now()+120000;state.itemTx=null;
+      note('Venta de pergamino aplazada; volveré a buscar al alquimista sin trasladar otro.');
+    }
+    if (state.suspendedScroll && !state.itemTx && Date.now()>=(state.suspendedScroll.retryAt||0)) {
+      state.itemTx=state.suspendedScroll;delete state.suspendedScroll;delete state.itemTx.blocked;delete state.itemTx.problem;delete state.itemTx.retryAt;state.itemTx.at=Date.now();save();
+    }
     if (state.itemTx?.blocked) {
       state.blockedItems=Array.isArray(state.blockedItems)?state.blockedItems:[];
       if(state.itemTx.kind==='sell')state.sellRetryAt=Date.now()+120000;
@@ -610,6 +633,7 @@
         note('Falta oro; buscando pergaminos. El dinero de alianza se recoge a mano.');
       } else {state.needGold=false;save();}
     }
+    if (scrollInventoryTick()) return;
     // Una lectura ya iniciada debe terminar antes de que otra tarea cambie la página.
     if(state.options.sell && state.marketCapacityScan && marketCapacityTick()) return;
     if(state.options.smelt && !state.suspendedSmelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
@@ -618,8 +642,8 @@
     if(!state.options.bid && !state.options.bidUsable && state.phase==='auction') {state.phase='packages';save();}
     const saleDue=!!state.suspendedSale || (state.phase==='packages' && Date.now()>=(state.nextPackages||0));
     if(state.options.sell && !state.scrollNeeded && saleDue && !marketSaleAllowed() && marketCapacityTick()) return;
-    if(marketSaleAllowed() && state.suspendedSale && !state.itemTx){state.itemTx=state.suspendedSale;state.itemTx.capacityGranted=true;state.marketCapacity.permit=false;delete state.suspendedSale;save();return;}
-    if (state.phase==='packages' && (state.options.sell || state.options.smelt || state.scrollNeeded) && Date.now()>=(state.nextPackages||0)) {
+    if(state.options.sell && marketSaleAllowed() && state.suspendedSale && !state.itemTx){state.itemTx=state.suspendedSale;state.itemTx.capacityGranted=true;state.marketCapacity.permit=false;delete state.suspendedSale;save();return;}
+    if (!state.suspendedScroll && state.phase==='packages' && (state.options.sell || state.options.smelt || state.scrollNeeded) && Date.now()>=(state.nextPackages||0)) {
       if (packageTick()) return;
       state.phase='auction';save();
     }
@@ -649,30 +673,42 @@
   const panel=document.createElement('aside');
   panel.id='gladibot-auction-beta';
   panel.style.cssText='position:fixed;bottom:12px;right:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;border-radius:8px;font:14px sans-serif;max-width:310px';
-  panel.innerHTML='<strong>Subasta y fundición · BETA</strong><div><label><input type="checkbox" data-option="bid"> Pujar equipo</label></div><div><label><input type="checkbox" data-option="bidUsable"> Pujar utilizables</label></div><div><label><input type="checkbox" data-option="sell"> Utilizables al mercado de alianza</label></div><div><label><input type="checkbox" data-option="smelt"> Fundición de equipo</label></div><button type="button" data-action="run">Iniciar</button><p data-capacity></p><p data-message></p>';
+  panel.innerHTML='<strong>Subasta y fundición · BETA</strong><div><label><input type="checkbox" data-option="bid"> Pujar equipo</label></div><div><label><input type="checkbox" data-option="bidUsable"> Pujar utilizables</label></div><div><label><input type="checkbox" data-option="smelt"> Fundición de equipo</label></div><button type="button" data-action="run">Iniciar</button><p data-message></p>';
   document.body.append(panel);
   function render() {
     for (const input of panel.querySelectorAll('[data-option]')) input.checked=!!state.options[input.dataset.option];
     panel.querySelector('[data-action="run"]').textContent=state.running?'Detener':'Iniciar';
-    const c=state.marketCapacity||{},v=x=>Number.isSafeInteger(x)?String(x):'Sin verificar';
-    panel.querySelector('[data-capacity]').textContent='Mercado: nivel '+v(c.level)+' · capacidad '+v(c.maximum)+' · propios '+v(c.own)+' · libres '+v(c.free)+' · '+(c.status==='full'?'Lleno':c.status==='available'?'Disponible':c.status==='checking'?'Comprobando':'Sin verificar')+(c.nextCheckAt?' · próxima revisión '+new Date(c.nextCheckAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'');
     panel.querySelector('[data-message]').textContent=state.message;
   }
   panel.addEventListener('change', e => { if (e.target.dataset.option) { state.options[e.target.dataset.option]=e.target.checked; save(); } });
-  let releaseLock=null, hasLock=false;
+  let releaseLock=null, releaseGuard=null, hasLock=false, guardActive=false, acquireAbort=null;
+  const controlKey='gladibot.beta.control.v1.'+host+'.'+encodeURIComponent(normal(accountName));
+  const controlId=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+  function announceControl() { if(guardActive && state.running) localStorage.setItem(controlKey,JSON.stringify({id:controlId,until:Date.now()+45000})); }
+  function releaseControl() {
+    try {if(JSON.parse(localStorage.getItem(controlKey))?.id===controlId)localStorage.removeItem(controlKey);}catch{}
+    acquireAbort?.abort(); acquireAbort=null;hasLock=false;guardActive=false;
+    const release=releaseLock,guard=releaseGuard;releaseLock=null;releaseGuard=null;release?.();guard?.();
+  }
   async function acquire() {
     if (!READY_FOR_GAME) return stop('Beta en desarrollo: falta validar los ciclos de venta y fundición.');
     if (!navigator.locks || !window.isSecureContext) return stop('Navegador sin bloqueo entre pestañas.');
     try {
-      await navigator.locks.request('axelbot.evento.owner.'+encodeURIComponent(normal(accountName)),{mode:'exclusive',ifAvailable:true},lock=>{
-        if(!lock) {stop('Otra pestaña o el bot principal controla este personaje.');return;}
-        hasLock=true;state.running=true;note('Beta activa.');
-        return new Promise(resolve=>{releaseLock=resolve;});
+      await navigator.locks.request('gladibot.beta.guard.'+encodeURIComponent(normal(accountName)),{mode:'exclusive',ifAvailable:true},guard=>{
+        if(!guard) {state.running=false;render();panel.querySelector('[data-message]').textContent='La beta ya está activa en otra pestaña.';return;}
+        guardActive=true;state.running=true;announceControl();note('Esperando que el bot principal termine su acción y ceda el control.');
+        acquireAbort=new AbortController();
+        navigator.locks.request('axelbot.evento.owner.'+encodeURIComponent(normal(accountName)),{mode:'exclusive',signal:acquireAbort.signal},lock=>{
+          if(!guardActive || !state.running)return;
+          hasLock=true;note('Beta activa; el bot principal reanudará cuando termine.');
+          return new Promise(resolve=>{releaseLock=resolve;});
+        }).catch(error=>{if(error?.name!=='AbortError')stop('No se pudo obtener el control de la cuenta.');});
+        return new Promise(resolve=>{releaseGuard=resolve;});
       });
     } catch {stop('No se pudo obtener el bloqueo de cuenta.');}
   }
   panel.querySelector('[data-action="run"]').addEventListener('click', () => {
-    if (state.running) {stop('Beta detenida.');hasLock=false;releaseLock?.();return;}
+    if (state.running) {stop('Beta detenida.');return;}
     if (!sameAccount()) return stop('Abre Visión general para identificar tu personaje.');
     if (!Object.values(state.options).some(Boolean)) return stop('Selecciona al menos una función.');
     if (verification()) return stop('CAPTCHA o verificación detectados. Intervención humana requerida.');
@@ -680,10 +716,11 @@
   });
   render();
   if (state.running) void acquire();
-  window.addEventListener('pagehide',()=>{hasLock=false;releaseLock?.();},{once:true});
+  window.addEventListener('pagehide',()=>{acquireAbort?.abort();hasLock=false;guardActive=false;releaseLock?.();releaseGuard?.();},{once:true});
+  setInterval(announceControl,10000);
   setInterval(()=>{if(!hasLock || !state.running)return;try {runTick();} catch (error) {
     const kind=/^[A-Za-z]+Error$/.test(error?.name||'')?error.name:'Error';
     const fn=String(error?.stack||'').match(/\bat\s+(\w+)\s*\(/)?.[1]||'desconocida';
-    stop('Error interno ('+kind+', '+fn+'). Operación pendiente conservada; revisa antes de continuar.');hasLock=false;releaseLock?.();
+    stop('Error interno ('+kind+', '+fn+'). Operación pendiente conservada; revisa antes de continuar.');
   }},1500);
 })();

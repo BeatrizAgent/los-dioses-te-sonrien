@@ -178,3 +178,7 @@ En 0.12.51, el aviso de subida de nivel observado puede aceptarse aunque su bot�
 En 0.12.52, avisos reconocidos de objetivos, logros, títulos y baúles se cierran con Aceptar, Cerrar, Continuar u OK. La estructura del aviso de objetivo se ha simulado a partir de la captura; selectores y textos de avisos reales pendientes de comprobar.
 
 En 0.12.53, el aviso observado de pieza de disfraz se cierra con No para continuar el ciclo. Su HTML se ha probado en simulación; falta comprobarlo instalado en el juego.
+
+En principal 0.12.54 y beta 0.5.6, el principal cede el control a la beta tras finalizar acciones pendientes y lo recupera al detenerla. La beta intenta acceder a ciudad si no ve al alquimista y aplaza tras esperar rutas o baúles. No se ha confirmado una venta real.
+
+Beta 0.5.7: búsqueda de pergaminos en baúl I antes de paquetes, comerciantes alternativos y retirada del módulo de mercado de alianza. La venta en juego requiere comprobación.

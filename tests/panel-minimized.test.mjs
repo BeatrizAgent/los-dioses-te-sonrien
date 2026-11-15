@@ -11,7 +11,7 @@ test('panel minimizado omite contenido y al abrirlo actualiza una vez',()=>{
   const uiState={minimized:true},nodes={},shell={classList:{toggle:()=>false}};
   let renders=0;
   const element=selector=>nodes[selector]??=(selector==='.shell'?shell:{textContent:'',classList:{toggle(){}},setAttribute(){}});
-  const context={uiState,state:{running:true},mod:'overview',verified:()=>true,$:element,renderContent:()=>renders++,saveUI:()=>{}};
+  const context={ownerActive:true,uiState,state:{running:true},mod:'overview',verified:()=>true,$:element,renderContent:()=>renders++,saveUI:()=>{}};
   vm.createContext(context);vm.runInContext(status+min,context);
   context.renderStatus();assert.equal(renders,0);
   nodes['.min'].onclick();assert.equal(uiState.minimized,false);assert.equal(renders,1);

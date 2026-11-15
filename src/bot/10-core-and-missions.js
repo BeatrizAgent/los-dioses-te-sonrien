@@ -19,6 +19,7 @@
   const needsStatsStart = !Number.isFinite(state.statsStartedAt);
   if (needsStatsStart) state.statsStartedAt = Date.now();
   function log(message, type = 'info') { state.logs.unshift({at: Date.now(), message, type}); state.logs = state.logs.slice(0, 40); }
+  ownerCanYield = () => !state.running || !(state.pending || state.pendingFight || state.pendingPve || state.pendingLoot || state.pendingHeal || state.pendingPackageFood || state.foodBuyTx || (state.goldTx && !state.goldTx.blocked) || (state.smeltTx && !state.smeltTx.blocked) || (state.repairTx && !state.repairTx.blocked));
   const save = () => { if (!ownerActive) return; const serialized=JSON.stringify(state); if (localStorage.getItem(KEY)!==serialized) localStorage.setItem(KEY,serialized); };
   if (needsStatsStart) save();
   if (state.running===false && state.message==='Identificador de alimento no verificable.') {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Los Dioses Te Sonríen - Asistente Gladiatus
 // @namespace    axelbot.evento
-// @version      0.12.53
+// @version      0.12.54
 // @description  Bot configurable para Gladiatus. Revisa los módulos elegidos antes de activarlo.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -26,7 +26,12 @@
     try { const identity=JSON.parse(sessionStorage.getItem(ID)); if (identity?.name && Date.now()-identity.at >= 0 && Date.now()-identity.at < 15*60*1000) accountName=identity.name; } catch {}
   }
   let waitingNotice = null;
-  let ownerActive = false;
+  let ownerActive = false, ownerStarted = false, ownerRelease = null;
+  let ownerCanYield = () => false;
+  const betaControlKey = 'gladibot.beta.control.v1.'+location.hostname.toLowerCase()+'.'+encodeURIComponent(accountName.normalize('NFKC').trim().toLocaleLowerCase('es'));
+  function betaWantsControl() {
+    try {const x=JSON.parse(localStorage.getItem(betaControlKey));return typeof x?.id==='string' && Number.isFinite(x.until) && x.until>Date.now() && x.until<=Date.now()+60000;} catch {return false;}
+  }
   window.addEventListener('pageshow', event => {
     if (event.persisted && !ownerActive) {
       document.querySelector('#axel-evento-panel')?.remove();
@@ -68,6 +73,7 @@
       showWaiting('Bot detenido: este navegador no permite proteger los datos entre pestañas.');
       return;
     }
+    if (betaWantsControl()) {showWaiting('Beta activa o esperando control; el bot principal reanudará después.');setTimeout(acquireOwner,3000);return;}
     const lockName = 'axelbot.evento.owner.' + encodeURIComponent(accountName.normalize('NFKC').toLocaleLowerCase());
     navigator.locks.request(lockName, {mode:'exclusive', ifAvailable:true}, lock => {
       if (!lock) {
@@ -75,9 +81,10 @@
         setTimeout(acquireOwner, 3000);
         return;
       }
+      if (betaWantsControl()) {showWaiting('Beta esperando control.');setTimeout(acquireOwner,3000);return;}
       waitingNotice?.remove();
       ownerActive = true;
-      try { startBot(); } catch (error) {
+      try { if (!ownerStarted) { startBot(); ownerStarted=true; } } catch (error) {
         ownerActive = false;
         document.querySelector('#axel-evento-panel')?.remove();
         const kind = /^[A-Za-z]+Error$/.test(error?.name || '') ? error.name : 'Error';
@@ -85,7 +92,12 @@
         console.error('[Los Dioses Te Sonríen] Error al iniciar el panel:', kind);
         return;
       }
-      return new Promise(resolve => window.addEventListener('pagehide', () => { ownerActive = false; resolve(); }, {once:true}));
+      return new Promise(resolve => {
+        let done=false; const finish=()=>{if(done)return;done=true;clearInterval(check);ownerRelease=null;ownerActive=false;resolve();};
+        ownerRelease=finish;
+        const check=setInterval(()=>{if(betaWantsControl() && ownerCanYield()) {showWaiting('Beta activa; el bot principal reanudará al terminar.');finish();setTimeout(acquireOwner,3000);}},1000);
+        window.addEventListener('pagehide',finish,{once:true});
+      });
     }).catch(error => { ownerActive = false; const kind = /^[A-Za-z]+Error$/.test(error?.name || '') ? error.name : 'Error'; showWaiting('Error del bloqueo (' + kind + '). El bot no está activo.'); });
   }
   acquireOwner();
