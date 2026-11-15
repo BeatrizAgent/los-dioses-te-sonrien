@@ -70,6 +70,8 @@ También intenta cerrar avisos informativos de logro, título o nivel cuando el 
 
 En 0.12.45, un control no verificable de mazmorra aplaza esa tarea y permite continuar las demás. Una cancelación enviada sin confirmación queda aislada sin repetirse. Si falla una reparación pero la pieza original o reparada se verifica en su ranura, la reparación se aplaza y el bot continúa. Si no puede comprobar la pieza, conserva la parada para evitar combatir sin equipo. Un aviso persistente mantiene el bot activo y reintenta la recuperación con intervalos, sin seguir actuando mientras el diálogo bloquea la pantalla. Probado en simulación; funcionamiento continuo durante 8–10 horas y recuperación instalada siguen sin verificar.
 
+En 0.12.46, la curación y la recogida de utilizables esperan como máximo 15 segundos si el baúl I no llega a seleccionarse. El bot aplaza esa tarea, continúa la cola y conserva las referencias de curaciones o traslados sin confirmar para no repetirlos. Probado en simulación; falta validar selección de baúl y funcionamiento prolongado en juego.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.

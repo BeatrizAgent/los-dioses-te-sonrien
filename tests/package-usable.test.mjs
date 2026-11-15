@@ -54,3 +54,14 @@ test('un filtro de paquetes no verificable aplaza la recogida sin detener el bot
   const c={state,mod:'packages',params:new URLSearchParams('f=0'),document:{querySelector:s=>s==='#inv'||s==='#packages'?{}:filter},location:{href:'https://s64-es.gladiatus.gameforge.com/game/index.php',origin:'https://s64-es.gladiatus.gameforge.com'},URL,visible:x=>!!x,skipHealing:m=>{skipped=m;state.packageCollectTrip=false;},stop:()=>{state.running=false;},save:()=>{}};
   vm.createContext(c);vm.runInContext(body,c);assert.equal(c.packageFoodTick(),true);assert.equal(state.running,true);assert.equal(state.packageCollectTrip,false);assert.match(skipped,/aplazada/);
 });
+
+test('baúl que no cambia se aplaza sin repetir clic ni perder operaciones inciertas',()=>{
+  const helpers=source.slice(source.indexOf('  function rememberUnknownPackageFood('),source.indexOf('  function packageFoodTick('));
+  const skip=source.slice(source.indexOf('  function skipHealing('),source.indexOf('  function dragFood('));
+  let now=10000,clicks=0;const state={running:true,packageFoodTrip:true,pendingHeal:{hash:'heal'},pendingPackageFood:{hash:'package'}};
+  const bag={click:()=>clicks++};const context={state,Date:{now:()=>now},visible:()=>true,validItemHash:x=>!!x,save(){},log(){}};
+  vm.createContext(context);vm.runInContext(helpers+skip,context);
+  context.selectHealingBag(bag);now+=10000;context.selectHealingBag(bag);assert.equal(clicks,1);assert.ok(state.pendingHeal);
+  now+=5000;context.selectHealingBag(bag);assert.equal(clicks,1);assert.equal(state.running,true);assert.equal(state.pendingHeal,null);assert.equal(state.pendingPackageFood,null);
+  assert.deepEqual(Array.from(state.unknownHealFood),['heal']);assert.deepEqual(Array.from(state.unknownPackageFood),['package']);assert.ok(state.healSkipUntil>now);
+});

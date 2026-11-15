@@ -66,6 +66,19 @@
     }
     state.pendingPackageFood=null;
   }
+  function selectHealingBag(bag) {
+    const now=Date.now();
+    if (!visible(bag) || (state.healBagSwitchAt && now-state.healBagSwitchAt>=15000)) {
+      if (state.pendingHeal && validItemHash(state.pendingHeal.hash)) {
+        state.unknownHealFood=Array.isArray(state.unknownHealFood)?state.unknownHealFood:[];
+        if (!state.unknownHealFood.includes(state.pendingHeal.hash)) state.unknownHealFood.push(state.pendingHeal.hash);
+      }
+      rememberUnknownPackageFood();delete state.healBagSwitchAt;
+      skipHealing('Baúl I no se pudo confirmar; curación aplazada y cola reanudada.');return;
+    }
+    if (state.healBagSwitchAt) return;
+    state.healBagSwitchAt=now;state.message='Seleccionando baúl I.';save();bag.click();
+  }
   function packageFoodTick() {
     const collecting=state.packageCollectTrip===true;
     if (collecting && mod!=='packages') {
@@ -88,7 +101,8 @@
     }
     const bag=document.querySelector('#inventory_nav a');
     if (!bag || !visible(bag)) { rememberUnknownPackageFood(); skipHealing('Baúl I no disponible; sigo con la cola.'); return true; }
-    if (!bag.classList.contains('current')) { delete state.packageScan; bag.click(); state.message='Seleccionando baúl I.'; save(); return true; }
+    if (!bag.classList.contains('current')) { delete state.packageScan; selectHealingBag(bag); return true; }
+    if (state.healBagSwitchAt) {delete state.healBagSwitchAt;save();}
     if (bag.getAttribute?.('data-bag-number') && bag.getAttribute('data-bag-number')!=='512') { rememberUnknownPackageFood(); skipHealing('Baúl I no verificable.'); return true; }
     const inventory=[...inv.querySelectorAll('.ui-draggable')];
     if (inventory.some(x=>!validItemHash(x.getAttribute('data-hash')))) { rememberUnknownPackageFood(); skipHealing('Objetos del baúl sin identificar; revisaré después.'); return true; }
@@ -135,6 +149,7 @@
     food.item.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window})); return true;
   }
   function skipHealing(message) {
+    delete state.healBagSwitchAt;
     if (state.packageCollectTrip) {state.packageCollectTrip=false;state.packageCollectAt=Date.now()+120000;delete state.packageScan;delete state.packageWaitAt;state.message=message;log(message,'warn');save();return;}
     state.pendingHeal=null; state.packageFoodTrip=false; delete state.packageScan; delete state.packageWaitAt; state.healSkipUntil=Date.now()+60000;
     state.message=message; log(message,'warn'); save();
@@ -174,9 +189,9 @@
     const selectedBag=[...document.querySelectorAll('#inventory_nav a')].findIndex(a=>a.classList.contains('current'));
     if (mod === 'overview' && selectedBag !== 0) {
       const bag=document.querySelector('#inventory_nav a');
-      if (!visible(bag)) { skipHealing('No se encuentra el baúl I; continuando con la cola.'); return true; }
-      bag.click(); state.message='Seleccionando baúl I.'; save(); return true;
+      selectHealingBag(bag); return true;
     }
+    if (state.healBagSwitchAt) {delete state.healBagSwitchAt;save();}
     if (state.pendingHeal) {
       const p=state.pendingHeal;
       if (!validItemHash(p.hash)) { skipHealing('Curación anterior no identificable; sigo con la cola.'); return true; }
