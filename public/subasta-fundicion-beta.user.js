@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.9
+// @version      0.5.10
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -539,6 +539,16 @@
     if (duration.value!=='3' || !/^24\s*h/i.test(duration.selectedOptions?.[0]?.textContent||'') || tx.salePrice!==SALE_PRICE || price.value!==String(SALE_PRICE) || !Number.isSafeInteger(cost) || cost<=0 || !Number.isSafeInteger(gold) || cost>gold) return waitItem(tx,'Tarifa de 24 h no verificable.');
     tx.stage='sold';tx.at=Date.now();tx.fee=cost;save();submit.click();return true;
   }
+  function shopFreeCell(shop) {
+    const r=shop?.getBoundingClientRect(),cols=shop?.offsetWidth/32,rows=shop?.offsetHeight/32;
+    if(!r || !Number.isInteger(cols) || !Number.isInteger(rows) || cols<1 || rows<1 || cols>20 || rows>20 || r.width<=0 || r.height<=0) return null;
+    const w=r.width/cols,h=r.height/rows,occupied=[...shop.querySelectorAll('.ui-draggable')].filter(visible).map(e=>e.getBoundingClientRect());
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) {
+      const cell={left:r.left+x*w,top:r.top+y*h,width:w,height:h};cell.right=cell.left+w;cell.bottom=cell.top+h;
+      if(!occupied.some(o=>cell.left<o.right && cell.right>o.left && cell.top<o.bottom && cell.bottom>o.top)) return {getBoundingClientRect:()=>cell};
+    }
+    return null;
+  }
   function npcScrollTick(tx) {
     const vendors=[...document.querySelectorAll('#mainmenu a[href]')].map(e=>{try{const u=new URL(e.href,location.href),name=normal(e.textContent).replace(/\s+/g,' ');if(!visible(e)||!['alquimista','armero','herrero','mercenarios','mercenario','maléfica','malefica'].includes(name)||u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='inventory'||!/^\d+$/.test(u.searchParams.get('sub')||'')||u.searchParams.has('action'))return null;return {el:e,sub:u.searchParams.get('sub')};}catch{return null;}}).filter(Boolean);
     if(!tx.vendorSub) tx.vendorSub=vendors.find(v=>params.get('mod')==='inventory'&&params.get('sub')===v.sub)?.sub || vendors.find(v=>v.sub==='4')?.sub || vendors[0]?.sub || '4';
@@ -568,8 +578,7 @@
     }
     const el=inventoryHash(tx.hash), item=itemDetails(el), gold=balance();
     if(!item||item.type!==20||item.name!==tx.name||!/^pergaminos?\b/i.test(item.name)||item.value!==tx.value||item.width!==1||item.height!==1||!Number.isSafeInteger(gold)) return waitItem(tx,'Pergamino o valor no verificable.');
-    const occupied=[...shop.querySelectorAll('.ui-draggable')].map(e=>e.getBoundingClientRect());
-    const cell=[...shop.querySelectorAll('.grid-droparea')].find(e=>{const r=e.getBoundingClientRect();return visible(e)&&r.width>0&&r.height>0&&!occupied.some(o=>r.left<o.right&&r.right>o.left&&r.top<o.bottom&&r.bottom>o.top);});
+    const cell=shopFreeCell(shop);
     if(!cell)return waitItem(tx,'Sin casilla libre en venta del alquimista.');
     tx.stage='npcSold';tx.at=Date.now();tx.balanceBefore=gold;save();
     if(!drag(el,cell)){tx.blocked=true;note('Arrastre al alquimista no disponible.');}return true;
