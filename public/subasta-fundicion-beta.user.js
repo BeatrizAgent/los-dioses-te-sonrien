@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.8
+// @version      0.5.9
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -50,6 +50,7 @@
   state.options.scroll = false;
   state.options.sell = false; // La beta solo ejecuta subasta y fundición.
   state.needGold = state.needGold === true && Number.isSafeInteger(state.goldRequired) && state.goldRequired>0;
+  if (state.scrollRecoveryV059!==true) {state.scrollRecoveryV059=true;state.scrollRetryAt=0;}
   if (state.itemTx?.kind==='sell' && !Number.isSafeInteger(state.itemTx.salePrice)) {
     if (state.itemTx.stage==='sold') state.itemTx.salePrice=5000;
     else if (state.itemTx.stage==='drop') {state.itemTx.blocked=true;state.itemTx.problem='Anuncio anterior a la actualización pendiente de revisión.';}
@@ -309,7 +310,7 @@
     const inv=document.querySelector('#inv'),bag=document.querySelector('#inventory_nav a[data-bag-number="512"]');
     if (!inv || !visible(bag) || bag.getAttribute('data-available')!=='true') return false;
     if (!selectBag('512')) return true;
-    const entries=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(el=>({el,item:itemDetails(el)})).filter(x=>x.item && x.item.type===20 && /^pergaminos?\b/i.test(x.item.name) && x.item.width===1 && x.item.height===1 && x.item.value && x.el.getAttribute('data-reserved')!=='true' && !state.blockedItems?.some(y=>y.hash===x.item.hash));
+    const entries=[...inv.querySelectorAll('.ui-draggable[data-basis]')].map(el=>({el,item:itemDetails(el)})).filter(x=>x.item && x.item.type===20 && /^pergaminos?\b/i.test(x.item.name) && x.item.width===1 && x.item.height===1 && x.item.value && x.el.getAttribute('data-reserved')!=='true' && !state.blockedItems?.some(y=>y.hash===x.item.hash && (y.kind!=='scroll' || y.stage!=='npc')));
     const selected=entries.find(x=>entries.filter(y=>y.item.hash===x.item.hash).length===1 && inventoryHash(x.item.hash));
     if (!selected) return false;
     state.itemTx={...selected.item,kind:'scroll',authorizedScroll:true,bag:'512',stage:'npc',at:Date.now()};
