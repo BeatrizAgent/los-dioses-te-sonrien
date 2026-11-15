@@ -174,6 +174,11 @@
       }
       if (state.pending) return;
     }
+    if (BUILD_CONFIG.modules.healing && healthPercent<=40) {
+      if (BUILD_CONFIG.modules.missions && mod!=='quests' && Date.now()>=(state.questRetryAt||0) && Date.now()-(state.lastQuestVisit||0)>=30000 && navigation(document.querySelector('#mainmenu a[href*="mod=quests"]'),'Revisando misiones mientras recupero vida.')) return;
+      if (state.message!=='Vida baja; esperando curación antes de combatir.') {state.message='Vida baja; esperando curación antes de combatir.';log(state.message,'warn');save();}
+      return;
+    }
     if (pveTick()) return;
     if (BUILD_CONFIG.modules.missions && !BUILD_CONFIG.modules.arenaCircus && mod !== 'quests' && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
       if (navigation(document.querySelector('#mainmenu a[href*="mod=quests"]'), 'Revisando misiones del Panteón.')) return;

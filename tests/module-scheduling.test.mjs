@@ -75,3 +75,14 @@ test('búsqueda de alimento aplazada no bloquea oro', () => {
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.deepEqual(calls,['pendiente','oro']);
 });
+
+test('vida baja con curación aplazada permite misiones pero no inicia PvE', () => {
+  const calls=[],state={running:true,healSkipUntil:Date.now()+60000,packageCollectAt:Date.now()+60000};
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{missions:true,arenaCircus:true,healing:true}},
+    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    healthReading:()=>({current:1000,maximum:10000}),goldTick:()=>false,pveTick:()=>{calls.push('pve');return true;},
+    navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.deepEqual(calls,['Revisando misiones mientras recupero vida.']);assert.equal(state.running,true);
+});
