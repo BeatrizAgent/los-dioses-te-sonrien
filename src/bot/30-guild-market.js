@@ -530,11 +530,15 @@
     return {el,name:name.trim(),refinement:Number(refinement[3]),refinementValue,refinementMax,hash,basis,quality,level,owner,width,height};
   }
   function repairSame(a,b) { return !!a && !!b && ['name','basis','quality','level','owner','width','height'].every(k=>a[k]===b[k]); }
-  function repairBlock(message) { if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;} stop('Reparación: '+message+' Revisa la pieza antes de continuar.'); }
+  function repairBlock(message) {
+    if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;}
+    if (repairAcknowledge(true)) { state.message='Reparación aplazada: '+message+' Pieza verificada en su ranura; continúo con las demás tareas.';log(state.message,'warn');save();return; }
+    stop('Reparación: '+message+' Revisa la pieza antes de continuar.');
+  }
   function repairRestore(message) { state.repairTx.stage='restore';state.repairTx.reason=message;state.repairTx.at=Date.now();save();return true; }
-  function repairAcknowledge() {
+  function repairAcknowledge(allowRunning=false) {
     const tx=state.repairTx;
-    if (!tx?.blocked || state.running || mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0') || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
+    if (!tx?.blocked || (state.running && !allowRunning) || mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0') || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
     const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
     const item=repairItem(target?.querySelector('[data-tooltip][data-basis]'));
     if(!item || !repairSame(item,tx.item) || (item.hash!==tx.item.hash && item.refinement!==100)) return false;

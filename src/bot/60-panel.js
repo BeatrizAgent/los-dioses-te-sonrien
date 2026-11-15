@@ -103,7 +103,7 @@
       content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Circo: '+ct),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
       content.append(textElement('div','sectionlabel','Ubicación'),textElement('div','card name',current));
       if (state.dungeonCombatUnknown) {
-        content.append(textElement('p','small','Mazmorra pausada: resultado de combate desconocido. Revisa el informe y la instancia antes de continuar; las demás tareas siguen activas.'));
+        content.append(textElement('p','small','Mazmorra pausada: '+(state.dungeonCombatUnknown.reason||'resultado desconocido')+'. Las demás tareas siguen activas.'));
         const reviewed=textElement('button','btn','Ya revisé el combate de mazmorra');
         reviewed.onclick=()=>{if(!verified()||captcha()||!state.dungeonCombatUnknown)return;state.dungeonCombatUnknown=null;log('El jugador revisó el combate de mazmorra; se conservan las derrotas anteriores.','warn');save();contentKey='';reviewed.blur();renderContent();};
         content.append(reviewed);

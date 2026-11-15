@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.4
+// @version      0.5.5
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -624,6 +624,7 @@
       state.phase='auction';save();
     }
     if (!state.options.bid && !state.options.bidUsable) return;
+    if (Date.now()<(state.auctionRetryAt||0)) return;
     if (params.get('mod')!=='auction') return navigate('#mainmenu a[href*="mod=auction"]','auction');
     const plan=auctionPlan();
     const index=Number.isInteger(state.auctionStep)&&state.auctionStep>=0&&state.auctionStep<plan.length?state.auctionStep:0;
@@ -635,7 +636,7 @@
     }
     const selected=Number(document.querySelector('select[name="itemType"]')?.value);
     if (state.filterExpected) {
-      if (selected!==state.filterExpected) { if(Date.now()-state.filterAt>20000)stop('Filtro de subasta sin confirmar.');return; }
+      if (selected!==state.filterExpected) { if(Date.now()-state.filterAt>20000){delete state.filterExpected;delete state.filterAt;state.auctionRetryAt=Date.now()+120000;state.phase='packages';state.nextPackages=0;note('Filtro de subasta sin confirmar; continuaré con otras tareas y lo revisaré más tarde.');}return; }
       delete state.filterExpected;save();
     }
     if (selected!==category) return auctionFilter(category);

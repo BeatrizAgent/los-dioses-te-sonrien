@@ -45,4 +45,9 @@ test('cancela una sola vez y espera confirmación antes de recrear',()=>{
  const second=run({mode:'dungeon',reset:first.state.dungeonReset});assert.deepEqual(second.clicks,[]);assert.equal(second.state.dungeonReset.phase,'submitted');
  const confirmed=run({mode:'dungeon',reset:first.state.dungeonReset,entered:true,points:'0'});assert.equal(confirmed.state.dungeonReset,null);assert.equal(confirmed.state.dungeonLosses,null);
  const bad=run({mode:'dungeon',reset:{dungeonId:'dungeon-test',phase:'needed'},cancelAction:'other'});assert.deepEqual(bad.clicks,[]);
+ assert.ok(bad.state.dungeonRouteRetryAt>Date.now());assert.equal(bad.state.dungeonReset.phase,'needed');
+});
+test('cancelación incierta aísla mazmorra sin repetir ni detener las demás tareas',()=>{
+ const x=run({mode:'dungeon',reset:{dungeonId:'dungeon-test',phase:'submitted',at:Date.now()-31000}});
+ assert.deepEqual(x.clicks,[]);assert.equal(x.state.dungeonReset.phase,'submitted');assert.match(x.state.dungeonCombatUnknown.reason,/sin confirmar/);assert.notEqual(x.state.running,false);
 });

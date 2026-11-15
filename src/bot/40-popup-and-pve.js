@@ -14,14 +14,20 @@
     const reportId=params.get('reportId'), type=params.get('t');
     const safeReport=mod==='reports' && sub==='showCombatReport' && /^\d+$/.test(reportId || '') && ['0','1'].includes(type) && [...params.keys()].every(k=>['mod','submod','reportId','t','sh'].includes(k));
     const key=kind+':' +(safeReport ? type+':'+reportId : 'overview');
-    if (state.popupRecovery?.key===key && Date.now()-state.popupRecovery.at<300000) { stop('El aviso persiste tras recargar; revisión necesaria.'); return true; }
+    if (state.popupRecovery?.key===key && Date.now()-state.popupRecovery.at<300000) {
+      if (!state.popupRecovery.waiting) {state.popupRecovery.waiting=true;state.message='Aviso persistente; volveré a comprobarlo sin repetir acciones.';log(state.message,'warn');save();}
+      return true;
+    }
     let target;
     if (safeReport) target=location.href;
     else {
       const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
       try { const u=new URL(link?.getAttribute('href'),location.href); if (visible(link) && u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='overview' && !u.searchParams.has('doll') && [...u.searchParams.keys()].every(k=>['mod','sh'].includes(k))) target=u.href; } catch {}
     }
-    if (!target) { stop('No hay una página segura para recuperar el aviso.'); return true; }
+    if (!target) {
+      if (Date.now()>=(state.popupRetryAt||0)) {state.popupRetryAt=Date.now()+60000;state.message='No hay una página segura para recuperar el aviso; volveré a comprobarlo.';log(state.message,'warn');save();}
+      return true;
+    }
     state.popupRecovery={key,at:Date.now()}; state.message='Recargando para recuperar aviso de '+kind+'; resultado anterior no confirmado.'; log(state.message,'warn'); save(); location.assign(target); return true;
   }
   function recoverUnexpectedPopup(dialog, kind) {
@@ -39,7 +45,7 @@
     const buttons=[...dialog.querySelectorAll('button')];
     const button=buttons.find(b=>b.textContent.trim()==='Búsqueda exhaustiva');
     const handler=button?.getAttribute('onclick') || '';
-    if (/rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent+' '+(button?.outerHTML || ''))) { stop('Aviso de botín con coste no verificado; revisión necesaria.'); return true; }
+    if (/rub[ií]|diamant|premium|reducir tiempo/i.test(dialog.textContent+' '+(button?.outerHTML || ''))) return recoverPopup('botín con coste no verificado');
     if (mod!=='reports' || sub!=='showCombatReport' || !['0','1'].includes(type) || !/^\d+$/.test(reportId || '') || !/Desvalijar a /i.test(dialog.querySelector('#header_')?.textContent || '')) return recoverUnexpectedPopup(dialog,'botín desconocido');
     if (!visible(button) || button.disabled) return recoverPopup('botín');
     const expected=new RegExp('^\\s*runAction\\(this,\\s*'+type+',\\s*'+reportId+',\\s*4,\\s*function\\s*\\(\\)\\s*\\{\\s*location\\.reload\\(\\)\\s*\\}\\)\\s*;?\\s*$');
@@ -59,6 +65,12 @@
     if (count>=limit) state.dungeonReset={dungeonId,phase:'needed'};
   }
   function pveTick() {
+    function deferDungeon(message,uncertain=false) {
+      state.pveTarget=null;
+      if (uncertain) state.dungeonCombatUnknown={dungeonId:BUILD_CONFIG.dungeon?.id,at:Date.now(),reason:message};
+      else state.dungeonRouteRetryAt=Date.now()+300000;
+      state.message='Mazmorra aplazada: '+message+' Las demás tareas continúan.';log(state.message,'warn');save();return false;
+    }
     const definitions={expedition:{mod:'location',bar:'#cooldown_bar_expedition',points:'#expeditionpoints_value',label:'expedición'},dungeon:{mod:'dungeon',bar:'#cooldown_bar_dungeon',points:'#dungeonpoints_value',label:'mazmorra'}};
     const choices=[];
     if (BUILD_CONFIG.modules.expedition && BUILD_CONFIG.expedition) choices.push('expedition');
@@ -155,10 +167,10 @@
     const enter=document.querySelector('#content input[type="submit"][name="'+inputName+'"]');
     const reset=state.dungeonReset;
     if (reset) {
-      if (reset.dungeonId!==dungeon.id) { stop('Reinicio pendiente de otra mazmorra; revisión necesaria.'); return true; }
+      if (reset.dungeonId!==dungeon.id) return deferDungeon('Reinicio pendiente de otra mazmorra.',true);
       if (reset.phase==='submitted') {
         if (visible(enter) && !enter.disabled) { state.dungeonReset=null; state.dungeonLosses=null; state.pveEntryAt=0; state.message='Cancelación de mazmorra confirmada; esperando para crearla de nuevo.'; log(state.message,'success'); save(); if (!ready('dungeon')) {state.pveTarget=null; save(); return true;} }
-        else { if (Date.now()-reset.at>30000) stop('Cancelación de mazmorra sin confirmar; revisión necesaria.'); return true; }
+        else { if (Date.now()-reset.at>30000) return deferDungeon('Cancelación de mazmorra sin confirmar; no se repetirá.',true); return true; }
       } else if (reset.phase==='needed') {
         const cancel=[...document.querySelectorAll('#content input[type="submit"]')].find(x=>x.value==='Cancelar Mazmorra' && visible(x) && !x.disabled);
         const instanceTitle=document.querySelector('#content h3')?.textContent || '';
@@ -166,13 +178,13 @@
         const form=cancel?.form; let u; try { u=new URL(form?.getAttribute('action'),location.href); } catch {}
         const id=form?.querySelector('input[type="hidden"][name="dungeonId"]');
         const csrf=form?.querySelector('input[type="hidden"][name="csrf_token"]');
-        if (!titleMatches || !cancel || !form || !u || u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='dungeon' || u.searchParams.get('action')!=='cancelDungeon' || u.searchParams.get('loc')!==params.get('loc') || String(form.method).toLowerCase()!=='post' || !id?.value || !csrf?.value || /rub[ií]|diamant|premium|reducir tiempo/i.test(cancel.outerHTML)) { stop('No se puede verificar el control para cancelar la mazmorra; revisión necesaria.'); return true; }
+        if (!titleMatches || !cancel || !form || !u || u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='dungeon' || u.searchParams.get('action')!=='cancelDungeon' || u.searchParams.get('loc')!==params.get('loc') || String(form.method).toLowerCase()!=='post' || !id?.value || !csrf?.value || /rub[ií]|diamant|premium|reducir tiempo/i.test(cancel.outerHTML)) return deferDungeon('Control de cancelación no verificable; lo revisaré más tarde.');
         state.dungeonReset={dungeonId:dungeon.id,phase:'submitted',at:Date.now()}; state.message='Límite de derrotas confirmado: cancelando mazmorra.'; log(state.message,'warn'); save(); cancel.click(); return true;
-      } else { stop('Estado de reinicio de mazmorra desconocido; revisión necesaria.'); return true; }
+      } else return deferDungeon('Estado de reinicio desconocido; no se repetirá.',true);
     }
     if (visible(enter) && !enter.disabled) {
-      const form=enter.form; let u; try { u=new URL(form.getAttribute('action'),location.href); } catch { return stop('Entrada de mazmorra no reconocida.'); }
-      if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='dungeon' || u.searchParams.has('action') || u.searchParams.get('loc')!==params.get('loc') || String(form.method).toLowerCase()!=='post' || enter.value!==inputLabel || !inConfiguredArea || sameName(area.name)!==sameName(dungeon.area.name) || /rub[ií]|diamant|premium/i.test(enter.outerHTML)) return stop('Entrada de mazmorra no coincide con la zona y dificultad configuradas.');
+      const form=enter.form; let u; try { u=new URL(form.getAttribute('action'),location.href); } catch { return deferDungeon('Entrada de mazmorra no reconocida.'); }
+      if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='dungeon' || u.searchParams.has('action') || u.searchParams.get('loc')!==params.get('loc') || String(form.method).toLowerCase()!=='post' || enter.value!==inputLabel || !inConfiguredArea || sameName(area.name)!==sameName(dungeon.area.name) || /rub[ií]|diamant|premium/i.test(enter.outerHTML)) return deferDungeon('Entrada no coincide con zona y dificultad configuradas.');
       if (state.pveEntryAt) { if (Date.now()-state.pveEntryAt<30000) return true; state.pveEntryAt=0; state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Entrada de mazmorra sin confirmar; esperaré antes de revisar.'; log(state.message,'warn'); save(); return true; }
       state.pveEntryAt=Date.now(); state.message='Iniciando '+dungeon.name+' ('+difficulty+') · enemigos nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); enter.click(); return true;
     }
