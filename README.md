@@ -76,6 +76,8 @@ En 0.12.47, cuando curación está activada y la vida es del 40 % o menos, el bo
 
 En 0.12.48, tras seleccionar el baúl I, curación espera cinco segundos antes de leerlo, incluso si la pestaña se marca activa inmediatamente. Esto reduce el riesgo de usar datos de la pestaña anterior. Probado en simulación; carga y contenido reales pendientes de validación en juego.
 
+En 0.12.49, el generador solo inserta el código completo en la página si se abre su vista previa. El panel ocupa menos altura en pantallas estrechas y aumenta el texto de estado. No cambia las acciones ni los tiempos de autonomía del bot; pendiente de validación en móvil real.
+
 En 0.12.33, los pasos de acceso a la zona y a la mazmorra tienen contadores independientes. Si una ruta realmente no progresa, solo se aplaza la mazmorra cinco minutos y las demás tareas continúan; el bot no cancela la instancia. La parada antigua por ruta repetida se recupera automáticamente. Probado en simulación; pendiente de validar instalado en juego.
 
 En 0.12.25, cuando la página no muestra los puntos de vida en texto, el bot lee los atributos numéricos de la barra y rechaza valores inválidos. La barra se observó en el territorio de CassiusFerox; el cambio está pendiente de instalar y validar en juego.

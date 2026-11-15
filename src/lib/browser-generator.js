@@ -28,10 +28,13 @@ export function initializeGenerator() {
   const error = document.querySelector('#form-error');
   const download = document.querySelector('#download-link');
   const preview = document.querySelector('#script-preview');
+  const previewDetails = document.querySelector('#script-preview-details');
   const installBlock = document.querySelector('#install-url-block');
   const installUrl = document.querySelector('#install-url');
   const copyButton = document.querySelector('#copy-install-url');
   const copyStatus = document.querySelector('#copy-status');
+  let generatedScript = '';
+  previewDetails.addEventListener('toggle', () => { preview.textContent = previewDetails.open ? generatedScript : ''; });
   copyButton?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(installUrl.value); copyStatus.textContent = 'Enlace copiado.'; }
     catch { installUrl.focus(); installUrl.select(); copyStatus.textContent = 'Selecciona y copia el enlace.'; }
@@ -146,7 +149,8 @@ export function initializeGenerator() {
       if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
       currentObjectUrl = URL.createObjectURL(blob);
       download.href = currentObjectUrl;
-      preview.textContent = userscript;
+      generatedScript = userscript;
+      preview.textContent = previewDetails.open ? generatedScript : '';
       document.querySelector('#result-title').textContent = 'Userscript generado';
       const enabled = Object.values(config.modules).filter(Boolean).length;
       const pveRegion = config.modules.expedition || config.modules.dungeon ? ` · región PvE ${config.campaignRegion}` : '';

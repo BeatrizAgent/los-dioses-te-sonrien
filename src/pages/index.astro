@@ -86,7 +86,7 @@ const dungeonCount = catalog.dungeons.length;
               <div class="install-url-actions"><button id="copy-install-url" type="button">Copiar enlace</button><a id="open-install-url" href="#">Abrir enlace ↗</a></div>
               <small id="copy-status" role="status"></small>
             </div>
-            <details><summary>Ver el código generado</summary><pre id="script-preview"></pre></details>
+            <details id="script-preview-details"><summary>Ver el código generado</summary><pre id="script-preview"></pre></details>
           </div>
           <p class="form-error" id="form-error" role="alert" hidden></p>
         </form>
@@ -117,7 +117,7 @@ const dungeonCount = catalog.dungeons.length;
         <div class="section-head install-head"><div><p class="overline"><span class="rule"></span> ANTES DE USARLO</p><h2 id="limits-title">Cuándo puede<br /><i>detenerse.</i></h2></div><p>El bot intenta continuar con las demás tareas cuando puede. Algunas situaciones requieren revisión y no garantizamos que funcione sin supervisión.</p></div>
         <div class="install-columns">
           <article class="install-route"><span class="platform-label">01 · PARADA TOTAL</span><h3>Verificación o aviso</h3><p>Se detiene ante CAPTCHA, posible verificación, identidad no comprobada o un aviso que no puede retirar de forma segura. Si la reparación queda incierta también puede detenerse para proteger la pieza. Revisa el mensaje del panel y el juego.</p></article>
-          <article class="install-route"><span class="platform-label">02 · TAREA PENDIENTE</span><h3>Operaciones inciertas</h3><p>Una compra, traslado o fundición sin confirmar puede quedar pendiente sin repetirse. Algunas situaciones de reinicio de mazmorra también detienen el bot. Revisa el estado y la pestaña Actividad antes de continuar.</p></article>
+          <article class="install-route"><span class="platform-label">02 · TAREA PENDIENTE</span><h3>Operaciones inciertas</h3><p>Una compra, traslado, fundición o cancelación de mazmorra sin confirmar puede quedar pendiente sin repetirse. El bot intenta continuar las demás tareas. Consulta el estado y la pestaña Actividad.</p></article>
           <article class="install-route"><span class="platform-label">03 · TÚ DECIDES</span><h3>Detener el bot</h3><p>En el panel dentro de Gladiatus pulsa <b>Detener bot</b>. Para impedir que se ejecute al recargar, desactiva también el userscript en Violentmonkey o en tu gestor de scripts.</p></article>
         </div>
         <aside class="mobile-caution"><span>!</span><p>El navegador puede suspender la pestaña; el móvil y algunos ciclos no están validados en juego. Crazy Addon es necesario para varios traslados. Comprueba resultados y operaciones pendientes.</p></aside>
@@ -178,7 +178,7 @@ const dungeonCount = catalog.dungeons.length;
       </section>
       <section class="install-section wrap" id="beta-subasta" aria-labelledby="beta-title">
         <div class="section-head install-head"><div><p class="overline"><span class="rule"></span> SCRIPT INDEPENDIENTE · BETA</p><h2 id="beta-title">Subasta y<br /><i>fundición.</i></h2></div><p>Elige qué pujar, vende utilizables y gestiona la fundición desde su propio panel.</p></div>
-        <div class="install-route"><h3>Instalar beta para servidores españoles</h3><p>Abre el enlace con Violentmonkey o descarga el archivo y ábrelo en tu gestor de scripts. Entra después en Visión general del personaje para identificarlo. Sus opciones y operaciones se guardan por servidor y personaje.</p><p>Las pujas de equipo, pujas de utilizables, venta de utilizables y fundición se activan por separado. Utilizables no vinculados ni reservados de paquetes y baúl I: 500 de oro durante 24 horas. Si falta oro, la beta intenta recoger cobros de Mercado de 500 o de los anteriores de 5.000 desde el filtro Oro; también podría recoger otro cobro de esos importes. La fundición usa el baúl II y la beta necesita Crazy Addon. Los pergaminos están reservados y no se venden.</p><p>Es una beta: la puja y las ventas manuales se observaron en juego; los ciclos automáticos completos, el cobro de oro y el uso con otros personajes siguen pendientes de validación. No actives a la vez otro bot que controle el mismo personaje. Nunca gasta rubíes ni resuelve verificaciones.</p><a class="download-link" style="color:#fff9ed" href={`${base}subasta-fundicion-beta.user.js`}>Instalar userscript beta <span aria-hidden="true">↗</span></a></div>
+        <div class="install-route"><h3>Instalar beta para servidores españoles</h3><p>Abre el enlace con Violentmonkey o descarga el archivo y ábrelo en tu gestor de scripts. Entra después en Visión general del personaje para identificarlo. Sus opciones y operaciones se guardan por servidor y personaje.</p><p>Las pujas de equipo, pujas de utilizables, venta de utilizables y fundición se activan por separado. Los utilizables no vinculados ni reservados se anuncian por 500 de oro durante 24 horas. Los cobros del mercado de alianza se recogen manualmente. Si falta oro para pujar o fundir, la beta puede vender un pergamino identificado al alquimista. La fundición usa el baúl II y necesita Crazy Addon.</p><p>Es una beta: algunas pujas y ventas se observaron en juego; los ciclos completos y la venta automática de pergaminos siguen pendientes de validación. No actives a la vez otro bot que controle el mismo personaje. Nunca gasta rubíes ni resuelve verificaciones.</p><a class="download-link" style="color:#fff9ed" href={`${base}subasta-fundicion-beta.user.js`}>Instalar userscript beta <span aria-hidden="true">↗</span></a></div>
       </section>
     </main>
 
@@ -237,8 +237,9 @@ const dungeonCount = catalog.dungeons.length;
     .builder-intro h1{font-size:36px}.builder-intro>p:not(.overline){font-size:13px}
     .forge-form{padding:0 14px 20px;border-width:3px}.form-topline{font-size:9px}
     .module-list{grid-template-columns:1fr;margin:16px 0}.module-row{grid-template-columns:44px minmax(0,1fr) 22px;min-height:70px;gap:10px}
-    .module-glyph{width:44px;height:44px}.module-row b{font-size:13px}.module-row small{font-size:12px}
+    .module-glyph{width:44px;height:44px}.module-row b{font-size:14px}.module-row small{font-size:13px;line-height:1.45}
     .target-fields select,.campaign-region select{font-size:16px}.result-box{overflow-wrap:anywhere}
+    .install-url-actions{display:flex;flex-wrap:wrap;gap:8px}.install-url-actions button,.install-url-actions a{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
   }
 
 </style>
