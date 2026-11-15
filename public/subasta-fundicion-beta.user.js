@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.7
+// @version      0.5.8
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -585,6 +585,12 @@
     const query=form.querySelector('input[name="qry"]');if(query)query.value='';
     state.filterExpected=category;state.filterAt=Date.now();save();button.click();return true;
   }
+  function ensureGoldForTasks() {
+    const gold=balance(),now=Date.now();
+    if (state.needGold || state.goldClaim || state.itemTx || state.suspendedScroll || state.pendingBid || now<(state.scrollRetryAt||0) || !(state.options.bid || state.options.bidUsable || state.options.smelt) || !Number.isSafeInteger(gold) || gold>=1000) return false;
+    state.needGold=true;state.goldRequired=1000;state.scrollNeeded=true;state.phase='packages';state.packageFilterIndex=0;state.nextPackages=0;
+    note('Oro inferior a 1.000; buscando pergaminos para continuar.');return true;
+  }
   function runTick() {
     if (!state.running) return;
     if (verification()) return stop('CAPTCHA o verificación detectados. Intervención humana requerida.');
@@ -625,6 +631,7 @@
       if (params.get('mod')!=='auction') return navigate('#mainmenu a[href*="mod=auction"]','auction');
       return auctionTick();
     }
+    ensureGoldForTasks();
     // Los cobros del mercado de alianza se recogen exclusivamente a mano.
     // Una transacción antigua aún se verifica arriba, pero nunca se inicia otra.
     if (state.needGold && !state.scrollNeeded && !state.goldClaim && Date.now()>=(state.scrollRetryAt||0)) {

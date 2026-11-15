@@ -182,3 +182,5 @@ En 0.12.53, el aviso observado de pieza de disfraz se cierra con No para continu
 En principal 0.12.54 y beta 0.5.6, el principal cede el control a la beta tras finalizar acciones pendientes y lo recupera al detenerla. La beta intenta acceder a ciudad si no ve al alquimista y aplaza tras esperar rutas o baúles. No se ha confirmado una venta real.
 
 Beta 0.5.7: búsqueda de pergaminos en baúl I antes de paquetes, comerciantes alternativos y retirada del módulo de mercado de alianza. La venta en juego requiere comprobación.
+
+Beta 0.5.8: si hay menos de 1.000 de oro y subasta o fundición activas, busca un pergamino para evitar depender de una puja detectable.
