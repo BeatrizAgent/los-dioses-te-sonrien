@@ -156,20 +156,22 @@
       if (Number.isSafeInteger(balance) && balance>200000 && !state.goldSupportSweepDone && !state.foodSupportNeeded) {state.foodSupportNeeded=true;state.foodSupportCount=0;save();}
       if (state.foodSupportNeeded && Date.now()>=(state.foodBuyRetryAt||0) && foodMarketTick()) return;
     }
-    if (!state.foodSupportNeeded) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
+    // Una búsqueda de apoyo aplazada no debe bloquear el ciclo de oro; una
+    // compra incierta sigue protegida por foodBuyTx dentro de goldTick.
+    if (!state.foodSupportNeeded || Date.now()<(state.foodBuyRetryAt||0)) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
     if (BUILD_CONFIG.modules.healing && !state.goldTx && !state.smeltTx && !state.repairTx && Date.now()>=(state.packageCollectAt||0)) {
       state.packageCollectTrip=true; state.packageCollectAt=Date.now()+120000; delete state.packageScan; delete state.packageWaitAt; save();
       if (packageFoodTick()) return;
     }
     if (BUILD_CONFIG.modules.smelting && safeSmeltingTick()) return;
-    if (mod === 'quests' && BUILD_CONFIG.modules.missions && (BUILD_CONFIG.modules.arenaCircus || state.pending || Date.now() - (state.lastQuestVisit || 0) >= 30000)) {
+    if (mod === 'quests' && BUILD_CONFIG.modules.missions && (state.pending || Date.now() - (state.lastQuestVisit || 0) >= 30000)) {
       questTick();
       if (!state.running) return;
       if (state.running && !state.pending) {
         state.lastQuestVisit = Date.now(); save();
-        if (BUILD_CONFIG.modules.arenaCircus) navigation(document.querySelector('#cooldown_bar_ct a'), 'Volviendo a Circo Provinciarum.');
+        if (BUILD_CONFIG.modules.arenaCircus && navigation(document.querySelector('#cooldown_bar_ct a'), 'Volviendo a Circo Provinciarum.')) return;
       }
-      if (BUILD_CONFIG.modules.arenaCircus || state.pending) return;
+      if (state.pending) return;
     }
     if (pveTick()) return;
     if (BUILD_CONFIG.modules.missions && !BUILD_CONFIG.modules.arenaCircus && mod !== 'quests' && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
@@ -188,7 +190,7 @@
     const mode = type === '2' ? 'arena-provinciarum' : 'turma-provinciarum';
     const bar = type === '2' ? '#cooldown_bar_arena' : '#cooldown_bar_ct';
     const remaining = type === '2' ? arenaRemaining : ctRemaining;
-    if (BUILD_CONFIG.modules.missions && !arenaReady && !ctReady && remaining !== null && remaining > 12 && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
+    if (BUILD_CONFIG.modules.missions && !arenaReady && !ctReady && (remaining === null || remaining > 12) && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
       const quest = document.querySelector('#mainmenu a[href*="mod=quests"]');
       if (navigation(quest, 'Revisando misiones del Panteón.')) return;
     }

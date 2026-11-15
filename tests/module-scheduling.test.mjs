@@ -41,3 +41,37 @@ test('misiones cede paso a PvE y respeta intervalo tras visitar Panteón', () =>
   assert.deepEqual(first.calls, ['quest', 'pve']);
   assert.deepEqual(runCombat('quests', { lastQuestVisit: first.state.lastQuestVisit }).calls, ['pve']);
 });
+
+test('sin enlace de Circo, misiones cede paso a PvE y no se repite cada ciclo', () => {
+  const calls=[], state={running:true};
+  const context={state,ownerActive:true,mod:'quests',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},
+    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>{calls.push('pve');return true;},
+    questTick:()=>calls.push('quest'),navigation:()=>false,save(){},log(){}};
+  vm.createContext(context);vm.runInContext(combat.slice(combat.indexOf('  function combatTick()')),context);
+  context.combatTick();context.combatTick();
+  assert.deepEqual(calls,['quest','pve','pve']);
+});
+
+test('temporizadores de Arena ausentes permiten visitar misiones', () => {
+  const calls=[],state={running:true};
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},ID:'identity',sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},
+    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>false,cooldownSeconds:()=>null,
+    navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.deepEqual(calls,['Revisando misiones del Panteón.']);
+});
+
+test('búsqueda de alimento aplazada no bloquea oro', () => {
+  const calls=[],state={running:true,foodSupportNeeded:true,foodBuyRetryAt:Date.now()+60000};
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{guildGold:true,foodMarket:true}},
+    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    healthReading:()=>({current:100,maximum:100}),goldBalance:()=>500000,goldTick:pending=>{calls.push(pending?'pendiente':'oro');return !pending;},
+    foodMarketTick:()=>{throw Error('alimento aplazado');},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.deepEqual(calls,['pendiente','oro']);
+});

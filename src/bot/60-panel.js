@@ -6,7 +6,19 @@
     if (!table) return [];
     return [...table.rows].slice(1).map(row => {const cells=[...row.cells]; return {name:cells[0]?.innerText.trim(), rivalLevel:Number(cells[1]?.innerText.trim()),server:mode==='turma'?host.split('.')[0]:cells[2]?.innerText.trim(),mode,level};}).filter(r=>r.name && Number.isInteger(r.rivalLevel) && r.server);
   }
-  function captureRivals() { const items = liveRivals(); if (items.length) { state.rivalSnapshot = {at:Date.now(), items}; save(); } return items; }
+  let capturedRivalsSignature = null;
+  function captureRivals() {
+    const items = liveRivals();
+    if (items.length) {
+      const signature = JSON.stringify(items);
+      if (signature !== capturedRivalsSignature || !state.rivalSnapshot) {
+        state.rivalSnapshot = {at:Date.now(), items};
+        capturedRivalsSignature = signature;
+        save();
+      }
+    }
+    return items;
+  }
   function rivals() { const current=liveRivals(); return current.length ? current : (state.rivalSnapshot?.items || []); }
   const panel = document.createElement('aside');
   panel.id = 'axel-evento-panel';
@@ -75,7 +87,8 @@
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   function renderContent() {
-    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,state.dungeonCombatUnknown,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.statsEvents,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records,state.rivalSnapshot,mod];
+    // Records and stats events are append-only until total reset, which clears contentKey.
+    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,state.dungeonCombatUnknown,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.records.length,state.statsEvents.length,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records.length,state.rivalSnapshot,mod];
     const signature = JSON.stringify([tabName,data]);
     if (signature === contentKey || (root.activeElement && $('.content').contains(root.activeElement))) return;
     contentKey=signature;
@@ -167,6 +180,6 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && ownerActive) { combatTick(); renderStatus(); }
   });
-  captureRivals(); renderStatus(); setTimeout(combatTick, 2500); setInterval(() => { combatTick(); renderStatus(); }, 5000);
+  captureRivals(); renderStatus(); setTimeout(combatTick, 2500); setInterval(() => { combatTick(); if (document.visibilityState !== 'hidden') renderStatus(); }, 5000);
   }
 })();

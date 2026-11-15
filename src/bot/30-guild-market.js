@@ -108,6 +108,22 @@
       return cells[1]?.textContent.trim().normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() && parseGold(cells[2]?.textContent)===price && /^\d{1,2}(?::\d{2})?\s*h$/i.test(cells[3]?.textContent.trim()||'') && goldSame(goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]')),item) && !!row.querySelector('input[value="Cancelar"]');
     }).length;
   }
+  // Solo navegación de lectura; no se guarda la URL ni el token de sesión.
+  function goldOfferPage() {
+    const pages=params.getAll('p'), allowed=['mod','fl','fq','f','qry','seller','s','p','sh'];
+    if (allowed.some(k=>params.getAll(k).length>1) || [...params.keys()].some(k=>!allowed.includes(k)) || params.get('mod')!=='guildMarket' || (params.get('f')||'0')!=='0' || (params.get('fq')||'-1')!=='-1' || (params.get('qry')||'')!=='' || (params.get('seller')||'')!=='') return null;
+    const page=pages.length ? Number(pages[0]) : 1;
+    const labels=[...(document.body?.innerText || document.body?.textContent || '').matchAll(/Página\s+(\d+)\s*\/\s*(\d+)/gi)];
+    if (!Number.isSafeInteger(page) || page<1 || labels.length!==1) return null;
+    const current=Number(labels[0][1]), total=Number(labels[0][2]);
+    return current===page && Number.isSafeInteger(total) && total>=page && total<=100 ? {page,total} : null;
+  }
+  function goldOfferGo(page) {
+    let url; try { url=new URL(location.href); } catch { return false; }
+    if (!goldOfferPage() || !Number.isSafeInteger(page) || page<1 || page>100 || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || captcha() || !verified() || Date.now()-(state.lastNavigationAt||0)<8000) return false;
+    url.searchParams.delete('p'); url.searchParams.set('p',String(page));
+    state.lastNavigationAt=Date.now(); state.message='Revisando página '+page+' del mercado de alianza.'; save(); location.assign(url.href); return true;
+  }
   // Recuento completo antes y después de anunciar. Una página parcial nunca
   // sirve como línea base; navegar solo por enlaces del mismo mercado y filtro.
   function goldMarketScan(tx,phase) {
@@ -181,6 +197,10 @@
         return true;
       }
       if (now-goldPageOpenedAt<5000) { state.message='Esperando a que cargue el baúl I y el mercado.'; save(); return true; }
+      const marketPage=goldOfferPage();
+      if (!marketPage) { state.goldOfferScanPage=1; state.goldCheckAt=now+60000; state.message='Paginación del mercado no verificable; revisaré más tarde.'; save(); return false; }
+      const scanPage=Number.isSafeInteger(state.goldOfferScanPage) && state.goldOfferScanPage>=1 && state.goldOfferScanPage<=marketPage.total ? state.goldOfferScanPage : 1;
+      if (marketPage.page!==scanPage) { if (!goldOfferGo(scanPage)) return false; return true; }
       const availableBag=goldBag();
       if (!availableBag) {
         if (state.goldBagSwitchAt && now-state.goldBagSwitchAt<5000) return true;
@@ -194,15 +214,19 @@
         const cost=goldFee(offer.price);
         if (cost!==null && balance-offer.price-cost>=100000) { chosen=offer; fee=cost; break; }
       }
-      if (!chosen) { state.goldCheckAt=now+60000; state.message='Sin oferta de oro verificable que respete la reserva.'; save(); return false; }
+      if (!chosen) {
+        if (marketPage.page<marketPage.total) { state.goldOfferScanPage=marketPage.page+1; save(); if (goldOfferGo(state.goldOfferScanPage)) return true; return false; }
+        state.goldOfferScanPage=1; state.goldCheckAt=now+60000; state.message='Sin oferta de oro verificable que respete la reserva.'; save(); return false;
+      }
       const offerElement=chosen.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');
-      const t={stage:'baseline',at:now,price:chosen.price,fee,item:chosen.item,seller:chosen.seller,offerHash:offerElement?.getAttribute('data-hash'),offerId:offerElement?.getAttribute('data-item-id')};
+      const t={stage:'baseline',at:now,price:chosen.price,fee,item:chosen.item,seller:chosen.seller,offerPage:marketPage.page,offerSort:params.get('s')||'',offerFl:params.get('fl')||'0',offerHash:offerElement?.getAttribute('data-hash'),offerId:offerElement?.getAttribute('data-item-id')};
       if (!validItemHash(t.offerHash)||!/^\d+$/.test(t.offerId||'')) {state.goldCheckAt=now+60000;save();return false;}
       state.goldTx=t; state.message='Comprobando paquetes antes de comprar.'; save(); return true;
     }
     if (tx.stage==='readyBuy') {
       if (mod!=='guildMarket') { goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Volviendo a la oferta comprobada.'); return true; }
       if (now-goldPageOpenedAt<5000) return true;
+      if (tx.offerPage) { const page=goldOfferPage(); if (!page || tx.offerPage>page.total || (params.get('s')||'')!==tx.offerSort || (params.get('fl')||'0')!==tx.offerFl) {state.goldTx=null;state.goldCheckAt=now+60000;state.message='Página de oferta no verificable; compra cancelada.';save();return false;} if (page.page!==tx.offerPage) { if (!goldOfferGo(tx.offerPage)) return false; return true; } }
       const candidates=goldOffers().filter(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && /^\d+$/.test(tx.offerId||'') && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
       const availableBag=goldBag(),fee=goldFee(tx.price);
       if (!availableBag && state.goldBagSwitchAt && now-state.goldBagSwitchAt<5000) return true;
@@ -224,6 +248,7 @@
     }
     if (tx.stage==='buy') {
       if(mod==='guildMarket' && (now-goldPageOpenedAt<5000 || now-tx.at<5000)) return true;
+      if (mod==='guildMarket' && tx.offerPage) { const page=goldOfferPage(); if (!page || tx.offerPage>page.total || (params.get('s')||'')!==tx.offerSort || (params.get('fl')||'0')!==tx.offerFl) { state.message='Compra incierta; página de oferta no verificable.';save();return false; } if (page.page!==tx.offerPage) { if (!goldOfferGo(tx.offerPage)) return false; return true; } }
       const offerStillPresent=mod==='guildMarket' && goldOffers().some(o=>{const e=o.button.closest('tr')?.querySelector('[data-tooltip][data-basis]');return o.price===tx.price && o.seller===tx.seller && goldSame(o.item,tx.item) && e?.getAttribute('data-item-id')===tx.offerId && e?.getAttribute('data-hash')===tx.offerHash;});
       if (mod==='guildMarket' && now-goldPageOpenedAt>=5000 && /^\d+$/.test(tx.offerId||'') && !offerStillPresent && tx.baselineEmpty===true && tx.confirmed && !tx.rejected && Number.isSafeInteger(tx.balanceBefore) && balance===tx.balanceBefore-tx.price) {
         tx.stage='packages';tx.at=now;delete tx.packageScan;delete tx.loadedAt;save();return true;

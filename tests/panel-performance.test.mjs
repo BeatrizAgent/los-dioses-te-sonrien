@@ -1,0 +1,60 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+
+const source = readFileSync(new URL('../src/bot/60-panel.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+
+test('guarda lista de rivales solo al cambiar o tras reiniciar', () => {
+  const code = source.slice(source.indexOf('  let capturedRivalsSignature'), source.indexOf('  function rivals()'));
+  let items = [{name:'Rival', rivalLevel:10}], writes = 0;
+  const context = {state:{}, liveRivals:()=>items, save:()=>writes++, Date, JSON};
+  vm.createContext(context);
+  vm.runInContext(code, context);
+  context.captureRivals();
+  const first = context.state.rivalSnapshot;
+  context.captureRivals();
+  assert.equal(writes, 1);
+  assert.equal(context.state.rivalSnapshot, first);
+  items = [{name:'Otro', rivalLevel:10}];
+  context.captureRivals();
+  assert.equal(writes, 2);
+  context.state.rivalSnapshot = null;
+  context.captureRivals();
+  assert.equal(writes, 3);
+});
+
+test('pestaña oculta conserva ciclo de juego y refresca panel al volver', () => {
+  const code = source.slice(source.indexOf("  document.addEventListener('visibilitychange'"), source.lastIndexOf('  }\n})();'));
+  let tick = 0, renders = 0, onVisibility, interval;
+  const document = {visibilityState:'hidden', addEventListener:(_event, fn)=>{onVisibility=fn;}};
+  const context = {document, ownerActive:true, combatTick:()=>tick++, renderStatus:()=>renders++, captureRivals:()=>{}, setTimeout:()=>{}, setInterval:fn=>{interval=fn;}};
+  vm.runInNewContext(code, context);
+  interval();
+  assert.equal(tick, 1);
+  assert.equal(renders, 1);
+  document.visibilityState='visible';
+  onVisibility();
+  assert.equal(tick, 2);
+  assert.equal(renders, 2);
+  interval();
+  assert.equal(renders, 3);
+});
+
+test('cambios de historial actualizan estadísticas sin serializar registros', () => {
+  const line = source.split(/\r?\n/).find(value => value.includes("const data = tabName === 'overview'"));
+  const code = line.replace('const data =', 'data =');
+  const state = {records:[], statsEvents:[], statsStartedAt:1, rivalSnapshot:null};
+  const context = {state, tabName:'stats', mod:'arena', document:{querySelector:()=>null}, data:null};
+  vm.createContext(context);
+  const signature = () => { vm.runInContext(code, context); return JSON.stringify(context.data); };
+  const before = signature();
+  state.records.push({toJSON(){ throw new Error('no serializar historial'); }});
+  const afterFight = signature();
+  assert.notEqual(afterFight, before);
+  context.tabName = 'rivals';
+  assert.doesNotThrow(signature);
+  context.tabName = 'stats';
+  state.statsEvents.push({toJSON(){ throw new Error('no serializar eventos'); }});
+  assert.notEqual(signature(), afterFight);
+});
