@@ -26,7 +26,7 @@ function runCombat(mod, state = {}) {
   const context = { state: { running: true, ...state }, ownerActive: true, mod, sub: '', params: new URLSearchParams(), Date, Number,
     BUILD_CONFIG: { modules: { missions: true, arenaCircus: false } },
     document: { querySelector: s => s.includes('mod=quests') ? {} : null, querySelectorAll: () => [] },
-    visible: () => false, captcha: () => false, verified: () => true, lootTick: () => false,
+    visible: () => false, captcha: () => false, verified: () => true, lootTick: () => false, updateMessage: message => { context.state.message=message; },
     healthReading: () => ({ current: 100, maximum: 100 }), goldTick: () => false, pveTick: () => { calls.push('pve'); return false; },
     questTick: () => calls.push('quest'), navigation: () => { calls.push('navigation'); return true; }, save() {}, log() {} };
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()')) + '\ncombatTick()', context);
@@ -48,7 +48,7 @@ test('sin enlace de Circo, misiones cede paso a PvE y no se repite cada ciclo', 
     BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},
     document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
     healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>{calls.push('pve');return true;},
-    questTick:()=>calls.push('quest'),navigation:()=>false,save(){},log(){}};
+    questTick:()=>calls.push('quest'),checkTurmaParticipation:()=>false,navigation:()=>false,save(){},log(){}};
   vm.createContext(context);vm.runInContext(combat.slice(combat.indexOf('  function combatTick()')),context);
   context.combatTick();context.combatTick();
   assert.deepEqual(calls,['quest','pve','pve']);
@@ -59,7 +59,7 @@ test('temporizadores de Arena ausentes permiten visitar misiones', () => {
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},ID:'identity',sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},
     document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
-    healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>false,cooldownSeconds:()=>null,
+    healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>false,checkTurmaParticipation:()=>false,cooldownSeconds:()=>null,
     navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.deepEqual(calls,['Revisando misiones del Panteón.']);

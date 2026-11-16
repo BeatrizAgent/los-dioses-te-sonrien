@@ -184,3 +184,5 @@ En principal 0.12.54 y beta 0.5.6, el principal cede el control a la beta tras f
 Beta 0.5.7: búsqueda de pergaminos en baúl I antes de paquetes, comerciantes alternativos y retirada del módulo de mercado de alianza. La venta en juego requiere comprobación.
 
 Beta 0.5.8: si hay menos de 1.000 de oro y subasta o fundición activas, busca un pergamino para evitar depender de una puja detectable.
+
+En la versión 0.12.56 el bot comprueba la participación de Circo Turma cada hora; si está en pasivo, sigue con Arena y las demás tareas. El botón «Comprobar estado de Turma» adelanta la consulta sin cambiar la participación. Antes de curar o manipular equipo comprueba la selección de batalla estándar del gladiador. También reduce lecturas y guardados repetidos. Probado en simulación; pendiente de validar instalado en el juego.

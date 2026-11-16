@@ -536,7 +536,7 @@
   function repairRestore(message) { state.repairTx.stage='restore';state.repairTx.reason=message;state.repairTx.at=Date.now();save();return true; }
   function repairAcknowledge(allowRunning=false) {
     const tx=state.repairTx;
-    if (!tx?.blocked || (state.running && !allowRunning) || mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0') || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
+    if (!tx?.blocked || (state.running && !allowRunning) || mod!=='overview' || !mainGladiatorSelected() || (params.has('doll')&&!['0','1'].includes(params.get('doll'))) || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
     const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
     const item=repairItem(target?.querySelector('[data-tooltip][data-basis]'));
     if(!item || !repairSame(item,tx.item) || (item.hash!==tx.item.hash && item.refinement!==100)) return false;
@@ -549,12 +549,15 @@
     if (!tx) {
       if (now<(state.repairNextAt||0) || state.goldTx || state.smeltTx || state.pendingFight || state.pendingPve || state.pending) return false;
       if (!Number.isSafeInteger(goldBalance()) || goldBalance()<101000) {state.repairNextAt=now+300000;save();return false;}
-      if (mod!=='overview' || (params.has('doll')&&params.get('doll')!=='0')) {
+      if (mod!=='overview' || (params.has('doll')&&!['0','1'].includes(params.get('doll')))) {
         const link=document.querySelector('#mainmenu a[href*="mod=overview"]'); let url;
         try {url=new URL(link?.getAttribute('href'),location.href);} catch {return false;}
         if (!visible(link)||url.origin!==location.origin||url.pathname!=='/game/index.php'||url.searchParams.get('mod')!=='overview'||url.searchParams.has('doll')||[...url.searchParams.keys()].some(k=>!['mod','sh'].includes(k))) return false;
         return navigation(link,'Revisando refinamiento del personaje.');
       }
+      const selection=selectMainGladiator();
+      if (selection==='unavailable') {state.repairNextAt=now+300000;state.message='No se puede verificar el gladiador; reparación aplazada.';save();return false;}
+      if (selection!=='ready') return true;
       const bag=document.querySelector('#inventory_nav a[data-bag-number="514"]'), inv=document.querySelector('#inv');
       if (!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv) {state.repairNextAt=now+300000;save();return false;}
       if (!bag.classList.contains('current')) {bag.click();return true;}
@@ -571,6 +574,11 @@
     if (!Number.isFinite(tx.at)||now-tx.at>180000) return fail('Tiempo agotado con pieza pendiente.');
     const bag=document.querySelector('#inventory_nav a[data-bag-number="514"]'),inv=document.querySelector('#inv');
     const bagItems=()=>inv?[...inv.querySelectorAll('[data-tooltip][data-basis]')].map(repairItem).filter(Boolean):[];
+    if (mod==='overview' && ['unequip','equip','verifyEquip','restore'].includes(tx.stage)) {
+      const selection=selectMainGladiator();
+      if (selection==='unavailable') return fail('No se puede verificar el gladiador seleccionado.');
+      if (selection!=='ready') return true;
+    }
     if (tx.stage==='unequip') {
       if (!visible(bag)||!bag.classList.contains('current')||!inv) return true;
       const found=bagItems().filter(x=>x.hash===tx.item.hash && repairSame(x,tx.item));
@@ -684,7 +692,7 @@
       tx.stage='collect';tx.newHash=found.hash;tx.at=now;tx.actionAt=now;save();item.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
     }
     if(['equip','verifyEquip','restore','verifyRestore'].includes(tx.stage)) {
-      if(mod!=='overview'||(params.has('doll')&&params.get('doll')!=='0')){if(!smeltNav('#mainmenu a[href*="mod=overview"]','overview',null,'Volviendo al personaje para equipar.')&&now-tx.at>25000)return fail('No se pudo abrir el personaje.');return true;}
+      if(mod!=='overview'||(params.has('doll')&&!['0','1'].includes(params.get('doll')))){if(!smeltNav('#mainmenu a[href*="mod=overview"]','overview',null,'Volviendo al personaje para equipar.')&&now-tx.at>25000)return fail('No se pudo abrir el personaje.');return true;}
       if(!visible(bag)||!inv)return true;if(!bag.classList.contains('current')){bag.click();return true;}
       const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
       if(!target)return fail('Ranura original no verificable.');

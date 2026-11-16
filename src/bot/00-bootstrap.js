@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Los Dioses Te Sonríen - Asistente Gladiatus
 // @namespace    axelbot.evento
-// @version      0.12.55
+// @version      0.12.56
 // @description  Bot configurable para Gladiatus. Revisa los módulos elegidos antes de activarlo.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -17,7 +17,7 @@
   const character = document.querySelector('.playername_achievement, .playername.ellipsis, .player_name_bg .playername, .playername, #header_values_name, #header_values_playername, #avatar .char_name');
   let accountName = '';
   const initialParams = new URLSearchParams(location.search);
-  if (initialParams.get('mod') === 'overview' && (!initialParams.has('doll') || initialParams.get('doll') === '0')) {
+  if (initialParams.get('mod') === 'overview' && (!initialParams.has('doll') || ['0','1'].includes(initialParams.get('doll')))) {
     if (character?.textContent.trim() && character.getClientRects().length) {
       accountName = character.textContent.trim();
       sessionStorage.setItem(ID, JSON.stringify({name:accountName,at:Date.now()}));
@@ -59,7 +59,7 @@
       const verification=[...document.querySelectorAll('iframe[src*="captcha" i], iframe[src*="turnstile" i], .g-recaptcha, .h-captcha, .cf-turnstile, #recaptcha, input[name*="captcha" i], [data-sitekey]')].some(el=>el.getClientRects().length);
       if (verification) { showWaiting('CAPTCHA detectado. Intervención humana requerida.'); return; }
       const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
-      if ((initialParams.get('mod') !== 'overview' || (initialParams.has('doll') && initialParams.get('doll') !== '0')) && link?.getClientRects().length) {
+      if ((initialParams.get('mod') !== 'overview' || (initialParams.has('doll') && !['0','1'].includes(initialParams.get('doll')))) && link?.getClientRects().length) {
         try {
           const url=new URL(link.getAttribute('href'),location.href);
           if (url.origin===location.origin && url.pathname==='/game/index.php' && url.searchParams.get('mod')==='overview' && !url.searchParams.has('doll')) {

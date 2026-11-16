@@ -22,6 +22,41 @@
     state.message='Turma sin adversarios; buscando de nuevo ('+retry.count+'/3).'; save();
     if (!navigation(document.querySelector(bar+' a'),'Actualizando lista de adversarios de Turma.')) { retry.count--; retry.next=0; save(); }
   }
+  function readTurmaParticipation() {
+    if (mod !== 'arena' || sub !== 'grouparena') return null;
+    const matches=[...document.querySelectorAll('#content p')].map(p => {
+      const text=(p.textContent || '').replace(/\s+/g,' ').trim();
+      const match=text.match(/^Estado de participaci[oó]n actual:\s*(Activo|Pasivo)\s*$/i);
+      return match ? match[1].toLocaleLowerCase('es') : null;
+    }).filter(Boolean);
+    return matches.length===1 ? matches[0] : null;
+  }
+  function checkTurmaParticipation() {
+    const now=Date.now(), observed=readTurmaParticipation();
+    if (observed) {
+      if (state.turmaParticipation?.status!==observed || now-(state.turmaParticipation?.checkedAt||0)>=3600000 || state.turmaCheckRequested) {
+        state.turmaParticipation={status:observed,checkedAt:now}; state.turmaCheckRequested=false;
+        delete state.turmaListRetry; delete state.turmaSkipUntil;
+        log('Circo Turma: participación '+observed+'.'); save();
+      }
+      return false;
+    }
+    if (now<(state.turmaCheckRetryAt||0)) return false;
+    if (!state.turmaCheckRequested && now-(state.turmaParticipation?.checkedAt||0)<3600000) return false;
+    if (mod==='arena' && sub==='grouparena') {
+      state.turmaCheckRetryAt=now+300000; state.turmaCheckRequested=false;
+      log('No se pudo leer el estado de participación de Turma; volveré a comprobarlo.','warn'); save(); return false;
+    }
+    if (now-(state.lastNavigationAt||0)<8000) return false;
+    const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
+    try {
+      const url=new URL(link?.getAttribute('href'),location.href);
+      if (!visible(link) || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='overview' || url.searchParams.has('doll') || [...url.searchParams.keys()].some(k=>!['mod','sh'].includes(k))) return false;
+      url.searchParams.set('mod','arena'); url.searchParams.set('submod','grouparena');
+      state.turmaCheckRetryAt=now+300000; state.lastNavigationAt=now;
+      state.message='Comprobando participación en Circo Turma.'; save(); location.assign(url.href); return true;
+    } catch { return false; }
+  }
   function combatTick() {
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
@@ -38,7 +73,7 @@
       if (dialog && !visible(dialog)) noticeAttempts.delete(dialog);
       if (visible(dialog)) return recoverUnexpectedPopup(dialog,'aviso desconocido');
     }
-    if (mod === 'overview' && params.has('doll') && params.get('doll') !== '0') {
+    if (mod === 'overview' && params.has('doll') && !['0','1'].includes(params.get('doll'))) {
       navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Volviendo al personaje principal.'); return;
     }
     const dialog = document.querySelector('#blackoutDialogbod');
@@ -173,7 +208,7 @@
       if (!state.running) return;
       if (state.running && !state.pending) {
         state.lastQuestVisit = Date.now(); save();
-        if (BUILD_CONFIG.modules.arenaCircus && navigation(document.querySelector('#cooldown_bar_ct a'), 'Volviendo a Circo Provinciarum.')) return;
+        if (BUILD_CONFIG.modules.arenaCircus && navigation(document.querySelector(state.turmaParticipation?.status==='pasivo' ? '#cooldown_bar_arena a' : '#cooldown_bar_ct a'), 'Volviendo a combates Provinciarum.')) return;
       }
       if (state.pending) return;
     }
@@ -182,11 +217,12 @@
       if (state.message!=='Vida baja; esperando curación antes de combatir.') {state.message='Vida baja; esperando curación antes de combatir.';log(state.message,'warn');save();}
       return;
     }
+    if (BUILD_CONFIG.modules.arenaCircus && checkTurmaParticipation()) return;
     if (pveTick()) return;
     if (BUILD_CONFIG.modules.missions && !BUILD_CONFIG.modules.arenaCircus && mod !== 'quests' && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
       if (navigation(document.querySelector('#mainmenu a[href*="mod=quests"]'), 'Revisando misiones del Panteón.')) return;
     }
-    if (!BUILD_CONFIG.modules.arenaCircus) { state.message='Esperando disponibilidad de los módulos elegidos.'; save(); return; }
+    if (!BUILD_CONFIG.modules.arenaCircus) { updateMessage('Esperando disponibilidad de los módulos elegidos.'); return; }
     const identity = JSON.parse(sessionStorage.getItem(ID) || '{}');
     if (Date.now() - identity.at > 12 * 60 * 1000 && mod !== 'overview') {
       navigation(document.querySelector('#mainmenu a[href*="mod=overview"]'), 'Verificando personaje.'); return;
@@ -194,7 +230,7 @@
     const ctRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent);
     const arenaRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent);
     const arenaReady = arenaRemaining === 0;
-    const ctReady = ctRemaining === 0 && Date.now() >= (state.turmaSkipUntil || 0);
+    const ctReady = ctRemaining === 0 && state.turmaParticipation?.status !== 'pasivo' && Date.now() >= (state.turmaSkipUntil || 0);
     const type = arenaReady && (!ctReady || state.lastFightMode !== 'arena-provinciarum') ? '2' : '3';
     const mode = type === '2' ? 'arena-provinciarum' : 'turma-provinciarum';
     const bar = type === '2' ? '#cooldown_bar_arena' : '#cooldown_bar_ct';
@@ -203,13 +239,13 @@
       const quest = document.querySelector('#mainmenu a[href*="mod=quests"]');
       if (navigation(quest, 'Revisando misiones del Panteón.')) return;
     }
-    if (!arenaReady && !ctReady && Date.now() < (state.turmaSkipUntil || 0)) { state.message='Turma aplazado; esperando otras tareas.'; save(); return; }
+    if (!arenaReady && !ctReady && (state.turmaParticipation?.status === 'pasivo' || Date.now() < (state.turmaSkipUntil || 0))) { updateMessage('Turma aplazado; esperando otras tareas.'); return; }
     if (mod !== 'arena' || sub !== 'serverArena' || params.get('aType') !== type) {
       navigation(document.querySelector(bar + ' a'), 'Abriendo ' + (type === '2' ? 'Arena' : 'Circo') + ' Provinciarum.'); return;
     }
     const cooldown = document.querySelector(bar);
     if (remaining !== 0) {
-      state.message = 'Esperando disponibilidad: ' + (cooldown?.textContent.trim() || 'tiempo desconocido'); save(); return;
+      updateMessage('Esperando disponibilidad: ' + (cooldown?.textContent.trim() || 'tiempo desconocido')); return;
     }
     captureRivals();
     const table = [...document.querySelectorAll('#content table')].find(t => /Nombre\s+Nivel/.test(t.innerText));
@@ -231,9 +267,9 @@
     if (!target) {
       if (type === '3') { turmaListMiss(bar); return; }
       if (Date.now() - (state.emptyListReloadAt || 0) > 60000) { if (navigation(document.querySelector(bar + ' a'), 'Actualizando lista de adversarios.')) { state.emptyListReloadAt=Date.now(); save(); } return; }
-      state.message='Sin adversarios reconocidos; volveré a revisar la lista.'; save(); return;
+      updateMessage('Sin adversarios reconocidos; volveré a revisar la lista.'); return;
     }
-    if (Date.now() < (state.fightRetryAt || 0)) { state.message='Esperando para volver a combatir tras un aviso sin confirmar.'; save(); return; }
+    if (Date.now() < (state.fightRetryAt || 0)) { updateMessage('Esperando para volver a combatir tras un aviso sin confirmar.'); return; }
     state.emptyListReloadAt=0;
     if (type === '3') { delete state.turmaListRetry; delete state.turmaSkipUntil; }
     state.pendingFight={name:target.name,server:target.server,rivalLevel:target.rivalLevel,level,mode,healthBefore:current,xpBefore:xpReading(),at:Date.now()};

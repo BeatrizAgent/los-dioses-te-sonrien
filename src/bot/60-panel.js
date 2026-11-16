@@ -88,7 +88,7 @@
   }
   function renderContent() {
     // Records and stats events are append-only until total reset, which clears contentKey.
-    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,state.dungeonCombatUnknown,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.records.length,state.statsEvents.length,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records.length,state.rivalSnapshot,mod];
+    const data = tabName === 'overview' ? [state.records.length,state.goldEnabled,state.goldTx,state.goldPreviousReview,state.foodBuyTx,state.smeltTx,state.dungeonCombatUnknown,state.turmaParticipation,state.turmaCheckRequested,mod,document.querySelector('#cooldown_bar_ct')?.textContent,document.querySelector('#cooldown_bar_expedition')?.textContent,document.querySelector('#cooldown_bar_dungeon')?.textContent,document.querySelector('#quest_header_cooldown')?.textContent,(mod==='quests' ? document.querySelector('#content')?.textContent : '')?.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0],document.querySelector('#mainmenu a[href*="mod=quests"]')?.textContent] : tabName === 'stats' ? [state.records.length,state.statsEvents.length,state.statsStartedAt] : tabName === 'log' ? state.logs : [state.records.length,state.rivalSnapshot,mod];
     const signature = JSON.stringify([tabName,data]);
     if (signature === contentKey || (root.activeElement && $('.content').contains(root.activeElement))) return;
     contentKey=signature;
@@ -96,11 +96,18 @@
     if (tabName === 'overview') {
       const current = mod === 'quests' ? (document.querySelector('#content')?.textContent.match(/Misiones aceptadas:\s*\d+\s*\/\s*\d+/i)?.[0] || 'Panteón abierto') : 'Abre el Panteón para gestionar misiones';
       const ct=document.querySelector('#cooldown_bar_ct')?.textContent.trim() || 'No disponible';
-      const questLink=[...document.querySelectorAll('#mainmenu a[href*="mod=quests"]')][0];
+      const questLink=document.querySelector('#mainmenu a[href*="mod=quests"]');
       const questState=questLink?.textContent.trim() || 'Estado no visible';
       const expedition=document.querySelector('#cooldown_bar_expedition')?.textContent.trim() || 'No disponible';
       const dungeon=document.querySelector('#cooldown_bar_dungeon')?.textContent.trim() || 'No disponible';
       content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Circo: '+ct),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
+      if (BUILD_CONFIG.modules.arenaCircus) {
+        const participation=state.turmaParticipation;
+        content.append(textElement('p','small',participation ? 'Turma: '+participation.status+' · comprobado '+new Date(participation.checkedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+(participation.status==='pasivo' ? ' · solo Arena hasta nueva comprobación.' : '.') : 'Estado de Turma aún no comprobado.'));
+        const recheck=textElement('button','btn','Comprobar estado de Turma');
+        recheck.onclick=()=>{if(!ownerActive || !verified() || captcha())return;state.turmaCheckRequested=true;state.turmaCheckRetryAt=0;state.message='Comprobación de Turma solicitada.';save();contentKey='';recheck.blur();renderContent();if(state.running)setTimeout(combatTick,300);};
+        content.append(recheck);
+      }
       content.append(textElement('div','sectionlabel','Ubicación'),textElement('div','card name',current));
       if (state.dungeonCombatUnknown) content.append(textElement('p','small','Resultado de mazmorra desconocido; se reanudará automáticamente.'));
       content.append(textElement('div','sectionlabel','Paquetes de oro'),textElement('p','small',state.goldTx?.manualReview ? 'Operación sin confirmar; continuará automáticamente.' : state.goldTx?.blocked ? 'Operación pendiente: volveré a comprobarla automáticamente.' : state.goldTx ? 'Operación en curso: '+state.goldTx.stage : BUILD_CONFIG.modules.guildGold ? 'Objetos de nivel 1 y utilizables de cualquier nivel: 100.000 a 1.000.000. Reserva 100.000 más tarifa; anuncios a 24 horas.' : 'Módulo no seleccionado en esta configuración.'));

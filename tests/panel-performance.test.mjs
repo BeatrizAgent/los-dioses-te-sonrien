@@ -58,3 +58,18 @@ test('cambios de historial actualizan estadísticas sin serializar registros', (
   state.statsEvents.push({toJSON(){ throw new Error('no serializar eventos'); }});
   assert.notEqual(signature(), afterFight);
 });
+
+test('no vuelve a guardar un mensaje de espera idéntico', () => {
+  const core=readFileSync(new URL('../src/bot/10-core-and-missions.js',import.meta.url),'utf8');
+  const code=core.slice(core.indexOf('  function updateMessage('),core.indexOf('  function verified()'));
+  let writes=0;const state={message:'Esperando'};const context={state,save:()=>writes++};
+  vm.runInNewContext(code,context);context.updateMessage('Esperando');context.updateMessage('Listo');context.updateMessage('Listo');
+  assert.equal(writes,1);assert.equal(state.message,'Listo');
+});
+
+test('resumen no lee contenido entero fuera del Panteón', () => {
+  const line=source.split(/\r?\n/).find(value=>value.includes("const data = tabName === 'overview'"));
+  const state={records:[],statsEvents:[]};const context={state,tabName:'overview',mod:'arena',document:{querySelector:s=>{if(s==='#content')throw Error('lectura innecesaria');return null;}},data:null};
+  vm.runInNewContext(line.replace('const data =','data ='),context);
+  assert.ok(context.data);
+});

@@ -14,5 +14,5 @@ test('tres búsquedas fallidas aplazan Turma y permiten otras tareas',()=>{
   now+=15000; context.turmaListMiss('#cooldown_bar_ct');
   now+=15000; context.turmaListMiss('#cooldown_bar_ct');
   assert.equal(reloads,2); assert.equal(state.turmaListRetry,undefined); assert.equal(state.turmaSkipUntil,now+300000);
-  assert.match(source,/const ctReady = ctRemaining === 0 && Date\.now\(\) >= \(state\.turmaSkipUntil \|\| 0\)/);
+  assert.match(source,/state\.turmaParticipation\?\.status !== 'pasivo'/);
 });

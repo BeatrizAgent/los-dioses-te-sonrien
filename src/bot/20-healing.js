@@ -168,10 +168,10 @@
       const pending=state.pendingHeal;
       item.dispatchEvent(start);
       setTimeout(() => {
-        if (!ownerActive || !state.running || state.pendingHeal!==pending || !item.isConnected || !target.isConnected || captcha()) { item.dispatchEvent(cancel); return; }
+        if (!ownerActive || !state.running || state.pendingHeal!==pending || !mainGladiatorSelected() || !item.isConnected || !target.isConnected || captcha()) { item.dispatchEvent(cancel); return; }
         item.dispatchEvent(move);
         setTimeout(() => {
-          if (!ownerActive || !state.running || state.pendingHeal!==pending || !item.isConnected || !target.isConnected || captcha()) { item.dispatchEvent(cancel); return; }
+          if (!ownerActive || !state.running || state.pendingHeal!==pending || !mainGladiatorSelected() || !item.isConnected || !target.isConnected || captcha()) { item.dispatchEvent(cancel); return; }
           item.dispatchEvent(end);
         },100);
       },350);
@@ -185,6 +185,11 @@
     return true;
   }
   function healTick(current, maximum) {
+    if (mod==='overview' && !state.pendingHeal) {
+      const selection=selectMainGladiator();
+      if (selection==='unavailable') { skipHealing('No se puede verificar el gladiador seleccionado; curación aplazada.'); return true; }
+      if (selection!=='ready') return true;
+    }
     const selectedBag=[...document.querySelectorAll('#inventory_nav a')].findIndex(a=>a.classList.contains('current'));
     if (mod === 'overview' && selectedBag !== 0) {
       const bag=document.querySelector('#inventory_nav a');

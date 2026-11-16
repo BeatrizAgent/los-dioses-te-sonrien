@@ -36,7 +36,8 @@
     if (!state.goldTx?.blocked && !state.goldPreviousReview) state.goldEnabled=true;
     save();
   }
-  const visible = el => !!el && !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && el.getClientRects().length > 0;
+  const visible = el => { if (!el || el.hidden) return false; const style=getComputedStyle(el); return style.display !== 'none' && style.visibility !== 'hidden' && el.getClientRects().length > 0; };
+  function updateMessage(message) { if (state.message===message) return; state.message=message; save(); }
   function verified() {
     try { const x = JSON.parse(sessionStorage.getItem(ID)); return x.name.normalize('NFKC').toLocaleLowerCase() === accountName.normalize('NFKC').toLocaleLowerCase() && Date.now() - x.at >= 0 && Date.now() - x.at < 15 * 60 * 1000; } catch { return false; }
   }
@@ -158,6 +159,27 @@
       return act(reroll, {kind:'reroll', signature:slots.map(s => s.querySelector('.quest_slot_title')?.textContent.trim()).join('|')});
     }
     state.message = 'Esperando misiones nuevas o fin de tiempo de espera.'; save(); renderStatus();
+  }
+  // La selección interna puede cambiar por AJAX sin modificar la URL.
+  function mainGladiatorSelected() {
+    const doll=document.querySelector('#plDoll');
+    const selected=document.querySelectorAll('#char .charmercsel.active');
+    return doll?.value==='1' && selected.length===1 && !!selected[0].querySelector('.charmercpic.doll1');
+  }
+  function selectMainGladiator() {
+    if (mainGladiatorSelected()) { delete state.mainDollRequestedAt; return 'ready'; }
+    const button=document.querySelector('#char .charmercsel:has(.charmercpic.doll1)');
+    const handler=button?.getAttribute('onclick') || '';
+    const match=handler.match(/^\s*selectDoll\(\s*(['"])([^'"]+)\1\s*\)\s*;?\s*$/);
+    try {
+      const url=new URL(match?.[2],location.href);
+      if (!visible(button) || !match || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='overview' || url.searchParams.get('doll')!=='1' || [...url.searchParams.keys()].some(k=>!['mod','doll','sh'].includes(k))) return 'unavailable';
+    } catch { return 'unavailable'; }
+    if (state.mainDollRequestedAt) {
+      if (Date.now()-state.mainDollRequestedAt<15000) return 'waiting';
+      delete state.mainDollRequestedAt; return 'unavailable';
+    }
+    state.mainDollRequestedAt=Date.now(); state.message='Seleccionando gladiador de batalla estándar.'; save(); button.click(); return 'waiting';
   }
   function navigation(link, purpose) {
     if (!visible(link) || captcha() || !verified()) return false;

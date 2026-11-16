@@ -35,7 +35,7 @@ test('usa comida de nivel superior en el baúl sin buscar paquetes',()=>{
   const tick=source.slice(source.indexOf('  function healTick('),source.indexOf('  // La compra de alimento'));
   const attrs={'data-content-type':'64','data-hash':'pan-109','data-measurement-x':'1','data-measurement-y':'1','data-tooltip':JSON.stringify([[['Rollos de pan','white'],['Nivel 109','gray'],['En uso: Cura 3.219 punto(s) de vida','green']]])};
   const item={getAttribute:k=>attrs[k]??null};const bag={classList:{contains:()=>true}},target={};let drags=0,navigations=0;
-  const state={};const c={state,accountName:'CassiusFerox',mod:'overview',Date,Number,String,document:{querySelectorAll:s=>s==='#inventory_nav a'?[bag]:s.startsWith('#inv ')?[item]:[],querySelector:s=>s==='#avatar'?target:null},validItemHash:x=>!!x,visible:x=>!!x,save:()=>{},log:()=>{},dragFood:()=>{drags++;return true;},navigation:()=>{navigations++;return true;}};
+  const state={};const c={state,selectMainGladiator:()=> 'ready',accountName:'CassiusFerox',mod:'overview',Date,Number,String,document:{querySelectorAll:s=>s==='#inventory_nav a'?[bag]:s.startsWith('#inv ')?[item]:[],querySelector:s=>s==='#avatar'?target:null},validItemHash:x=>!!x,visible:x=>!!x,save:()=>{},log:()=>{},dragFood:()=>{drags++;return true;},navigation:()=>{navigations++;return true;}};
   vm.createContext(c);vm.runInContext(healing+'\n'+tick,c);c.healTick(1000,10000);assert.equal(drags,1);assert.equal(navigations,0);assert.equal(state.pendingHeal.hash,'pan-109');
 });
 
@@ -71,6 +71,6 @@ test('tras cambiar baúl espera carga antes de usar alimento',()=>{
   let now=10000,drags=0;const state={healBagSwitchAt:now};
   const attrs={'data-content-type':'64','data-hash':'pan','data-measurement-x':'1','data-measurement-y':'1','data-tooltip':JSON.stringify([[['Pan','white'],['En uso: Cura 500 punto(s) de vida','green']]])};
   const item={getAttribute:k=>attrs[k]??null},bag={classList:{contains:()=>true}},target={};
-  const c={state,accountName:'CassiusFerox',mod:'overview',Date:{now:()=>now},Number,String,document:{querySelectorAll:s=>s==='#inventory_nav a'?[bag]:s.startsWith('#inv ')?[item]:[],querySelector:s=>s==='#avatar'?target:null},validItemHash:x=>!!x,visible:x=>!!x,save(){},log(){},dragFood:()=>{drags++;return true;}};
+  const c={state,selectMainGladiator:()=> 'ready',accountName:'CassiusFerox',mod:'overview',Date:{now:()=>now},Number,String,document:{querySelectorAll:s=>s==='#inventory_nav a'?[bag]:s.startsWith('#inv ')?[item]:[],querySelector:s=>s==='#avatar'?target:null},validItemHash:x=>!!x,visible:x=>!!x,save(){},log(){},dragFood:()=>{drags++;return true;}};
   vm.createContext(c);vm.runInContext(healing+'\n'+tick,c);c.healTick(1000,10000);assert.equal(drags,0);now+=5000;c.healTick(1000,10000);assert.equal(drags,1);assert.equal(state.pendingHeal.hash,'pan');
 });
