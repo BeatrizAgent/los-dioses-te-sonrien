@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.10
+// @version      0.5.11
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -653,7 +653,9 @@
     if (scrollInventoryTick()) return;
     // Una lectura ya iniciada debe terminar antes de que otra tarea cambie la página.
     if(state.options.sell && state.marketCapacityScan && marketCapacityTick()) return;
-    if(state.options.smelt && !state.suspendedSmelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
+    // La búsqueda de oro necesita el baúl I. No alternarlo con el baúl II
+    // de fundición antes de que termine la búsqueda o se aplace.
+    if(state.options.smelt && !state.scrollNeeded && !state.suspendedSmelt && !state.forgeSave?.blocked && Date.now()>=(state.forgeDue||0)) {
       if(forgeReviewTick()) return;
     }
     if(!state.options.bid && !state.options.bidUsable && state.phase==='auction') {state.phase='packages';save();}
