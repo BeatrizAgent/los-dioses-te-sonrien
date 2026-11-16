@@ -124,6 +124,12 @@
       if (Date.now()-p.at>15000) { rememberUnknownPackageFood(); skipHealing('Traslado de alimento sin confirmar; sigo con la cola.'); }
       return true;
     }
+    if (params.getAll('page').length>1 || !/^[1-9]\d*$/.test(params.get('page')||'1')) { skipHealing('Página de paquetes ambigua; continúo.'); return true; }
+    if (Number(params.get('page')||'1')!==1) {
+      let u; try {u=new URL(location.href);} catch {}
+      if (!u || u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='packages' || u.searchParams.get('f')!=='7') {skipHealing('Primera página de paquetes no verificable; continúo.');return true;}
+      u.searchParams.delete('page');u.searchParams.set('page','1');delete state.packageScan;save();location.assign(u.href);return true;
+    }
     const pageKey=(params.get('page') || '1')+':'+params.get('f');
     if (state.packageScan?.key!==pageKey) { state.packageScan={key:pageKey,at:Date.now()}; state.message='Esperando los alimentos y el complemento de paquetes.'; save(); return true; }
     if (Date.now()-state.packageScan.at<5000) return true;
@@ -132,17 +138,9 @@
     const food=available.find(x=>inventorySpace({inv,items:inventory},{width:Number(x.item.getAttribute('data-measurement-x')),height:Number(x.item.getAttribute('data-measurement-y'))}));
     if (!food && available.length) { skipHealing('Baúl I lleno o espacio no verificable para '+(collecting?'utilizables':'alimentos')+'; revisaré después.'); return true; }
     if (!food) {
-      const next=document.querySelector('.paging_right_step');
-      if (!visible(next)) {
-        const invalid=candidates.some(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && !validItemHash(x.item.getAttribute('data-hash')));
-        if (!collecting && BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
-        skipHealing(collecting ? 'Sin utilizables trasladables en paquetes; revisaré después.' : invalid ? 'Alimento sin identificador verificable; revisaré después.' : candidates.length ? 'Hay comida, pero Crazy Addon no habilitó su traslado; revisaré después.' : 'Sin comida utilizable en paquetes; revisaré el mercado de la alianza.'); return true;
-      }
-      let url; try { url=new URL(next.getAttribute('href'),location.href); } catch { { skipHealing('Paginación de paquetes no reconocible. Curación aplazada; continúo con la cola.'); return true; } }
-      const pages=url.searchParams.getAll('page'), nextPage=Number(pages.at(-1)), currentPage=Number(params.get('page') || 1);
-      const visited=Array.isArray(state.packagePages) ? state.packagePages : [];
-      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='packages' || url.searchParams.get('f')!=='7' || !Number.isSafeInteger(nextPage) || nextPage<=currentPage || visited.includes(nextPage) || visited.length>=50) { skipHealing('Paginación de paquetes no verificable. Curación aplazada; continúo con la cola.'); return true; }
-      state.packagePages=[...visited,currentPage]; state.message='Revisando página '+nextPage+' de alimentos.'; save(); next.click(); return true;
+      const invalid=candidates.some(x=>x.item.hasAttribute('data-gca-flag_double-click-event') && !validItemHash(x.item.getAttribute('data-hash')));
+      if (!collecting && BUILD_CONFIG.modules.foodMarket && !invalid && !candidates.length && !state.foodBuyTx && Date.now()>=(state.foodBuyRetryAt||0)) state.foodBuyNeeded=true;
+      skipHealing(collecting ? 'Sin utilizables en la primera página de paquetes; continúo.' : 'Sin alimento utilizable en la primera página de paquetes; continúo.'); return true;
     }
     const hash=food.item.getAttribute('data-hash');
     state.pendingPackageFood={hash,name:food.name,before:inventory.filter(x=>x.getAttribute('data-hash')===hash).length,at:Date.now()};
@@ -310,12 +308,12 @@
         const values=params.getAll('page'),page=Number(values[0]||'1'),scan=tx.scan;
         if(values.length>1||!Number.isSafeInteger(page)||page<1||page>100||!scan) return deferFoodCheck('Paginación de alimento ambigua; volveré a comprobarla.');
         const go=n=>{let u;try{u=new URL(location.href);}catch{return false;}if(u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('f')!=='7'||u.searchParams.get('fq')!=='-1'||u.searchParams.get('qry')!==tx.name||[...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k))||n<1||n>100)return false;u.searchParams.delete('page');u.searchParams.set('page',String(n));tx.loadedAt=0;tx.at=Date.now();save();location.assign(u.href);return true;};
-        const expected=scan.pages.length?scan.pages.at(-1)+1:1;if(page!==expected)return go(expected) || deferFoodCheck('No se pudo revisar la página de alimento; volveré a comprobarla.');
+        if(page!==1){tx.scan={pages:[],matches:0,fingerprints:{}};return go(1) || deferFoodCheck('No se pudo abrir la primera página de alimento.');}
         const listed=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].filter(visible),fp=listed.map(e=>e.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
         if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return deferFoodCheck('Página de alimento repetida; volveré a comprobarla.');
         if(fp)scan.fingerprints[page]=fp;
         scan.matches+=listed.filter(e=>{const food=healingFood(e);return food && food.name===tx.name && food.amount===tx.amount && food.level===tx.level && e.getAttribute('data-basis')===tx.basis && (e.getAttribute('data-soulbound-to')||null)===tx.soul && /\bMercado\b/i.test(e.closest('.packageItem')?.textContent||'');}).length;
-        scan.pages.push(page);tx.at=now;save();if(visible(document.querySelector('.paging_right_step')))return go(page+1) || deferFoodCheck('No se pudo revisar la página siguiente de alimento; volveré a comprobarla.');
+        scan.pages.push(page);tx.at=now;save();if(visible(document.querySelector('.paging_right_step')))return deferFoodCheck('Hay más paquetes: no se puede confirmar la compra solo con la primera página.');
         if(tx.stage==='baseline') {
           if(scan.matches!==0 && !tx.support){state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;state.packageFoodTrip=true;delete state.packageScan;state.message='Ya hay alimento en paquetes; intentaré recogerlo.';save();return true;}
           tx.baselineCount=scan.matches;tx.baselineComplete=true;tx.baselineEmpty=scan.matches===0;tx.stage='readyBuy';tx.at=now;delete tx.scan;delete tx.loadedAt;save();return true;

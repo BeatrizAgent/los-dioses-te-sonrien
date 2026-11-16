@@ -189,7 +189,7 @@
       if (now<tx.retryAt) return false;
       tx.blocked=false; tx.at=now; delete tx.retryAt; delete tx.loadedAt;
       if (tx.stage==='drop') tx.stage='market'; // El arrastre no publica ni consume oro.
-      if (tx.stage==='packages' || tx.stage==='verifyBuy') delete tx.packageScan; // Volver a comprobar todas las páginas.
+      if (tx.stage==='packages' || tx.stage==='verifyBuy') delete tx.packageScan; // Volver a comprobar la primera página.
       state.goldEnabled=true; state.message='Revisando la operación de oro pendiente.'; log(state.message); save();
     }
     // La casilla del generador controla el módulo; no existe una segunda activación.
@@ -327,12 +327,11 @@
       };
       if (!Number.isSafeInteger(page) || page<1 || page>100) { goldPause('Página de paquetes no verificable.'); return false; }
       if (!scan.complete) {
-        const expected=scan.pages.length ? scan.pages.at(-1)+1 : 1;
-        if (page!==expected) { if (!goPage(expected)) goldPause('No se pudo revisar la paginación de paquetes.'); return true; }
+        if (page!==1) { delete tx.packageScan; if (!goPage(1)) goldPause('No se pudo abrir la primera página de paquetes.'); return true; }
         for (const match of matches) { const hash=match.getAttribute('data-hash'); if (!validItemHash(hash) || scan.matches.some(x=>x.hash===hash)) { goldPause('Identificadores de paquetes ambiguos.'); return false; } scan.matches.push({hash,page}); }
         scan.pages.push(page); save();
         const next=document.querySelector('.paging_right_step');
-        if (visible(next)) { if (!goPage(page+1)) goldPause('No se pudo revisar la siguiente página.'); return true; }
+        if (visible(next)) { goldPause('Hay más paquetes; no se puede confirmar la operación solo con la primera página.'); return false; }
         if (scan.matches.length===0 && packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
         if(tx.stage==='baseline') {
           if(scan.matches.length){state.goldTx=null;state.goldCheckAt=now+60000;state.message='Ya existe un paquete igual; omito esta oferta.';save();return false;}
@@ -499,17 +498,11 @@
       if (now-tx.at<5000) return true;
       if (params.get('f')!=='0' || params.get('fq')!=='-1' || (params.get('qry')||'')!==tx.query) {if(now-tx.at>20000) smeltBlock('Búsqueda de paquetes sin confirmar.');return true;}
       if (params.getAll('page').length>1 || (params.has('page') && !/^[1-9]\d*$/.test(params.get('page')))) {smeltBlock('Paginación de paquetes ambigua.');return false;}
+      if (Number(params.get('page')||'1')!==1) {tx.stage='packages';tx.at=now;save();return true;}
       const candidates=[...packages.querySelectorAll('.ui-draggable[data-tooltip][data-hash]')].map(e=>smeltItem(e)).filter(x=>x && (priority==='green-blue'||x.name.normalize('NFKC').toLocaleLowerCase('es').split(/\s+/).includes(tx.query.toLocaleLowerCase('es'))) && x.el.hasAttribute('data-gca-flag_double-click-event'));
       const hasSpace=goldSpace({inv,items},{width:1,height:1});
       const candidate=hasSpace ? candidates.find(x=>goldSpace({inv,items},x)) : null;
       if (!candidate) {
-        const next=document.querySelector('.paging_right_step');
-        if (hasSpace && visible(next)) {
-          let u; try {u=new URL(next.getAttribute('href'),location.href);} catch {}
-          const current=Number(params.getAll('page').at(-1)||'1'), visited=Array.isArray(tx.pages)?tx.pages:[];
-          if (!u || u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='packages' || u.searchParams.get('f')!=='0' || u.searchParams.get('fq')!=='-1' || (u.searchParams.get('qry')||'')!==tx.query || !Number.isSafeInteger(current) || current<1 || current>=50 || visited.includes(current)) {smeltBlock('Paginación de paquetes no verificable.');return false;}
-          tx.pages=[...visited,current];tx.at=now;save();u.searchParams.delete('page');u.searchParams.set('page',String(current+1));location.assign(u.href);return true;
-        }
         state.smeltPrefixIndex=index+1;smeltDone('Sin equipo apto o sin espacio; continúo la rutina.');return true;
       }
       Object.assign(tx,{stage:'transfer',hash:candidate.hash,name:candidate.name,basis:candidate.basis,quality:candidate.quality,actionAt:now,at:now});save();candidate.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
@@ -676,13 +669,13 @@
       const matches=listed.map(repairItem).filter(x=>x&&x.refinement===100&&repairSame(x,tx.item)&&/^Banco de trabajo\b/i.test((x.el.closest('.packageItem')?.textContent||'').trim()));
       const go=n=>{let u;try{u=new URL(location.href);}catch{return false;}if(u.origin!==location.origin||u.pathname!=='/game/index.php'||u.searchParams.get('mod')!=='packages'||u.searchParams.get('f')!==tx.packageFilter.type||u.searchParams.get('fq')!=='-1'||u.searchParams.get('qry')!==tx.packageFilter.query||[...u.searchParams.keys()].some(k=>!['mod','f','fq','qry','sh','page'].includes(k))||n<1||n>100)return false;u.searchParams.delete('page');u.searchParams.set('page',String(n));tx.loadedAt=0;tx.at=Date.now();save();location.assign(u.href);return true;};
       if(!scan.complete){
-        const expected=scan.pages.length?scan.pages.at(-1)+1:1;if(page!==expected){if(!go(expected))return fail('No se pudo abrir la página esperada.');return true;}
+        if(page!==1){tx.scan={pages:[],matches:[],fingerprints:{}};if(!go(1))return fail('No se pudo abrir la primera página.');return true;}
         const fp=listed.map(e=>e.getAttribute('data-hash')).filter(validItemHash).sort().join('|');
         if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return fail('Página de paquetes repetida.');
         if(fp)scan.fingerprints[page]=fp;
         for(const x of matches){if(scan.matches.some(m=>m.hash===x.hash))return fail('Pieza reparada ambigua.');scan.matches.push({hash:x.hash,page});}
         scan.pages.push(page);save();const next=document.querySelector('.paging_right_step');
-        if(visible(next)){if(!go(page+1))return fail('No se pudo revisar la siguiente página.');return true;}
+        if(visible(next))return fail('Hay más paquetes; la pieza no se puede confirmar solo con la primera página.');
         if(scan.matches.length===0&&tx.packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);tx.stage='search';tx.at=now;save();return true;}
         if(scan.matches.length!==1)return fail('No se identificó una pieza reparada única.');scan.complete=true;save();
       }

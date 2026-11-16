@@ -13,11 +13,11 @@ function fixture({page='1',names=['Ojo de Ra'],scan, next=false}={}) {
  const c={state,params,location,mod:'packages',goldPageOpenedAt:now-6000,Date,URL,Number,String,Array,JSON,document:{querySelector:s=>s==='#packages'?pkg:s==='.paging_right_step'&&next?{}:null},visible:x=>!!x,log:()=>{},save:()=>{},parseGold:()=>500000,validItemHash:x=>typeof x==='string'&&!!x,accountName:'CassiusFerox'};
  vm.createContext(c);vm.runInContext(code,c);c.goldBalance=()=>500000;c.goldBag=()=>({items:[]});c.goldSpace=()=>true;c.goldItem=el=>({ ...item,name:JSON.parse(el.getAttribute('data-tooltip'))[0][0][0] });return {c,state,tx,location};
 }
-test('ignora objetos ajenos al nombre filtrado',()=>{const x=fixture({names:['Ojo de Ra','Trapos'],next:true});assert.equal(x.c.goldTick(),true);assert.equal(x.tx.manualReview,undefined);assert.equal(x.tx.packageScan.matches.length,1);assert.equal(x.tx.packageScan.matches[0].hash,'hash0');});
+test('ignora objetos ajenos al nombre filtrado',()=>{const x=fixture({names:['Ojo de Ra','Trapos'],next:true});assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,undefined);assert.equal(x.tx.packageScan.matches.length,1);assert.equal(x.tx.packageScan.matches[0].hash,'hash0');});
 test('bloquea pagina duplicada sin seguir navegando',()=>{const x=fixture({page:'20&page=1'});assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,true);assert.equal(x.location.destination,undefined);});
 test('bloquea paginas con contenido identico aunque cambie el numero',()=>{const x=fixture({page:'2',scan:{pages:[1],matches:[],complete:false,fingerprints:{1:'hash0'}}});assert.equal(x.c.goldTick(),false);assert.match(x.tx.problem,/repetido/);});
 test('mantiene el bloqueo manual y no reintenta la compra',()=>{const x=fixture();x.tx.blocked=true;x.tx.manualReview=true;x.tx.retryAt=0;assert.equal(x.c.goldTick(),false);assert.equal(x.tx.blocked,true);});
-test('avanza a la pagina siguiente con un solo parametro',()=>{const x=fixture({next:true});assert.equal(x.c.goldTick(),true);const u=new URL(x.location.destination);assert.deepEqual(u.searchParams.getAll('page'),['2']);assert.equal(x.tx.manualReview,undefined);});
+test('no navega a la segunda pagina y aplaza la operacion ambigua',()=>{const x=fixture({next:true});assert.equal(x.c.goldTick(),false);assert.equal(x.location.destination,undefined);assert.match(x.tx.problem,/primera p.gina/);});
 
 test('una transaccion de versiones anteriores requiere revision manual',()=>{const x=fixture();delete x.state.goldPackageGuardV129;assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,true);assert.match(x.tx.problem,/versión anterior/);});
 

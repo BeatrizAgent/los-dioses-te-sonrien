@@ -68,12 +68,12 @@ test('ciclo simulado confirma recogida, traslado, arrastre y pago una sola vez',
 });
 
 
-test('revisa páginas consecutivas sin seguir rutas externas',()=>{
+test('fundicion no recorre paginas posteriores',()=>{
  let destination='';const now=Date.now();const bag={classList:{contains:()=>true},getAttribute:()=> 'true'};const inv={querySelectorAll:()=>[],getBoundingClientRect:()=>({width:256,height:160})};const packages={querySelectorAll:()=>[]};
  const next={getAttribute:()=>'/game/index.php?mod=packages&f=0&fq=-1&qry=Servius&page=3'};
  const document={querySelectorAll:()=>[],querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:s==='#packages'?packages:s==='.paging_right_step'?next:null};
  const x=setup({stage:'search',query:'Servius',at:now-6000},{goldSpace:()=>true,mod:'packages',sub:null,document,params:new URLSearchParams('f=0&fq=-1&qry=Servius&page=1'),location:{origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php?mod=packages',assign:u=>destination=u}});
- x.c.smeltingTick();assert.equal(new URL(destination).searchParams.get('page'),'2');assert.equal(x.state.smeltTx.stage,'search');
+ x.c.smeltingTick();assert.equal(destination,'');assert.equal(x.state.smeltTx,null);
 });
 
 test('excepción del módulo bloquea fundición sin romper la cola',()=>{

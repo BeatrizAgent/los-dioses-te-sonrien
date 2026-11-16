@@ -7,7 +7,7 @@
     const button=dialog.querySelector('#linkcancelnotification');
     if (!visible(button) || button.disabled || button.form || button.tagName!=='INPUT' || button.type!=='submit' || button.value!=='No' || !/^\s*blackoutDialog\(\s*false\s*\)\s*;?\s*$/.test(button.getAttribute('onclick') || '')) return false;
     const previous=noticeAttempts.get(dialog);
-    if (previous && Date.now()-previous<15000) return true;
+    if (previous) { if (Date.now()-previous<15000) return true; return recoverPopup('aviso persistente'); }
     noticeAttempts.set(dialog,Date.now());state.message='Disfraz encontrado; cerrando aviso y continuando.';log(state.message);save();button.click();return true;
   }
   function dismissCompletionNotice(dialog) {
@@ -22,7 +22,7 @@
     const button=candidates[0],handler=button.getAttribute('onclick') || '';
     if (handler && !/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler)) return false;
     const previous=noticeAttempts.get(dialog);
-    if (previous && Date.now()-previous<15000) return true;
+    if (previous) { if (Date.now()-previous<15000) return true; return recoverPopup('aviso persistente'); }
     noticeAttempts.set(dialog,Date.now());state.message='Cerrando aviso: '+header+'.';log(state.message);save();button.click();return true;
   }
   function dismissInformationalNotice(dialog) {
@@ -37,7 +37,7 @@
     const closeHandler=/^\s*blackoutDialog(?:notification)?\(\s*false\s*\)\s*;?\s*$/.test(handler);
     if (!visible(button) || button.disabled || button.form || !/^(?:BUTTON|INPUT|DIV|SPAN)$/.test(button.tagName || '') || (!closeHandler && !levelNotice)) return false;
     const previous=noticeAttempts.get(dialog);
-    if (previous && Date.now()-previous<15000) return true;
+    if (previous) { if (Date.now()-previous<15000) return true; return recoverPopup('aviso persistente'); }
     noticeAttempts.set(dialog,Date.now());state.message='Cerrando aviso informativo del juego.';save();button.click();return true;
   }
   function recoverPopup(kind) {
@@ -45,7 +45,7 @@
     const reportId=params.get('reportId'), type=params.get('t');
     const safeReport=mod==='reports' && sub==='showCombatReport' && /^\d+$/.test(reportId || '') && ['0','1'].includes(type) && [...params.keys()].every(k=>['mod','submod','reportId','t','sh'].includes(k));
     const key=kind+':' +(safeReport ? type+':'+reportId : 'overview');
-    if (state.popupRecovery?.key===key && Date.now()-state.popupRecovery.at<300000) {
+    if (state.popupRecovery?.key===key && Date.now()-state.popupRecovery.at<60000) {
       if (!state.popupRecovery.waiting) {state.popupRecovery.waiting=true;state.message='Aviso persistente; volveré a comprobarlo sin repetir acciones.';log(state.message,'warn');save();}
       return true;
     }

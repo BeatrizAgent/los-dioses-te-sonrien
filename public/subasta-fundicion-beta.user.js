@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gladiatus · Subasta y fundición beta
 // @namespace    gladibot.beta.subasta
-// @version      0.5.11
+// @version      0.5.12
 // @description  Beta independiente para personajes de servidores españoles.
 // @match        https://*.gladiatus.gameforge.com/game/index.php*
 // @grant        none
@@ -27,7 +27,7 @@
   }
   if (!accountName) {
     const notice=document.createElement('aside');
-    notice.style.cssText='position:fixed;right:12px;bottom:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;font:14px sans-serif';
+    notice.style.cssText='position:fixed;left:12px;top:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;font:14px sans-serif;max-width:calc(100vw - 48px)';
     notice.textContent='Subasta beta: abre Visión general de tu personaje para identificarlo.';
     document.body.append(notice);return;
   }
@@ -691,7 +691,7 @@
   }
   const panel=document.createElement('aside');
   panel.id='gladibot-auction-beta';
-  panel.style.cssText='position:fixed;bottom:12px;right:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;border-radius:8px;font:14px sans-serif;max-width:310px';
+  panel.style.cssText='position:fixed;top:12px;left:12px;z-index:2147483000;background:#211b18;color:#f5e6c7;padding:12px;border:1px solid #a88150;border-radius:8px;font:14px sans-serif;max-width:min(310px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto';
   panel.innerHTML='<strong>Subasta y fundición · BETA</strong><div><label><input type="checkbox" data-option="bid"> Pujar equipo</label></div><div><label><input type="checkbox" data-option="bidUsable"> Pujar utilizables</label></div><div><label><input type="checkbox" data-option="smelt"> Fundición de equipo</label></div><button type="button" data-action="run">Iniciar</button><p data-message></p>';
   document.body.append(panel);
   function render() {
