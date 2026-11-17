@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const source = await readFile(new URL('../src/bot/40-popup-and-pve.js', import.meta.url), 'utf8');
 const pve = source.slice(source.indexOf('  function pveTick()'), source.lastIndexOf('\n'));
-function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Sumo Chaman', enemyName='Sumo Chamán', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, points='10', city=false, countryHref='/game/index.php?mod=map&submod=country'}={}) {
+function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Sumo Chaman', enemyName='Sumo Chamán', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, entryDisabled=false, entryAction='/game/index.php?mod=dungeon&loc=7', points='10', city=false, countryHref='/game/index.php?mod=map&submod=country'}={}) {
   let clicks = [];
   const area={id:'gorge',name:'El Desfiladero',entryLevel:90};
   const areaLink={textContent:area.name,getAttribute:()=>'/game/index.php?mod=location&loc=7',visible:true};
@@ -13,7 +13,7 @@ function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Su
   const button={getAttribute:()=>onclick,visible:visibleButton,disabled,outerHTML:'<button>Atacar</button>',click:()=>clicks.push('expedition')};
   const cancelForm={method:'post',getAttribute:()=>`/game/index.php?mod=dungeon&loc=7&action=${cancelAction}`,querySelector:(q)=>q.includes('dungeonId')?{value:'instance-1'}:{value:'opaque'}};
   const cancel={value:'Cancelar Mazmorra',visible:true,disabled:false,form:cancelForm,outerHTML:'<input>',click:()=>clicks.push('cancel')};
-  const enter={visible:true,disabled:false};
+  const enter={visible:true,disabled:entryDisabled,value:'Avanzado',form:{method:'post',getAttribute:()=>entryAction},outerHTML:'<input>',click:()=>clicks.push('enter')};
   const fights=fightCalls.map(call=>({visible:true,outerHTML:'<img>',getAttribute:()=>call,click:()=>clicks.push(call)}));
   const country={visible:true,getAttribute:()=>countryHref};
   const doc={querySelector(selector){if(selector==='#header_values_level')return {textContent:'99'};if(selector==='a')return null;if(selector==='#submenuhead1')return city?{visible:true}:null;if(selector.includes('cooldown_bar_'))return selector.endsWith(' a')?bar.querySelector():bar;if(selector.includes('points_value'))return {textContent:points};if(selector==='#content h3')return {textContent:'Mazmorra Abierto hasta mañana'};if(selector==='#expedition_info4')return {getAttribute:()=>tooltipName ? JSON.stringify([[[tooltipName,'white']]]) : null};if(selector.includes('expedition_info'))return {textContent:name};if(selector.startsWith('#content input[type="submit"][name='))return entered?enter:null;return null;},querySelectorAll(selector){if(selector==='#submenuhead1 a.submenuswitch')return [country];if(selector==='#mainnav a, #mainmenu a')return city?[]:[areaLink,dungeonLink];if(selector==='#expedition_list .expedition_button')return [{},{},{},button];if(selector==='#content img[onclick^="startFight"]')return fights;if(selector==='#content input[type="submit"]')return [cancel];return [];}};
@@ -46,6 +46,21 @@ test('cancela una sola vez y espera confirmación antes de recrear',()=>{
  const confirmed=run({mode:'dungeon',reset:first.state.dungeonReset,entered:true,points:'0'});assert.equal(confirmed.state.dungeonReset,null);assert.equal(confirmed.state.dungeonLosses,null);
  const bad=run({mode:'dungeon',reset:{dungeonId:'dungeon-test',phase:'needed'},cancelAction:'other'});assert.deepEqual(bad.clicks,[]);
  assert.ok(bad.state.dungeonRouteRetryAt>Date.now());assert.equal(bad.state.dungeonReset.phase,'needed');
+});
+test('al alcanzar límite cancela, confirma y reinicia cuando recupera puntos',()=>{
+ const record=source.slice(source.indexOf('  function recordDungeonOutcome'),source.indexOf('  function pveTick()'));
+ const c={state:{},String,Number,BUILD_CONFIG:{dungeon:{lossLimit:2}}};vm.runInNewContext(record,c);
+ c.recordDungeonOutcome({dungeonId:'dungeon-test'},'loss','Aldeano','100');assert.equal(c.state.dungeonReset,undefined);
+ c.recordDungeonOutcome({dungeonId:'dungeon-test'},'loss','Aldeano','101');
+ const sent=run({mode:'dungeon',reset:c.state.dungeonReset});assert.deepEqual(sent.clicks,['cancel']);
+ const waiting=run({mode:'dungeon',reset:sent.state.dungeonReset});assert.deepEqual(waiting.clicks,[]);
+ const confirmed=run({mode:'dungeon',reset:sent.state.dungeonReset,entered:true,points:'0'});assert.equal(confirmed.state.dungeonReset,null);assert.deepEqual(confirmed.clicks,[]);
+ const restart=run({mode:'dungeon',entered:true,points:'1'});assert.deepEqual(restart.clicks,['enter']);
+});
+test('confirma cancelación aunque entrada esté deshabilitada y rechaza formulario ajeno',()=>{
+ const reset={dungeonId:'dungeon-test',phase:'submitted',at:Date.now()};
+ const waiting=run({mode:'dungeon',reset,entered:true,entryDisabled:true});assert.equal(waiting.state.dungeonReset,null);assert.deepEqual(waiting.clicks,[]);
+ const invalid=run({mode:'dungeon',reset,entered:true,entryAction:'https://example.com/game/index.php?mod=dungeon&loc=7'});assert.equal(invalid.state.dungeonReset.phase,'submitted');assert.deepEqual(invalid.clicks,[]);
 });
 test('cancelación incierta aísla mazmorra sin repetir ni detener las demás tareas',()=>{
  const x=run({mode:'dungeon',reset:{dungeonId:'dungeon-test',phase:'submitted',at:Date.now()-31000}});

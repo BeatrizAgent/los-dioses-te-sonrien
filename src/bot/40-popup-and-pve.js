@@ -216,7 +216,9 @@
     if (reset) {
       if (reset.dungeonId!==dungeon.id) return deferDungeon('Reinicio pendiente de otra mazmorra.',true);
       if (reset.phase==='submitted') {
-        if (visible(enter) && !enter.disabled) { state.dungeonReset=null; state.dungeonLosses=null; state.pveEntryAt=0; state.message='Cancelación de mazmorra confirmada; esperando para crearla de nuevo.'; log(state.message,'success'); save(); if (!ready('dungeon')) {state.pveTarget=null; save(); return true;} }
+        const form=enter?.form; let entryUrl; try { entryUrl=new URL(form?.getAttribute('action'),location.href); } catch {}
+        const entryMatches=visible(enter) && enter.value===inputLabel && String(form?.method).toLowerCase()==='post' && entryUrl?.origin===location.origin && entryUrl.pathname==='/game/index.php' && entryUrl.searchParams.get('mod')==='dungeon' && !entryUrl.searchParams.has('action') && entryUrl.searchParams.get('loc')===params.get('loc') && !/rub[ií]|diamant|premium/i.test(enter.outerHTML || '');
+        if (entryMatches) { state.dungeonReset=null; state.dungeonLosses=null; state.pveEntryAt=0; state.message='Cancelación de mazmorra confirmada; esperando para crearla de nuevo.'; log(state.message,'success'); save(); if (enter.disabled || !ready('dungeon')) {state.pveTarget=null; save(); return true;} }
         else { if (Date.now()-reset.at>30000) return deferDungeon('Cancelación de mazmorra sin confirmar; no se repetirá.',true); return true; }
       } else if (reset.phase==='needed') {
         const cancel=[...document.querySelectorAll('#content input[type="submit"]')].find(x=>x.value==='Cancelar Mazmorra' && visible(x) && !x.disabled);

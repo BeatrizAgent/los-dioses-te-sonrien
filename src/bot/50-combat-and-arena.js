@@ -185,7 +185,11 @@
         const defender=(defenderNode?.innerText || defenderNode?.textContent || '').split('\n').map(x=>x.trim()).find(Boolean) || '';
         const normal=value=>String(value || '').normalize('NFKC').trim().toLocaleLowerCase('es');
         const attackerOK=normal(attacker)===normal(accountName);
-        const result=attackerOK && winnerName && normal(winnerName)===normal(accountName) ? 'win' : attackerOK && defender && winnerName && normal(winnerName)===normal(defender) && normal(defender)!==normal(accountName) ? 'loss' : null;
+        const defenders=[defender,...[...document.querySelectorAll('[id^="defenderAvatar"]')].map(node=>(node.innerText || node.textContent || '').split('\n').map(x=>x.trim()).find(Boolean) || '')].filter(Boolean);
+        const enemyWon=defender && winnerName && normal(winnerName)!==normal(accountName) && defenders.some(name=>normal(name)===normal(winnerName));
+        const result=attackerOK && winnerName && normal(winnerName)===normal(accountName) ? 'win' : attackerOK && enemyWon ? 'loss' : null;
+        // El informe puede aparecer antes de que el juego termine de rellenar sus participantes.
+        if (!result && Date.now()-p.at<15000) return;
         const confirmed=!!result;
         if (p.mode==='dungeon') recordDungeonOutcome(p,result,defender,params.get('reportId'));
         if (p.mode==='dungeon' && !confirmed) { state.dungeonCombatUnknown={dungeonId:p.dungeonId,at:p.at,reason:'Informe no concluyente'}; if (state.dungeonLosses) state.dungeonLosses.uncertain=true; }

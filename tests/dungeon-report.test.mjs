@@ -4,12 +4,14 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const combat=await readFile(new URL('../src/bot/50-combat-and-arena.js',import.meta.url),'utf8');
 const code=combat.slice(combat.indexOf('    if (state.pendingPve) {'),combat.indexOf('    if (goldTick(true))'));
-function run(winner,defender='Aldeano',attacker='CassiusFerox'){
- const state={pendingPve:{mode:'dungeon',dungeonId:'route',at:Date.now()},statsEvents:[]};let observed=[];
- const context={state,document:{querySelector:s=>s==='#attackerAvatar1'?{innerText:attacker}:s==='#defenderAvatar11'?{innerText:defender}:null,querySelectorAll:()=>winner?[{textContent:'Ganador: '+winner}]:[]},mod:'reports',sub:'showCombatReport',params:new URLSearchParams('t=1&reportId=101'),accountName:'CassiusFerox',recordDungeonOutcome:(...a)=>observed.push(a),reportGold:()=>null,log:()=>{},save:()=>{},Date,String,Number};
+function run(winner,defender='Aldeano',attacker='CassiusFerox',others=[],age=16000){
+ const state={pendingPve:{mode:'dungeon',dungeonId:'route',at:Date.now()-age},statsEvents:[]};let observed=[];
+ const context={state,document:{querySelector:s=>s==='#attackerAvatar1'?{innerText:attacker}:s==='#defenderAvatar11'?{innerText:defender}:null,querySelectorAll:s=>s==='[id^="defenderAvatar"]'?others.map(innerText=>({innerText})):winner?[{textContent:'Ganador: '+winner}]:[]},mod:'reports',sub:'showCombatReport',params:new URLSearchParams('t=1&reportId=101'),accountName:'CassiusFerox',recordDungeonOutcome:(...a)=>observed.push(a),reportGold:()=>null,log:()=>{},save:()=>{},Date,String,Number};
  vm.runInNewContext(`(function(){${code}})()`,context);return {state,observed};
 }
 test('derrota exige atacante y ganador coincidente con defensor',()=>{let r=run('Aldeano');assert.equal(r.state.statsEvents[0].result,'loss');assert.equal(r.observed[0][1],'loss');assert.equal(r.observed[0][2],'Aldeano');});
+test('derrota por otro miembro del equipo defensor cuenta para el encuentro principal',()=>{let r=run('Guardián','Aldeano','CassiusFerox',['Aldeano','Guardián']);assert.equal(r.state.statsEvents[0].result,'loss');assert.equal(r.observed[0][2],'Aldeano');});
+test('informe incompleto espera antes de marcar resultado desconocido',()=>{let r=run('','Aldeano','CassiusFerox',[],1000);assert.ok(r.state.pendingPve);assert.equal(r.state.statsEvents.length,0);assert.equal(r.state.dungeonCombatUnknown,undefined);});
 test('resultado ambiguo no cuenta como derrota y pausa solo mazmorra',()=>{for(const [winner,defender,attacker] of [['Otro','Aldeano','CassiusFerox'],['Aldeano','','CassiusFerox'],['Aldeano','Aldeano','Otro']]){let r=run(winner,defender,attacker);assert.equal(r.state.statsEvents[0].result,null);assert.equal(r.observed[0][1],null);assert.equal(r.state.dungeonCombatUnknown.dungeonId,'route');}});
 test('timeout conserva derrotas y bloquea nueva acción de mazmorra',()=>{
  const state={pendingPve:{mode:'dungeon',dungeonId:'route',at:Date.now()-31000},dungeonLosses:{dungeonId:'route',enemy:'jefe',count:2},statsEvents:[]};
