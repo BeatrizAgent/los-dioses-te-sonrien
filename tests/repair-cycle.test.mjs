@@ -14,7 +14,7 @@ test('no selecciona recursos de calidad azul o superior',()=>{const opts=[{value
 test('la rutina se conserva activa al desmarcar el modulo',()=>{let {c,state}=setup({stage:'unknown',at:Date.now(),item:{name:'Botas'}},{BUILD_CONFIG:{modules:{repair:false}}});assert.equal(c.repairTick(),true);assert.equal(state.repairTx.blocked,true);});
 test('ciclo simulado preserva la prioridad hasta reequipar la misma pieza',()=>{
  const original={name:'Botas',hash:'old',basis:'8-4',quality:'2',level:'104',owner:'CassiusFerox',width:2,height:2,refinementMax:100};
- const tx={stage:'preview',slot:'10',slotIndex:0,packageFilter:{query:'Botas',type:'0',optimized:false},item:original,at:Date.now(),actionAt:Date.now()},bag={classList:{contains:()=>true},getAttribute:()=> 'true'}, inv={querySelectorAll:()=>inventory};let inventory=[],slotState='forge_closed',balance=200000, clicked=[],equipped=null;
+ const tx={stage:'preview',slot:'10',slotIndex:0,packageFilter:{query:'Botas',type:'0',optimized:false},item:original,at:Date.now(),actionAt:Date.now()},bag={classList:{contains:()=>true},getAttribute:()=> 'true'}, inv={querySelectorAll:s=>s==='.ui-draggable'?[]:inventory};let inventory=[],slotState='forge_closed',balance=200000, clicked=[],equipped=null;
  const old={...original,refinement:10},renewed={...original,hash:'new',refinement:100};
  const oldEl={mock:old},newEl={mock:renewed,getAttribute:k=>k==='data-hash'?'new':null,hasAttribute:()=>true,closest:()=>({textContent:'\n    Banco de trabajo\n    Caduca'}),dispatchEvent:()=>clicked.push('collect')};old.el=oldEl;renewed.el=newEl;
  const pay={textContent:'1000',querySelector:s=>s==='.icon_gold'?{}:null,click:()=>clicked.push('rent')};const option={value:'-1',textContent:'Estándar (37/37)'};const quality={value:'-1',options:[option]};const add={click:()=>clicked.push('resources')};const start={classList:{contains:()=>false},click:()=>clicked.push('start')};const send={textContent:'Enviar en forma de paquete',click:()=>clicked.push('package')};const target={querySelector:()=>equipped};const packages={querySelectorAll:s=>s==='[data-hash]'?[]:[newEl]};
@@ -34,12 +34,13 @@ test('programa la revisión desde otra pantalla sin iniciar una reparación',()=
  const {c,state}=setup(null,{mod:'location',location:{origin:'https://s64-es.gladiatus.gameforge.com',href:'https://s64-es.gladiatus.gameforge.com/game/index.php?mod=location'},document:{querySelector:()=>link},navigation:(el,msg)=>{calls.push(msg);return true;}});
  assert.equal(c.repairTick(),true);assert.equal(state.repairTx,null);assert.match(calls[0],/refinamiento/);
 });
-test('selecciona baúl III y en el siguiente ciclo inicia la pieza elegible',()=>{
- let selected=false,moved=0;const item=makeItem(50);const bag={classList:{contains:()=>selected},getAttribute:()=> 'true',click:()=>{selected=true;}};const inv={querySelector:()=>null};
+test('espera carga de baúl III antes de iniciar la pieza elegible',()=>{
+ let selected=false,moved=0;const item=makeItem(50);const bag={classList:{contains:()=>selected},getAttribute:()=> 'true',click:()=>{selected=true;}};const inv={querySelector:()=>null,querySelectorAll:()=>[]};
  const doc={querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:null,querySelectorAll:s=>s.startsWith('#char')?[item]:[]};
  const {c,state}=setup(null,{document:doc,dragFood:()=>{moved++;return true;}});
  assert.equal(c.repairTick(),true);assert.equal(state.repairTx,null);assert.equal(selected,true);
- assert.equal(c.repairTick(),true);assert.equal(state.repairTx.stage,'unequip');assert.equal(moved,1);
+ assert.equal(c.repairTick(),true);assert.equal(state.repairTx,null);assert.equal(moved,0);
+ state.repairBagSwitchAt-=5000;assert.equal(c.repairTick(),true);assert.equal(state.repairTx.stage,'unequip');assert.equal(moved,1);
 });
 test('no inicia ni navega a reparar con transacción de oro pendiente',()=>{const {c,state}=setup();state.goldTx={manualReview:true};c.mod='location';assert.equal(c.repairTick(),false);assert.equal(state.repairTx,null);});
 test('acepta Ceres confirmado aunque GCA restablezca el selector a estándar',()=>{let clicks=0,now=Date.now();const tx={stage:'start',at:now,actionAt:now,slotIndex:0,resourceQuality:'0',item:{name:'Anillo',refinementMax:100}};const slots=Array.from({length:6},(_,i)=>({classList:{contains:s=>s==='tabActive'&&i===0}}));const start={classList:{contains:()=>false},click:()=>clicks++};const doc={querySelectorAll:s=>s==='#forge_nav > div'?slots:[],querySelector:s=>({'#slot-opened #forge_start':start,'#resource-quality':{value:'-1'},'#content':{textContent:'Anillo'},'#forge_refinement_base':{textContent:'100'}}[s]||null)};const x=setup(tx,{mod:'forge',sub:'workbench',document:doc,parseGold:Number});assert.equal(x.c.repairTick(),true);assert.equal(clicks,1);assert.equal(tx.stage,'crafting');});
@@ -54,3 +55,21 @@ test('acepta valor final máximo aunque el incremento sea 64 por ciento',()=>{le
 test('detiene si el valor final no alcanza el máximo de la pieza',()=>{let clicks=0,now=Date.now();const tx={stage:'start',at:now,actionAt:now,slotIndex:0,resourceQuality:'-1',item:{name:'Trapos',refinementMax:67753}};const slots=Array.from({length:6},(_,i)=>({classList:{contains:s=>s==='tabActive'&&i===0}}));const doc={querySelectorAll:()=>slots,querySelector:s=>({'#slot-opened #forge_start':{classList:{contains:()=>false},click:()=>clicks++},'#content':{textContent:'Trapos'},'#forge_refinement_base':{textContent:'60000'}}[s]||null)};const x=setup(tx,{mod:'forge',sub:'workbench',document:doc,parseGold:Number});x.c.repairTick();assert.equal(clicks,0);assert.equal(tx.blocked,true);});
 
 test('si el filtro preciso no encuentra la pieza reparada vuelve a búsqueda amplia',()=>{const now=Date.now(),bag={classList:{contains:()=>true}},inv={querySelectorAll:()=>[]},packages={querySelectorAll:()=>[]};const tx={stage:'find',at:now,loadedAt:now-6000,item:{name:'Anillo azul Lucius de la delicadeza'},packageFilter:{query:'delicadeza',type:'6',optimized:true},scan:{pages:[],matches:[],fingerprints:{}}};const doc={querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:s==='#packages'?packages:null};const x=setup(tx,{mod:'packages',document:doc,params:new URLSearchParams('f=6&fq=-1&qry=delicadeza&page=1')});assert.equal(x.c.repairTick(),true);assert.equal(tx.stage,'search');assert.equal(tx.packageFilter.query,tx.item.name);assert.equal(tx.packageFilter.type,'0');assert.notEqual(tx.blocked,true);});
+
+
+test('no usa contenido anterior aunque el baúl III figure seleccionado',()=>{
+ let container='512',moves=0;const item=makeItem(50),bag={classList:{contains:()=>true},getAttribute:()=> 'true'};
+ const inv={querySelector:()=>null,querySelectorAll:()=>[{getAttribute:()=>container}]};
+ const doc={querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:null,querySelectorAll:s=>s.startsWith('#char')?[item]:[]};
+ const x=setup(null,{document:doc,dragFood:()=>{moves++;return true;}});
+ assert.equal(x.c.repairTick(),true);assert.equal(moves,0);assert.equal(x.state.repairTx,null);
+ container='514';assert.equal(x.c.repairTick(),true);assert.equal(moves,1);
+});
+
+
+test('baúl que no termina de cargar aplaza reparación y libera la cola',()=>{
+ let selected=false,clicks=0;const bag={classList:{contains:()=>selected},getAttribute:()=> 'true',click:()=>clicks++};
+ const inv={querySelector:()=>null,querySelectorAll:()=>[]};const doc={querySelector:s=>s.includes('data-bag-number')?bag:s==='#inv'?inv:null};
+ const x=setup(null,{document:doc});assert.equal(x.c.repairTick(),true);assert.equal(clicks,1);
+ x.state.repairBagWaitAt-=16000;assert.equal(x.c.repairTick(),false);assert.equal(clicks,1);assert.ok(x.state.repairNextAt>Date.now());
+});

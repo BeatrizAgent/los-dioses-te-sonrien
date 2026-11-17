@@ -52,3 +52,17 @@ test('apoyo mantiene pendiente la compra si el saldo no confirma',()=>{const x=s
 test('compra de apoyo sin saldo no intenta pagar',()=>{const x=setup();x.state.foodBuyNeeded=false;x.state.foodSupportNeeded=true;x.c.goldBalance=()=>100;x.c.params=new URLSearchParams('mod=guildMarket&p=1');x.c.document={body:{innerText:'Página 1 / 1'}};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.clicks,0);assert.equal(x.state.foodBuyTx,undefined);});
 
 test('compra incierta antigua se archiva y excluye oferta sin atribuir éxito',()=>{const x=setup();x.state.foodBuyTx={support:true,stage:'buy',offerId:'123',offerHash:'foodhash',at:Date.now()-61000};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.state.foodBuyTx,null);assert.equal(x.state.foodUnknownOffers[0].id,'123');assert.equal(x.state.foodSupportCount,undefined);});
+
+
+test('revisa dos páginas de alimento sin repetir navegación',()=>{
+ const x=setup(),now=Date.now();const tx=x.state.foodBuyTx={stage:'baseline',name:'Pan',amount:1000,level:1,basis:'7-1',at:now,loadedAt:now-6000,scan:{pages:[],matches:0,fingerprints:{}}};
+ x.c.mod='packages';x.c.params=new URLSearchParams('mod=packages&f=7&fq=-1&qry=Pan');let visits=0;
+ x.c.location.href='https://s64-es.gladiatus.gameforge.com/game/index.php?mod=packages&f=7&fq=-1&qry=Pan';x.c.location.assign=()=>visits++;
+ let next=true;x.c.document={querySelector:s=>s==='#packages'?{querySelectorAll:()=>[]}:s==='.paging_right_step'&&next?{}:null};
+ assert.equal(x.c.foodMarketTick(),true);assert.equal(visits,1);tx.loadedAt=now-6000;assert.equal(x.c.foodMarketTick(),true);assert.equal(visits,1);
+ x.c.params=new URLSearchParams('mod=packages&f=7&fq=-1&qry=Pan&page=2');x.c.location.href+='&page=2';tx.loadedAt=now-6000;next=false;
+ assert.equal(x.c.foodMarketTick(),true);assert.equal(tx.stage,'readyBuy');assert.equal(tx.baselineEmpty,true);
+});
+test('alimento sin compra espera hasta que termine oro pendiente',()=>{
+ const x=setup();x.state.goldTx={stage:'packages'};x.state.foodBuyTx={stage:'baseline',at:Date.now()};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.clicks,0);
+});

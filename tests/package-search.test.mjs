@@ -44,3 +44,37 @@ test('búsqueda previa sin compra no excluye un objeto para siempre',()=>{
  const x=fixture();x.tx.stage='baseline';x.tx.manualReview=true;x.tx.reviewAt=Date.now()-1;
  assert.equal(x.c.goldTick(),false);assert.equal(x.state.goldTx,null);assert.equal(x.state.goldUnresolved.length,0);
 });
+
+
+test('operación con progreso no se archiva por un bloqueo antiguo',()=>{
+ const x=fixture({names:['Otro']});x.tx.unresolvedSince=Date.now()-121000;x.tx.at=Date.now()-1000;
+ x.c.goldTick();assert.ok(x.state.goldTx);assert.equal(x.state.goldUnresolved,undefined);
+});
+test('oferta descartada por paquete existente se salta durante cinco minutos',()=>{
+ const x=fixture();Object.assign(x.tx,{stage:'baseline',offerId:'123',offerHash:'offer123'});
+ assert.equal(x.c.goldTick(),false);assert.equal(x.state.goldTx,null);assert.equal(x.state.goldSkippedOffers[0].id,'123');assert.ok(x.state.goldSkippedOffers[0].until>Date.now());
+});
+test('espera carga de siguiente página sin repetir navegación',()=>{
+ const x=fixture({names:['Otro'],next:true});let visits=0;x.c.location.assign=()=>visits++;
+ assert.equal(x.c.goldTick(),true);assert.equal(visits,1);x.tx.loadedAt=Date.now()-6000;
+ assert.equal(x.c.goldTick(),true);assert.equal(visits,1);
+});
+
+
+test('oro pendiente continúa aunque una búsqueda de alimento espere su turno',()=>{
+ const x=fixture({names:['Otro']});x.state.foodBuyTx={stage:'baseline',retryAt:Date.now()-1};
+ assert.equal(x.c.goldTick(true),false);assert.ok(x.state.goldTx);assert.equal(x.tx.blocked,true);
+});
+
+
+test('una navegación de lectura sin respuesta permite reintento posterior',()=>{
+ const x=fixture({names:['Otro'],next:true});let visits=0;x.c.location.assign=()=>visits++;
+ x.c.goldTick();x.tx.loadedAt=Date.now()-6000;x.tx.readNav.at-=11000;
+ assert.equal(x.c.goldTick(),true);assert.equal(x.tx.blocked,true);assert.equal(x.tx.readNav,undefined);assert.equal(visits,1);
+});
+
+
+test('releer la misma página tras un error no reinicia plazo de aislamiento',()=>{
+ const x=fixture({names:['Ojo de Ra','Ojo de Ra']});x.tx.readProgress={key:'packages:packages:0:Ojo de Ra',page:1};x.tx.unresolvedSince=Date.now()-30000;
+ assert.equal(x.c.goldTick(),false);assert.equal(x.tx.blocked,true);assert.ok(x.tx.unresolvedSince<=Date.now()-30000);
+});

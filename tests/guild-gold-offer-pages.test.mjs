@@ -42,3 +42,11 @@ test('reutiliza espacio y tarifa durante la lectura de ofertas equivalentes',()=
   assert.equal(x.context.goldTick(),false);
   assert.equal(spaces,1);assert.equal(fees,1);
 });
+
+
+test('oferta con paquete previo no impide elegir otra oferta válida',()=>{
+ const x=fixture({total:1});x.state.goldSkippedOffers=[{id:'1',hash:'hash1',until:Date.now()+60000}];
+ const offer=(id,price)=>{const el={getAttribute:k=>k==='data-item-id'?id:k==='data-hash'?'hash'+id:null};return {price,seller:'Aliado',item:{name:'Anillo',width:1,height:1},button:{closest:()=>({querySelector:()=>el})}};};
+ x.context.goldOffers=()=>[offer('1',200000),offer('2',150000)];x.context.goldFee=()=>1000;x.context.validItemHash=x=>!!x;
+ assert.equal(x.context.goldTick(),true);assert.equal(x.state.goldTx.offerId,'2');assert.equal(x.state.goldTx.stage,'baseline');
+});

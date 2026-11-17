@@ -190,3 +190,7 @@ En la versión 0.12.56 el bot comprueba la participación de Circo Turma cada ho
 Paquetes de oro: busca ofertas de nivel 1 con precio superior a 100.000, sin límite máximo fijo; excluye utilizables y bienes de forja y mantiene 100.000 de reserva más tarifa. Acepta objetos vinculados al personaje sin exigir un aviso que el juego no muestre y recorre páginas de paquetes. Probado en simulación; pendiente de validar instalado.
 
 En 0.12.58 el planificador revisa tareas cada 1,5 segundos y limita la navegación a una acción cada 3 segundos. Mantiene esperas y comprobaciones de operaciones inciertas. Probado en simulación; la rapidez y el consumo reales siguen pendientes de medir.
+
+En 0.12.59, oro conserva las operaciones que avanzan y omite temporalmente ofertas con paquetes idénticos previos. La búsqueda de alimentos recorre páginas y cede ante oro si su revisión anterior está aplazada. Reparación espera y comprueba el baúl III; las búsquedas y paginaciones de mercado y paquetes esperan respuesta antes de repetir una navegación. Probado en simulación; pendiente de validar instalado.
+
+La 0.12.59 también recorre páginas de paquetes para recuperar la pieza reparada y buscar alimento. Reparación exige una coincidencia única tras revisar todas las páginas; curación busca un alimento trasladable antes de decidir que no hay. La navegación en curso no se repite mientras carga. Simulado; falta validar con Crazy Addon y juego real.
