@@ -371,6 +371,6 @@
     return true;
   }
   // Una sola operación de oro por cuenta. Las etapas con efectos se guardan antes de actuar.
-  const goldPriceAllowed=price=>Number.isSafeInteger(price) && price>=100000 && price<=1000000;
+  const goldPriceAllowed=price=>Number.isSafeInteger(price) && price>100000;
   const goldPageOpenedAt=Date.now();
 

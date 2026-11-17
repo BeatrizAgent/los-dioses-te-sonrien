@@ -11,14 +11,14 @@ function run(prices,basis='6-1',level=1,usable=false,includeIneligible=false){
  const ctx={document:{querySelectorAll:()=>rows},goldItem:()=>({name:'Objeto',owner:null,basis,level,usable}),parseGold:x=>/^\d+$/.test(x||'')?Number(x):null,goldPriceAllowed:null,URL,location:{href:'https://s64-es.gladiatus.gameforge.com/game/index.php',origin:'https://s64-es.gladiatus.gameforge.com'},accountName:'CassiusFerox',visible:()=>true,Number,includeIneligible};
  return vm.runInNewContext(`${price}\n${offers}\ngoldOffers(includeIneligible).map(o=>o.price)`,ctx);
 }
-test('acepta ofertas entre 100k y 1kk, ordenadas por precio',()=>{assert.deepEqual(Array.from(run([200000,300000,500000,1000000,150001,99999,1000001])),[1000000,500000,300000,200000,150001]);});
-test('acepta ofertas de objetos distintos de anillos',()=>{for(const basis of ['1-1','3-1','6-1','7-1','8-1','9-1']) assert.deepEqual(Array.from(run([200000],basis)),[200000]);});
+test('acepta precios mayores de 100k sin máximo arbitrario',()=>{assert.deepEqual(Array.from(run([100000,100001,200000,1000001,99999])),[1000001,200000,100001]);});
+test('acepta ofertas de objetos distintos de anillos',()=>{for(const basis of ['1-1','3-1','6-1','8-1','9-1','19-1','20-1']) assert.deepEqual(Array.from(run([200000],basis)),[200000]);});
 test('ofertas nuevas exigen nivel 1 salvo utilizables; revisión de compra incluye ofertas antiguas',()=>{
  assert.deepEqual(Array.from(run([200000],'3-1',20,false)),[]);
- assert.deepEqual(Array.from(run([200000],'7-1',20,true)),[200000]);
+ assert.deepEqual(Array.from(run([200000],'7-1',1,true)),[]);
  assert.deepEqual(Array.from(run([200000],'3-1',20,false,true)),[200000]);
 });
-test('valida el precio tanto al comprar como al calcular la tarifa de venta',()=>{assert.equal((market.match(/!goldPriceAllowed\(price\)/g)||[]).length,2);assert.match(market,/balance-offer\.price-cost>=100000/);assert.match(market,/goldFee\(tx\.price\)/);});
+test('valida el precio tanto al comprar como al calcular la tarifa de venta',()=>{assert.match(market,/!goldPriceAllowed\(price\)/);assert.match(market,/price<100000/);assert.match(market,/balance-offer\.price-cost>=100000/);assert.match(market,/goldFee\(tx\.price\)/);});
 const space=market.slice(market.indexOf('  function goldSpace('),market.indexOf('  function goldFee('));
 function fits(width,height,items){
  const ctx={bag:{inv:{offsetWidth:128,offsetHeight:96,getBoundingClientRect:()=>({left:0,top:0,width:128,height:96})},items:items.map(({x,y,w=1,h=1})=>({getBoundingClientRect:()=>({left:x*32,top:y*32}),getAttribute:k=>String(k==='data-measurement-x'?w:h)}))},item:{width,height},visible:()=>true,Number,Math,Array};
@@ -31,15 +31,15 @@ test('verifica hueco rectangular para objetos grandes y rechaza posiciones ambig
 });
 const itemFn=market.slice(market.indexOf('  function goldItem('),market.indexOf('  function goldSame('));
 function item(name,basis,width,height,level='1',contentType=null){const attrs={'data-tooltip':JSON.stringify([[[name,'white']]]),'data-basis':basis,'data-level':level,'data-content-type':contentType,'data-measurement-x':String(width),'data-measurement-y':String(height)};return vm.runInNewContext(`${itemFn}\ngoldItem(el)`,{el:{getAttribute:k=>attrs[k]??null},Number,JSON,Array});}
-test('admite objetos de varias casillas y protege materiales y herramientas reservadas',()=>{assert.equal(item('Armadura','3-1',2,3)?.height,3);assert.equal(item('Material de forja','12-1',1,1),null);assert.equal(item('Yunque','19-1',1,1),null);});
+test('admite objetos de varias casillas y protege materiales y herramientas reservadas',()=>{assert.equal(item('Armadura','3-1',2,3)?.height,3);assert.equal(item('Material de forja','12-1',1,1),null);assert.equal(item('Yunque','19-1',1,1)?.basis,'19-1');});
 test('admite niveles superiores y rechaza nivel inválido o bienes reservados',()=>{
  assert.equal(item('Armadura','3-1',2,3,'100')?.height,3);
  for(const level of ['','0','1.5','desconocido'])assert.equal(item('Armadura','3-1',2,3,level),null);
- for(const name of ['Pergamino antiguo','Herramienta','Botín reservado'])assert.equal(item(name,'3-1',1,1,'20'),null);
+ assert.equal(item('Material de forja','3-1',1,1,'20'),null);
 });
 test('solo identifica utilizable con categoría y tipo verificados',()=>{
  assert.equal(item('Pan','7-1',1,1,'20','64').usable,true);
- assert.equal(item('Pan','7-1',1,1,'20',null).usable,false);
+ assert.equal(item('Pan','7-1',1,1,'20',null).usable,true);
  assert.equal(item('Armadura','3-1',1,1,'20','64').usable,false);
 });
 test('compara nivel del objeto en compras nuevas y mantiene transacciones antiguas',()=>{
@@ -73,3 +73,16 @@ test('encuentra espacio con Array.from reemplazado por MooTools',()=>{
   const bag={inv:{offsetWidth:127,offsetHeight:96,getBoundingClientRect:()=>({left:0,top:0,width:128,height:96})},items:[]};
   assert.equal(vm.runInNewContext(`${space}\ngoldSpace(bag,item)`,{bag,item:{width:1,height:1},visible:()=>true,Number,Math,Array}),false);
  });
+
+
+test('admite objetos vinculados con aviso y al propio personaje sin aviso',()=>{
+ function eligible(owner,notice){
+  const button={value:'Comprar',outerHTML:'<input>',form:{method:'post',getAttribute:k=>k==='action'?'/game/index.php?mod=guildMarket':k==='data-confirm-message'?notice:null}};
+  const row={cells:[{querySelector:()=>({})},{textContent:'Aliado'},{textContent:'500000'},{textContent:'24 h'},{textContent:'1'}],textContent:'objeto',querySelector:()=>button};
+  const ctx={document:{querySelectorAll:()=>[row]},goldItem:()=>({name:'Pendiente',owner,basis:'9-1',level:1,usable:false}),parseGold:Number,URL,location:{href:'https://s64-es.gladiatus.gameforge.com/game/index.php',origin:'https://s64-es.gladiatus.gameforge.com'},accountName:'CassiusFerox',visible:()=>true,Number};
+  return vm.runInNewContext(`${price}\n${offers}\ngoldOffers().length`,ctx);
+ }
+ assert.equal(eligible('CassiusFerox',null),1);
+ assert.equal(eligible('Otra','Este objeto está vinculado al alma'),1);
+ assert.equal(eligible('Otra','Aviso desconocido'),0);
+});

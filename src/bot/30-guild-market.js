@@ -21,9 +21,9 @@
     const width=Number(el.getAttribute('data-measurement-x')), height=Number(el.getAttribute('data-measurement-y'));
     const level=el.getAttribute('data-level');
     if (!/^\d+$/.test(level || '') || !Number.isSafeInteger(Number(level)) || Number(level)<1 || !Number.isInteger(width) || !Number.isInteger(height) || width<1 || height<1 || width>8 || height>8) return null;
-    // Materiales, pergaminos y herramientas nunca se manipulan como paquetes de oro.
-    if (/^(?:1[2-9])-/.test(basis) || /pergamino|receta|herramienta|material de forja|bot[ií]n reservado/i.test(name)) return null;
-    const usable=/^7-\d+$/.test(basis) && el.getAttribute('data-content-type')==='64';
+    // Los bienes de forja no se manipulan como paquetes de oro.
+    if (/^(?:1[2-8])-/.test(basis) || /material de forja|bien(?:es)? de forja/i.test(name)) return null;
+    const usable=/^7-\d+$/.test(basis) || (/^21-\d+$/.test(basis) && el.getAttribute('data-content-type')==='64');
     return {name,owner,soul:soul || null,basis,level:Number(level),usable,width,height};
   }
   function goldSame(a,b) { return !!a && !!b && ['name','owner','soul','basis'].every(k=>a[k]===b[k]) && (b.level==null || a.level===b.level) && (b.width==null || (a.width===b.width && a.height===b.height)); }
@@ -66,7 +66,7 @@
   }
   function goldFee(price) {
     const form=document.querySelector('#sellForm'), input=document.querySelector('#preis'), duration=document.querySelector('#dauer'), fee=document.querySelector('#marktgebuehren');
-    if (!form || !input || !duration || !fee || !goldPriceAllowed(price) || !/calcDues\(\)/.test(input.getAttribute('onkeyup')||'') || !/calcDues\(\)/.test(duration.getAttribute('onchange')||'')) return null;
+    if (!form || !input || !duration || !fee || !Number.isSafeInteger(price) || price<100000 || !/calcDues\(\)/.test(input.getAttribute('onkeyup')||'') || !/calcDues\(\)/.test(duration.getAttribute('onchange')||'')) return null;
     try {
       duration.value='3'; input.value=String(price); fee.textContent='';
       // MooTools puede sustituir window.Event; el método nativo del documento no depende de él.
@@ -98,10 +98,10 @@
       const cells=[...(row.cells||[])], seller=cells[1]?.textContent.trim(), price=parseGold(cells[2]?.textContent), item=goldItem(cells[0]?.querySelector('[data-tooltip][data-basis]'));
       const button=row.querySelector('input[name="buy"]'), form=button?.form;
       let url; try { url=new URL(form?.getAttribute('action'),location.href); } catch { return null; }
-      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || !goldPriceAllowed(price) || cells[4]?.textContent.trim()!=='1' || !item || (!includeIneligible && item.level!==1 && !item.usable) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
+      if (!seller || seller.normalize('NFKC').toLocaleLowerCase()===accountName.normalize('NFKC').toLocaleLowerCase() || (!includeIneligible ? !goldPriceAllowed(price) : !Number.isSafeInteger(price) || price<100000) || cells[4]?.textContent.trim()!=='1' || !item || (!includeIneligible && (item.level!==1 || item.usable)) || !visible(button) || button.disabled || button.value!=='Comprar') return null;
       const notice=form.getAttribute('data-confirm-message');
-      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (item.owner ? notice!=='Este objeto está vinculado al alma' : notice!==null) || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
-      return {seller,price,item,button};
+      if (url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || String(form.method).toLowerCase()!=='post' || (notice!==null && (notice!=='Este objeto está vinculado al alma' || !item.owner)) || /rub[ií]|diamant|premium/i.test(button.outerHTML+' '+row.textContent)) return null;
+      return {seller,price,item,button,notice};
     }).filter(Boolean).sort((a,b)=>b.price-a.price);
   }
   function goldOwnCount(item,price) {
@@ -180,7 +180,7 @@
     if (tx?.manualReview || (tx?.unresolvedSince && now-tx.unresolvedSince>=120000)) {
       if (tx.manualReview && Number.isFinite(tx.reviewAt) && now<tx.reviewAt) return false;
       if (!Array.isArray(state.goldUnresolved)) state.goldUnresolved=[];
-      state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldEnabled=true; state.goldCheckAt=now+60000;
+      if (!['baseline','readyBuy'].includes(tx.stage)) state.goldUnresolved.push({...tx,unresolvedAt:now}); state.goldTx=null; state.goldEnabled=true; state.goldCheckAt=now+60000;
       state.message='Operación de oro sin confirmar; continuaré excluyendo el objeto pendiente.'; log(state.message,'warn'); save(); return false;
     }
     if (tx?.blocked) {
@@ -221,7 +221,7 @@
         const size=offer.item.width+'x'+offer.item.height;
         if (!spaceBySize.has(size)) spaceBySize.set(size,goldSpace(availableBag,offer.item));
         if (!spaceBySize.get(size)) continue;
-        if (Array.isArray(state.goldUnresolved) && state.goldUnresolved.some(x=>goldSame(x.item,offer.item))) continue;
+        if (Array.isArray(state.goldUnresolved) && state.goldUnresolved.some(x=>!['baseline','readyBuy'].includes(x.stage) && goldSame(x.item,offer.item))) continue;
         if (balance-offer.price<100000) continue;
         if (!feeByPrice.has(offer.price)) feeByPrice.set(offer.price,goldFee(offer.price));
         const cost=feeByPrice.get(offer.price);
@@ -245,7 +245,7 @@
       if (!availableBag && state.goldBagSwitchAt && now-state.goldBagSwitchAt<5000) return true;
       if(candidates.length!==1 || !availableBag || !goldSpace(availableBag,tx.item) || fee===null || !Number.isSafeInteger(balance) || balance-tx.price-fee<100000) {state.goldTx=null;state.goldCheckAt=now+60000;state.message='Oferta o reserva cambiaron antes de comprar.';save();return false;}
       const chosen=candidates[0],t=tx;
-      t.stage='buy';t.at=now;t.balanceBefore=balance;t.confirmed=!chosen.item.owner;state.message='Comprando paquete de '+t.price.toLocaleString('es-ES')+' de '+t.seller+'.';log(state.message,'action');save();
+      t.stage='buy';t.at=now;t.balanceBefore=balance;t.confirmed=!chosen.notice;state.message='Comprando paquete de '+t.price.toLocaleString('es-ES')+' de '+t.seller+'.';log(state.message,'action');save();
       const original=window.confirm;
       if (typeof original!=='function') { goldPause('Confirmación nativa no disponible; compra no iniciada.'); return false; }
       try {
@@ -327,11 +327,12 @@
       };
       if (!Number.isSafeInteger(page) || page<1 || page>100) { goldPause('Página de paquetes no verificable.'); return false; }
       if (!scan.complete) {
-        if (page!==1) { delete tx.packageScan; if (!goPage(1)) goldPause('No se pudo abrir la primera página de paquetes.'); return true; }
+        const expected=scan.pages.length ? scan.pages.at(-1)+1 : 1;
+        if (page!==expected) { if (!goPage(expected)) goldPause('No se pudo abrir la página necesaria de paquetes.'); return true; }
         for (const match of matches) { const hash=match.getAttribute('data-hash'); if (!validItemHash(hash) || scan.matches.some(x=>x.hash===hash)) { goldPause('Identificadores de paquetes ambiguos.'); return false; } scan.matches.push({hash,page}); }
         scan.pages.push(page); save();
         const next=document.querySelector('.paging_right_step');
-        if (visible(next)) { goldPause('Hay más paquetes; no se puede confirmar la operación solo con la primera página.'); return false; }
+        if (visible(next)) { if (page>=100 || !goPage(page+1)) { goldPause('No se pudo revisar la siguiente página de paquetes.'); return false; } return true; }
         if (scan.matches.length===0 && packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
         if(tx.stage==='baseline') {
           if(scan.matches.length){state.goldTx=null;state.goldCheckAt=now+60000;state.message='Ya existe un paquete igual; omito esta oferta.';save();return false;}

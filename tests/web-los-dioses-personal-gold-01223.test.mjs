@@ -13,11 +13,11 @@ function fixture({page='1',names=['Ojo de Ra'],scan, next=false}={}) {
  const c={state,params,location,mod:'packages',goldPageOpenedAt:now-6000,Date,URL,Number,String,Array,JSON,document:{querySelector:s=>s==='#packages'?pkg:s==='.paging_right_step'&&next?{}:null},visible:x=>!!x,log:()=>{},save:()=>{},parseGold:()=>500000,validItemHash:x=>typeof x==='string'&&!!x,accountName:'CassiusFerox'};
  vm.createContext(c);vm.runInContext(code,c);c.goldBalance=()=>500000;c.goldBag=()=>({items:[]});c.goldSpace=()=>true;c.goldItem=el=>({ ...item,name:JSON.parse(el.getAttribute('data-tooltip'))[0][0][0] });return {c,state,tx,location};
 }
-test('ignora objetos ajenos al nombre filtrado',()=>{const x=fixture({names:['Ojo de Ra','Trapos'],next:true});assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,undefined);assert.equal(x.tx.packageScan.matches.length,1);assert.equal(x.tx.packageScan.matches[0].hash,'hash0');});
+test('ignora objetos ajenos al nombre filtrado',()=>{const x=fixture({names:['Ojo de Ra','Trapos'],next:true});assert.equal(x.c.goldTick(),true);assert.equal(x.tx.manualReview,undefined);assert.equal(x.tx.packageScan.matches.length,1);assert.equal(x.tx.packageScan.matches[0].hash,'hash0');assert.equal(new URL(x.location.destination).searchParams.get('page'),'2');});
 test('bloquea pagina duplicada sin seguir navegando',()=>{const x=fixture({page:'20&page=1'});assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,true);assert.equal(x.location.destination,undefined);});
 test('bloquea paginas con contenido identico aunque cambie el numero',()=>{const x=fixture({page:'2',scan:{pages:[1],matches:[],complete:false,fingerprints:{1:'hash0'}}});assert.equal(x.c.goldTick(),false);assert.match(x.tx.problem,/repetido/);});
 test('mantiene el bloqueo manual y no reintenta la compra',()=>{const x=fixture();x.tx.blocked=true;x.tx.manualReview=true;x.tx.retryAt=0;assert.equal(x.c.goldTick(),false);assert.equal(x.tx.blocked,true);});
-test('no navega a la segunda pagina y aplaza la operacion ambigua',()=>{const x=fixture({next:true});assert.equal(x.c.goldTick(),false);assert.equal(x.location.destination,undefined);assert.match(x.tx.problem,/primera p.gina/);});
+test('continúa a la segunda página antes de concluir búsqueda',()=>{const x=fixture({next:true});assert.equal(x.c.goldTick(),true);assert.equal(new URL(x.location.destination).searchParams.get('page'),'2');assert.equal(x.tx.blocked,undefined);});
 
 test('una transaccion de versiones anteriores requiere revision manual',()=>{const x=fixture();delete x.state.goldPackageGuardV129;assert.equal(x.c.goldTick(),false);assert.equal(x.tx.manualReview,true);assert.match(x.tx.problem,/versión anterior/);});
 
@@ -43,3 +43,17 @@ test('actualizacion exige revisión de operación anterior',()=>{const x=fixture
 test('revisión repetida reinicia recorrido ambiguo',()=>{const x=fixture();x.tx.blocked=true;x.tx.retryAt=0;x.tx.packageScan={pages:[1,2],matches:[{hash:'a',page:1}],complete:false};assert.equal(x.c.goldTick(),true);assert.equal(x.tx.packageScan,undefined);});
 test('venta antigua no se confirma automáticamente',()=>{const x=fixture();x.c.mod='guildMarket';x.tx.stage='sell';x.tx.price=300000;x.tx.ownBefore=0;x.c.goldOwnCount=()=>1;assert.equal(x.c.goldTick(),false);assert.equal(x.state.goldTx,x.tx);assert.equal(x.tx.manualReview,true);});
 test('anuncios de duración restante corta cuentan en referencia',()=>{const x=fixture();const row={cells:[{querySelector:()=>({})},{textContent:'CassiusFerox'},{textContent:'300000'},{textContent:'12:30 h'}],querySelector:()=>({})};x.c.document.querySelectorAll=()=>[row];x.c.parseGold=Number;x.c.goldItem=()=>x.tx.item;assert.equal(x.c.goldOwnCount(x.tx.item,300000),1);});
+
+
+test('busca en la segunda página y completa referencia previa vacía',()=>{
+ const x=fixture({names:['Otro'],next:true});x.tx.stage='baseline';
+ assert.equal(x.c.goldTick(),true);assert.equal(x.tx.packageScan.pages.length,1);
+ x.c.params=new URLSearchParams('f=0&fq=-1&qry=Ojo+de+Ra&page=2');x.c.location.href=x.location.destination;
+ x.c.document.querySelector=s=>s==='#packages'?{querySelectorAll:()=>[],textContent:''}:null;
+ x.tx.loadedAt=Date.now()-6000;
+ assert.equal(x.c.goldTick(),true);assert.equal(x.tx.stage,'readyBuy');assert.equal(x.tx.baselineEmpty,true);
+});
+test('búsqueda previa sin compra no excluye un objeto para siempre',()=>{
+ const x=fixture();x.tx.stage='baseline';x.tx.manualReview=true;x.tx.reviewAt=Date.now()-1;
+ assert.equal(x.c.goldTick(),false);assert.equal(x.state.goldTx,null);assert.equal(x.state.goldUnresolved.length,0);
+});
