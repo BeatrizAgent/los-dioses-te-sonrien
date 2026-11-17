@@ -168,6 +168,17 @@
     if (document.visibilityState === 'visible' && ownerActive) { combatTick(); renderStatus(); }
   });
   let panelTick=0;
-  captureRivals(); renderStatus(); setTimeout(combatTick, 1000); setInterval(() => { combatTick(); if (++panelTick%3===0 && document.visibilityState !== 'hidden') renderStatus(); }, 1500);
+  captureRivals(); renderStatus(); setTimeout(combatTick, 1000); setInterval(() => {
+    let failed=false;
+    try {combatTick();} catch (error) {
+      failed=true;
+      if (ownerActive && state.running && Date.now()-(state.lastRuntimeErrorLogAt||0)>=60000) {
+        state.lastRuntimeErrorLogAt=Date.now();const kind=/^[A-Za-z]+Error$/.test(error?.name || '') ? error.name : 'Error';
+        state.message='Error interno ('+kind+'); comprobando recuperación.';log(state.message,'warn');try {save();} catch {}
+      }
+    }
+    stallRecoveryTick(failed);
+    if (++panelTick%3===0 && document.visibilityState !== 'hidden') renderStatus();
+  }, 1500);
   }
 })();

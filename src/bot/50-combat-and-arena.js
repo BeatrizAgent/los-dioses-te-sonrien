@@ -57,6 +57,35 @@
       state.message='Comprobando participación en Circo Turma.'; save(); location.assign(url.href); return true;
     } catch { return false; }
   }
+  let stallObservation=null;
+  function stallRecoveryTick(force=false) {
+    if (!ownerActive || !state.running || captcha() || !verified()) {stallObservation=null;return false;}
+    const hp=healthReading();
+    if (BUILD_CONFIG.modules.healing && hp && hp.current<=hp.maximum*.4) {stallObservation=null;return false;}
+    const txKeys=['goldTx','foodBuyTx','smeltTx','repairTx'];
+    const pendingKeys=['pending','pendingFight','pendingPve','pendingHeal','pendingPackageFood','pendingLoot'];
+    const pending=pendingKeys.some(k=>!!state[k]) || txKeys.some(k=>!!state[k]) || !!state.packageCollectTrip || !!state.packageFoodTrip;
+    const readyBar=selector=>cooldownSeconds(document.querySelector(selector)?.textContent)===0;
+    const pveReady=(BUILD_CONFIG.modules.expedition && readyBar('#cooldown_bar_expedition') && Number((document.querySelector('#expeditionpoints_value')?.textContent||'').trim().split('/')[0])>0) || (BUILD_CONFIG.modules.dungeon && readyBar('#cooldown_bar_dungeon') && Number((document.querySelector('#dungeonpoints_value')?.textContent||'').trim().split('/')[0])>0);
+    const pvpReady=BUILD_CONFIG.modules.arenaCircus && (readyBar('#cooldown_bar_arena') || (state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && readyBar('#cooldown_bar_ct')));
+    if (!force && !pending && !pveReady && !pvpReady) {stallObservation=null;return false;}
+    const signature=JSON.stringify([mod,sub,params.get('loc'),params.get('page'),params.get('p'),state.pveTarget,state.lastAction,state.lastPveAt,state.lastFightMode,...txKeys.map(k=>[state[k]?.stage,state[k]?.blocked,state[k]?.at,state[k]?.scan?.pages?.length,state[k]?.packageScan?.pages?.length,state[k]?.saleScan?.pages?.length]),...pendingKeys.map(k=>[state[k]?.kind,state[k]?.mode,state[k]?.at]),state.packageScan?.pages?.length]);
+    const now=Date.now();
+    const repeatedExpedition=mod==='location' && BUILD_CONFIG.modules.expedition && pveReady && !pending && Number.isFinite(state.expeditionMismatchSince) && now-state.expeditionMismatchSince>=90000;
+    if (!repeatedExpedition) {
+      if (!stallObservation || stallObservation.signature!==signature) {stallObservation={signature,since:now};return false;}
+      if (now-stallObservation.since<90000) return false;
+    }
+    if (now-(state.stallRecoveryAt||0)<300000) return false;
+    const allowed={overview:['mod','doll','sh'],location:['mod','loc','sh'],map:['mod','submod','sh'],arena:['mod','submod','aType','sh'],packages:['mod','f','fq','qry','page','sh'],guildMarket:['mod','fl','fq','f','qry','seller','s','p','sh'],forge:['mod','submod','sh'],quests:['mod','sh'],reports:['mod','submod','t','reportId','sh']};
+    let url;try {url=new URL(location.href);} catch {return false;}
+    if (!allowed[mod] || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.getAll('mod').length!==1 || url.searchParams.get('mod')!==mod || [...url.searchParams.keys()].some(k=>!allowed[mod].includes(k)) || allowed[mod].some(k=>url.searchParams.getAll(k).length>1)) return false;
+    if (mod==='map' && !['city','country'].includes(sub)) return false;
+    if (mod==='arena' && !['grouparena','serverArena'].includes(sub)) return false;
+    if (mod==='reports' && (sub!=='showCombatReport' || !/^\d+$/.test(params.get('reportId')||'') || !['0','1','2','3'].includes(params.get('t')))) return false;
+    if (mod==='forge' && !['forge','smeltery','workbench','storage'].includes(sub)) return false;
+    state.stallRecoveryAt=now;state.message='Sin avance; recargando la página para recuperar la cola.';log(state.message,'warn');save();stallObservation=null;location.assign(url.href);return true;
+  }
   function combatTick() {
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
@@ -274,7 +303,7 @@
     if (type === '3') { delete state.turmaListRetry; delete state.turmaSkipUntil; }
     state.pendingFight={name:target.name,server:target.server,rivalLevel:target.rivalLevel,level,mode,healthBefore:current,xpBefore:xpReading(),at:Date.now()};
     state.lastFightMode=mode;
-    state.lastAction='pvp';
+    state.lastAction='pvp'; delete state.pvpWaitSince;
     state.message='Iniciando combate contra '+target.name+'.'; log(state.message, 'action'); save(); target.button.click();
   }
 

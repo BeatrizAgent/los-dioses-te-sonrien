@@ -86,3 +86,13 @@ test('vida baja con curación aplazada permite misiones pero no inicia PvE', () 
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.deepEqual(calls,['Revisando misiones mientras recupero vida.']);assert.equal(state.running,true);
 });
+
+
+test('Arena disponible sin atacar no impide expediciones indefinidamente',()=>{
+ let now=1000000,navigations=0;const area={id:'zone',name:'Zona',entryLevel:20};
+ const link={textContent:'Zona',getAttribute:()=>'/game/index.php?mod=location&loc=1'},bar={textContent:'0:00',querySelector:()=>link};
+ const state={lastAction:'pve',lastPveAt:now-60000};
+ const c={state,Date:{now:()=>now},URL,Number,String,params:new URLSearchParams('mod=overview'),mod:'overview',location:{href:'https://s1-es.gladiatus.gameforge.com/game/index.php?mod=overview',origin:'https://s1-es.gladiatus.gameforge.com'},
+ BUILD_CONFIG:{playerLevel:20,modules:{expedition:true,arenaCircus:true},expedition:{area}},document:{querySelector:s=>s==='#header_values_level'?{textContent:'20'}:s.includes('points_value')?{textContent:'1'}:s.includes('cooldown_bar')?bar:null,querySelectorAll:()=>[link]},visible:x=>!!x,cooldownSeconds:()=>0,save(){},log(){},navigation(){navigations++;return true;}};
+ vm.createContext(c);vm.runInContext(pve,c);assert.equal(c.pveTick(),false);assert.equal(navigations,0);now+=31000;assert.equal(c.pveTick(),true);assert.equal(navigations,1);
+});

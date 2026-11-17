@@ -28,7 +28,7 @@ test('pestaña oculta conserva ciclo de juego y refresca panel al volver', () =>
   const code = source.slice(source.indexOf("  document.addEventListener('visibilitychange'"), source.lastIndexOf('  }\n})();'));
   let tick = 0, renders = 0, onVisibility, interval;
   const document = {visibilityState:'hidden', addEventListener:(_event, fn)=>{onVisibility=fn;}};
-  const context = {document, ownerActive:true, combatTick:()=>tick++, renderStatus:()=>renders++, captureRivals:()=>{}, setTimeout:()=>{}, setInterval:fn=>{interval=fn;}};
+  const context = {document, ownerActive:true, combatTick:()=>tick++, stallRecoveryTick:()=>{}, renderStatus:()=>renders++, captureRivals:()=>{}, setTimeout:()=>{}, setInterval:fn=>{interval=fn;}};
   vm.runInNewContext(code, context);
   interval();
   assert.equal(tick, 1);
@@ -80,7 +80,7 @@ test('resumen no lee contenido entero fuera del Panteón', () => {
 test('planificador revisa cada 1,5 segundos y panel cada 4,5',()=>{
  const code=source.slice(source.indexOf("  document.addEventListener('visibilitychange'"),source.lastIndexOf('  }\n})();'));
  let interval,delay,renders=0,ticks=0;
- const context={document:{visibilityState:'visible',addEventListener(){}},ownerActive:true,combatTick:()=>ticks++,renderStatus:()=>renders++,captureRivals(){},setTimeout(){},setInterval:(fn,ms)=>{interval=fn;delay=ms;}};
+ const context={document:{visibilityState:'visible',addEventListener(){}},ownerActive:true,combatTick:()=>ticks++,stallRecoveryTick:()=>{},renderStatus:()=>renders++,captureRivals(){},setTimeout(){},setInterval:(fn,ms)=>{interval=fn;delay=ms;}};
  vm.runInNewContext(code,context);assert.equal(delay,1500);interval();assert.equal(ticks,1);assert.equal(renders,1);interval();assert.equal(ticks,2);assert.equal(renders,1);interval();assert.equal(ticks,3);assert.equal(renders,2);
 });
 
@@ -89,4 +89,11 @@ test('navegación espera tres segundos antes de otro clic',()=>{
  const code=core.slice(core.indexOf('  function navigation('),core.indexOf('  function renewIdentity('));let now=8000,clicks=0;
  const context={state:{lastNavigationAt:6000},Date:{now:()=>now},visible:()=>true,captcha:()=>false,verified:()=>true,save(){},link:{click:()=>clicks++}};
  vm.createContext(context);vm.runInContext(code,context);assert.equal(context.navigation(context.link,'Prueba'),false);now=9000;assert.equal(context.navigation(context.link,'Prueba'),true);assert.equal(clicks,1);
+});
+
+
+test('error del ciclo no impide ejecutar el vigilante',()=>{
+ const code=source.slice(source.indexOf("  document.addEventListener('visibilitychange'"),source.lastIndexOf('  }\n})();'));let interval,forced=false;
+ const c={document:{visibilityState:'hidden',addEventListener(){}},state:{running:true},ownerActive:true,Date,combatTick(){throw new Error('x');},stallRecoveryTick:x=>forced=x,renderStatus(){},captureRivals(){},setTimeout(){},setInterval:fn=>interval=fn,log(){},save(){}};
+ vm.runInNewContext(code,c);interval();assert.equal(forced,true);
 });

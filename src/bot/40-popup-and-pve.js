@@ -116,7 +116,11 @@
     if (state.dungeonReset && choices.includes('dungeon')) selected='dungeon';
     if (!selected || (!ready(selected) && !(selected==='dungeon' && state.dungeonReset))) {
       const arenaReady=BUILD_CONFIG.modules.arenaCircus && (cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0 || (state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0));
-      if ((arenaReady && state.lastAction==='pve') || Date.now()-(state.lastPveAt||0)<20000) return false;
+      if (arenaReady && state.lastAction==='pve') {
+        if (!state.pvpWaitSince) {state.pvpWaitSince=Date.now();save();}
+        if (Date.now()-state.pvpWaitSince<30000) return false;
+      } else if (state.pvpWaitSince) {delete state.pvpWaitSince;save();}
+      if (Date.now()-(state.lastPveAt||0)<20000) return false;
       const options=choices.filter(ready);
       selected=options.find(x=>x!==state.lastPveMode) || options[0];
       if (!selected) return false;
@@ -186,14 +190,22 @@
     if (selected==='expedition') {
       const enemy=BUILD_CONFIG.expedition.enemy,position=enemy?.position,loc=params.get('loc');
       const button=Number.isInteger(position)&&position>=1&&position<=4 ? document.querySelectorAll('#expedition_list .expedition_button')[position-1] : null;
-      const rival=Number.isInteger(position) ? document.querySelector('#expedition_info'+position+' .expedition_name')?.textContent.trim() : '';
+      const info=Number.isInteger(position) ? document.querySelector('#expedition_info'+position) : null;
+      const label=Number.isInteger(position) ? document.querySelector('#expedition_info'+position+' .expedition_name')?.textContent.trim() || '' : '';
+      let tooltipName='';
+      try { const rows=JSON.parse(info?.getAttribute('data-tooltip') || 'null'); if (typeof rows?.[0]?.[0]?.[0]==='string') tooltipName=rows[0][0][0].trim(); } catch {}
+      const norm=value=>String(value||'').normalize('NFKC').trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const truncated=/…|\.\.\.$/.test(label);
+      const prefix=norm(label.replace(/(?:…|\.\.\.)$/, ''));
+      const rival=truncated && tooltipName && prefix && norm(tooltipName).startsWith(prefix) ? tooltipName : label;
       const onclick=button?.getAttribute('onclick') || '';
       const call=onclick.match(/^\s*attack\(null,\s*(['"])(\d+)\1,\s*(\d+),\s*0,\s*(['"])[^'"]*\4(?:,\s*(['"])[^'"]*\5)?\)\s*;?\s*$/);
       const safeCall=call?.[2]===loc && Number(call?.[3])===position;
       const enemyName=value=>sameName(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       if (!enemy?.name || !rival || enemyName(rival)!==enemyName(enemy.name) || !safeCall || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
-        state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Expedición aplazada: enemigo o ataque no coincide con la posición elegida.'; log(state.message,'warn'); save(); return false;
+        state.expeditionMismatchSince ||= Date.now();state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Expedición aplazada: enemigo o ataque no coincide con la posición elegida.'; log(state.message,'warn'); save(); return false;
       }
+      delete state.expeditionMismatchSince;
       state.pendingPve={mode:selected,at:Date.now(),target:rival || enemy.name,area:area.name,spawn:[enemy.levelMin,enemy.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
       state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve';
       state.message='Atacando posición '+position+' · '+(rival || enemy.name)+' · rango de catálogo '+enemy.levelMin+'–'+enemy.levelMax+'.'; log(state.message,'action'); save(); button.click(); return true;
