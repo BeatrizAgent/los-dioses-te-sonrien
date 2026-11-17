@@ -122,7 +122,7 @@
   }
   function goldOfferGo(page) {
     let url; try { url=new URL(location.href); } catch { return false; }
-    if (!goldOfferPage() || !Number.isSafeInteger(page) || page<1 || page>100 || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || captcha() || !verified() || Date.now()-(state.lastNavigationAt||0)<8000) return false;
+    if (!goldOfferPage() || !Number.isSafeInteger(page) || page<1 || page>100 || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='guildMarket' || captcha() || !verified() || Date.now()-(state.lastNavigationAt||0)<3000) return false;
     url.searchParams.delete('p'); url.searchParams.set('p',String(page));
     state.lastNavigationAt=Date.now(); state.message='Revisando página '+page+' del mercado de alianza.'; save(); location.assign(url.href); return true;
   }
@@ -200,7 +200,7 @@
       if (mod!=='guildMarket') {
         const link=document.querySelector('#gca_shortcuts_bar a[href*="mod=guildMarket"]');
         if (!visible(link)) { state.goldCheckAt=now+60000; save(); return false; }
-        if (now-(state.lastNavigationAt||0)<8000) return true;
+        if (now-(state.lastNavigationAt||0)<3000) return true;
         if (!goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Revisando paquetes de oro de la alianza.')) { state.goldCheckAt=now+15000; save(); return false; }
         return true;
       }

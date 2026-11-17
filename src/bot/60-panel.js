@@ -167,6 +167,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && ownerActive) { combatTick(); renderStatus(); }
   });
-  captureRivals(); renderStatus(); setTimeout(combatTick, 2500); setInterval(() => { combatTick(); if (document.visibilityState !== 'hidden') renderStatus(); }, 5000);
+  let panelTick=0;
+  captureRivals(); renderStatus(); setTimeout(combatTick, 1000); setInterval(() => { combatTick(); if (++panelTick%3===0 && document.visibilityState !== 'hidden') renderStatus(); }, 1500);
   }
 })();

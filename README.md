@@ -188,3 +188,5 @@ Beta 0.5.8: si hay menos de 1.000 de oro y subasta o fundición activas, busca u
 En la versión 0.12.56 el bot comprueba la participación de Circo Turma cada hora; si está en pasivo, sigue con Arena y las demás tareas. El botón «Comprobar estado de Turma» adelanta la consulta sin cambiar la participación. Antes de curar o manipular equipo comprueba la selección de batalla estándar del gladiador. También reduce lecturas y guardados repetidos. Probado en simulación; pendiente de validar instalado en el juego.
 
 Paquetes de oro: busca ofertas de nivel 1 con precio superior a 100.000, sin límite máximo fijo; excluye utilizables y bienes de forja y mantiene 100.000 de reserva más tarifa. Acepta objetos vinculados al personaje sin exigir un aviso que el juego no muestre y recorre páginas de paquetes. Probado en simulación; pendiente de validar instalado.
+
+En 0.12.58 el planificador revisa tareas cada 1,5 segundos y limita la navegación a una acción cada 3 segundos. Mantiene esperas y comprobaciones de operaciones inciertas. Probado en simulación; la rapidez y el consumo reales siguen pendientes de medir.

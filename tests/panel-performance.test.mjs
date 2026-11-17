@@ -38,6 +38,8 @@ test('pestaña oculta conserva ciclo de juego y refresca panel al volver', () =>
   assert.equal(tick, 2);
   assert.equal(renders, 2);
   interval();
+  assert.equal(renders, 2);
+  interval();
   assert.equal(renders, 3);
 });
 
@@ -72,4 +74,19 @@ test('resumen no lee contenido entero fuera del Panteón', () => {
   const state={records:[],statsEvents:[]};const context={state,tabName:'overview',mod:'arena',document:{querySelector:s=>{if(s==='#content')throw Error('lectura innecesaria');return null;}},data:null};
   vm.runInNewContext(line.replace('const data =','data ='),context);
   assert.ok(context.data);
+});
+
+
+test('planificador revisa cada 1,5 segundos y panel cada 4,5',()=>{
+ const code=source.slice(source.indexOf("  document.addEventListener('visibilitychange'"),source.lastIndexOf('  }\n})();'));
+ let interval,delay,renders=0,ticks=0;
+ const context={document:{visibilityState:'visible',addEventListener(){}},ownerActive:true,combatTick:()=>ticks++,renderStatus:()=>renders++,captureRivals(){},setTimeout(){},setInterval:(fn,ms)=>{interval=fn;delay=ms;}};
+ vm.runInNewContext(code,context);assert.equal(delay,1500);interval();assert.equal(ticks,1);assert.equal(renders,1);interval();assert.equal(ticks,2);assert.equal(renders,1);interval();assert.equal(ticks,3);assert.equal(renders,2);
+});
+
+test('navegación espera tres segundos antes de otro clic',()=>{
+ const core=readFileSync(new URL('../src/bot/10-core-and-missions.js',import.meta.url),'utf8');
+ const code=core.slice(core.indexOf('  function navigation('),core.indexOf('  function renewIdentity('));let now=8000,clicks=0;
+ const context={state:{lastNavigationAt:6000},Date:{now:()=>now},visible:()=>true,captcha:()=>false,verified:()=>true,save(){},link:{click:()=>clicks++}};
+ vm.createContext(context);vm.runInContext(code,context);assert.equal(context.navigation(context.link,'Prueba'),false);now=9000;assert.equal(context.navigation(context.link,'Prueba'),true);assert.equal(clicks,1);
 });

@@ -183,7 +183,7 @@
   }
   function navigation(link, purpose) {
     if (!visible(link) || captcha() || !verified()) return false;
-    if (Date.now() - (state.lastNavigationAt || 0) < 8000) return false;
+    if (Date.now() - (state.lastNavigationAt || 0) < 3000) return false;
     state.lastNavigationAt = Date.now(); state.message = purpose; save(); link.click(); return true;
   }
   function renewIdentity() {
@@ -196,7 +196,7 @@
       const u=new URL(link.getAttribute('href'),location.href);
       if (u.origin!==location.origin || u.pathname!=='/game/index.php' || u.searchParams.get('mod')!=='overview' || u.searchParams.has('doll')) return false;
     } catch { return false; }
-    if (Date.now()-(state.lastNavigationAt || 0)<8000) { state.message='Esperando para actualizar identidad.'; save(); return true; }
+    if (Date.now()-(state.lastNavigationAt || 0)<3000) { state.message='Esperando para actualizar identidad.'; save(); return true; }
     state.lastNavigationAt=Date.now(); state.message='Actualizando identidad del personaje.'; save(); link.click(); return true;
   }
 

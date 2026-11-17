@@ -12,7 +12,7 @@
   function turmaListMiss(bar) {
     const now=Date.now(), retry=state.turmaListRetry || {count:0,next:0};
     if (now<retry.next) return;
-    if (retry.count<2 && now-(state.lastNavigationAt||0)<8000) return;
+    if (retry.count<2 && now-(state.lastNavigationAt||0)<3000) return;
     retry.count++; retry.next=now+15000; state.turmaListRetry=retry;
     if (retry.count>=3) {
       state.turmaSkipUntil=now+300000; delete state.turmaListRetry;
@@ -47,7 +47,7 @@
       state.turmaCheckRetryAt=now+300000; state.turmaCheckRequested=false;
       log('No se pudo leer el estado de participación de Turma; volveré a comprobarlo.','warn'); save(); return false;
     }
-    if (now-(state.lastNavigationAt||0)<8000) return false;
+    if (now-(state.lastNavigationAt||0)<3000) return false;
     const link=document.querySelector('#mainmenu a[href*="mod=overview"]');
     try {
       const url=new URL(link?.getAttribute('href'),location.href);
