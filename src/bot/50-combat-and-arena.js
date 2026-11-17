@@ -226,8 +226,8 @@
     }
     // Una búsqueda de apoyo aplazada no debe bloquear el ciclo de oro; una
     // compra incierta sigue protegida por foodBuyTx dentro de goldTick.
-    if (!state.foodSupportNeeded || Date.now()<(state.foodBuyRetryAt||0)) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
-    if (BUILD_CONFIG.modules.healing && !state.goldTx && !state.smeltTx && !state.repairTx && Date.now()>=(state.packageCollectAt||0)) {
+    if (!BUILD_CONFIG.modules.foodMarket || !state.foodSupportNeeded || Date.now()<(state.foodBuyRetryAt||0)) { if (BUILD_CONFIG.modules.guildGold && goldTick()) return; }
+    if (BUILD_CONFIG.modules.healing && healthPercent>40 && !state.goldTx && !state.smeltTx && !state.repairTx && Date.now()>=(state.packageCollectAt||0)) {
       state.packageCollectTrip=true; state.packageCollectAt=Date.now()+120000; delete state.packageScan; delete state.packageWaitAt; save();
       if (packageFoodTick()) return;
     }
@@ -269,6 +269,10 @@
       if (navigation(quest, 'Revisando misiones del Panteón.')) return;
     }
     if (!arenaReady && !ctReady && (state.turmaParticipation?.status === 'pasivo' || Date.now() < (state.turmaSkipUntil || 0))) { updateMessage('Turma aplazado; esperando otras tareas.'); return; }
+    if (!arenaReady && !ctReady) {
+      const waits=[arenaRemaining,ctRemaining].filter(Number.isFinite);
+      updateMessage(waits.length ? 'Esperando disponibilidad: '+Math.min(...waits)+' s.' : 'Esperando tiempos de combate verificables.'); return;
+    }
     if (mod !== 'arena' || sub !== 'serverArena' || params.get('aType') !== type) {
       navigation(document.querySelector(bar + ' a'), 'Abriendo ' + (type === '2' ? 'Arena' : 'Circo') + ' Provinciarum.'); return;
     }

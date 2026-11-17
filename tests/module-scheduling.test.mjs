@@ -76,6 +76,38 @@ test('búsqueda de alimento aplazada no bloquea oro', () => {
   assert.deepEqual(calls,['pendiente','oro']);
 });
 
+test('apoyo de comida antiguo no bloquea oro si el módulo de comida está desactivado', () => {
+  const calls=[],state={running:true,foodSupportNeeded:true};
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{guildGold:true,foodMarket:false}},document:{querySelector:()=>null},visible:()=>false,
+    captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:100,maximum:100}),
+    goldTick:pending=>{calls.push(pending?'pendiente':'oro');return !pending;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.deepEqual(calls,['pendiente','oro']);
+});
+
+test('vida baja aplazada no inicia recogida periódica de utilizables', () => {
+  const state={running:true,healSkipUntil:Date.now()+60000};let collected=false;
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
+    BUILD_CONFIG:{modules:{healing:true}},document:{querySelector:()=>null},visible:()=>false,
+    captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:10,maximum:100}),goldTick:()=>false,
+    packageFoodTick:()=>{collected=true;return true;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.equal(collected,false);assert.equal(state.packageCollectTrip,undefined);assert.match(state.message,/Vida baja/);
+});
+
+test('espera en página actual cuando arena y circo están en enfriamiento', () => {
+  const state={running:true};let navigations=0,message='';
+  const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,ID:'id',
+    sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},BUILD_CONFIG:{modules:{arenaCircus:true}},
+    document:{querySelector:s=>s==='#cooldown_bar_arena'?{textContent:'0:20'}:s==='#cooldown_bar_ct'?{textContent:'0:30'}:null},
+    visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:100,maximum:100}),
+    goldTick:()=>false,checkTurmaParticipation:()=>false,pveTick:()=>false,cooldownSeconds:s=>s==='0:20'?20:30,
+    navigation:()=>{navigations++;return true;},updateMessage:m=>{message=m;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
+  assert.equal(navigations,0);assert.match(message,/20 s/);
+});
+
 test('vida baja con curación aplazada permite misiones pero no inicia PvE', () => {
   const calls=[],state={running:true,healSkipUntil:Date.now()+60000,packageCollectAt:Date.now()+60000};
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,

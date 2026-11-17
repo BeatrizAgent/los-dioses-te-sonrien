@@ -28,6 +28,27 @@ test('espacio fragmentado no equivale a hueco contiguo', () => {
   assert.equal(ctx.inventorySpace(inventory, {width: 2, height: 1}), false);
 });
 
+test('reserva una casilla tras recoger, incluso para objetos grandes', () => {
+  assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 2, 1], [0, 1, 1, 1]]), {width: 1, height: 1}, 1), false);
+  assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 2, 1]]), {width: 1, height: 1}, 1), true);
+  assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 2, 1]]), {width: 2, height: 1}, 1), false);
+  assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 2, 1], [0, 1, 1, 1]]), {width: 1, height: 1}), true);
+});
+
+test('recogida periódica conserva último hueco y aplaza revisión', () => {
+  const tick=source.slice(source.indexOf('  function packageFoodTick()'),source.indexOf('  function skipHealing('));
+  const inventory=bag(2,1,[[0,0,1,1]]), occupied=inventory.items[0], get=occupied.getAttribute;
+  occupied.getAttribute=n=>n==='data-hash'?'existing':n==='data-container-number'?'512':get(n);
+  inventory.inv.querySelectorAll=()=>inventory.items;
+  let skipped='', scans=0; const state={packageCollectTrip:true};
+  const selected={classList:{contains:()=>true},getAttribute:()=> '512'};
+  const context={state,mod:'packages',params:new URLSearchParams('f=7'),Date:{now:()=>10000},
+    document:{querySelector:n=>({'#inv':inventory.inv,'#packages':{querySelectorAll:()=>{scans++;return [];}},'#inventory_nav a':selected})[n]??null},
+    visible:x=>!!x,validItemHash:x=>!!x,skipHealing:m=>{skipped=m;state.packageCollectTrip=false;},save(){}};
+  vm.createContext(context);vm.runInContext(code+tick,context);context.packageFoodTick();
+  assert.match(skipped,/conservo una casilla/);assert.equal(scans,0);assert.equal(state.packageCollectAt,610000);assert.equal(state.pendingPackageFood,undefined);
+});
+
 test('escala visual y geometría incompleta o contradictoria', () => {
   for (const scale of [1, 1.25, 1.5]) assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 1, 1]], scale), {width: 1, height: 1}), true);
   assert.equal(ctx.inventorySpace(bag(2, 2, [[0, 0, 2, 2], [1, 1, 1, 1]]), {width: 1, height: 1}), false);
@@ -62,7 +83,7 @@ test('recogida con baúl lleno no despacha ni crea operación pendiente', () => 
 
 test('con espacio despacha una vez y confirma recepción tras varios ciclos', () => {
   const tick = source.slice(source.indexOf('  function packageFoodTick()'), source.indexOf('  function skipHealing('));
-  const inventory = bag(1, 1);
+  const inventory = bag(2, 1);
   inventory.inv.querySelectorAll = () => inventory.items;
   const attrs = {'data-hash':'food', 'data-measurement-x':'1', 'data-measurement-y':'1'};
   let clicks = 0, now = 10000;
@@ -85,7 +106,7 @@ test('con espacio despacha una vez y confirma recepción tras varios ciclos', ()
 test('traslado no confirmado queda excluido y no vuelve a despacharse', () => {
   const remember=source.slice(source.indexOf('  function rememberUnknownPackageFood('),source.indexOf('  function packageFoodTick('));
   const tick=source.slice(source.indexOf('  function packageFoodTick()'),source.indexOf('  function skipHealing('));
-  const inventory=bag(1,1); inventory.inv.querySelectorAll=()=>inventory.items;
+  const inventory=bag(2,1); inventory.inv.querySelectorAll=()=>inventory.items;
   const attrs={'data-hash':'food','data-measurement-x':'1','data-measurement-y':'1'};
   let clicks=0, now=10000;
   const food={getAttribute:n=>attrs[n]??null,hasAttribute:()=>true,dispatchEvent:()=>clicks++};
