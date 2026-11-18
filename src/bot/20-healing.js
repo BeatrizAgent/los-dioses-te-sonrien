@@ -300,6 +300,7 @@
     log(state.message,'success');save();
   }
   function foodMarketTick() {
+    const sellerBlocked=name=>[...(Array.isArray(state.blockedMarketSellers) ? state.blockedMarketSellers : []), ...(typeof BUILD_CONFIG !== 'undefined' && Array.isArray(BUILD_CONFIG.blockedMarketSellers) ? BUILD_CONFIG.blockedMarketSellers : [])].some(value=>typeof value==='string' && value.trim().normalize('NFKC').toLocaleLowerCase()===String(name||'').trim().normalize('NFKC').toLocaleLowerCase());
     const tx=state.foodBuyTx;
     if (tx) {
       const now=Date.now();
@@ -361,7 +362,7 @@
         if(mod!=='guildMarket'){goldNav('#gca_shortcuts_bar a[href*="mod=guildMarket"]','guildMarket','Volviendo a la oferta de alimento.');return true;}
         if(now-goldPageOpenedAt<5000)return true;
         if (tx.support && Number(params.get('p')||'1')!==tx.offerPage) {if (!foodMarketGoPage(tx.offerPage)) return deferFoodCheck('No se pudo volver a la oferta de alimento.');return true;}
-        const offers=foodMarketOffers(tx.support===true).filter(o=>o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.amount===tx.amount&&o.food.level===tx.level&&o.food.item.getAttribute('data-basis')===tx.basis&&o.food.item.getAttribute('data-hash')===tx.offerHash&&/^\d+$/.test(tx.offerId||'')&&o.food.item.getAttribute('data-item-id')===tx.offerId);
+        const offers=foodMarketOffers(tx.support===true).filter(o=>!sellerBlocked(o.seller)&&o.price===tx.price&&o.seller===tx.seller&&o.food.name===tx.name&&o.food.amount===tx.amount&&o.food.level===tx.level&&o.food.item.getAttribute('data-basis')===tx.basis&&o.food.item.getAttribute('data-hash')===tx.offerHash&&/^\d+$/.test(tx.offerId||'')&&o.food.item.getAttribute('data-item-id')===tx.offerId);
         const balance=goldBalance();if(offers.length!==1||!Number.isSafeInteger(balance)||balance<tx.price){state.foodBuyTx=null;state.foodBuyRetryAt=now+60000;save();return false;}
         const offer=offers[0],original=window.confirm; if(typeof original!=='function')return false;
         tx.stage='buy';tx.at=now;tx.unknownSince=now;tx.balanceBefore=balance;tx.confirmed=!offer.notice;save();
@@ -387,7 +388,7 @@
       return true;
     }
     if (Date.now()-goldPageOpenedAt<5000) return true;
-    const balance=goldBalance(), offer=foodMarketOffers(support).find(x=>Number.isSafeInteger(balance) && x.price<=balance && !(state.foodUnknownOffers||[]).some(u=>u.id===x.food.item.getAttribute('data-item-id') && u.hash===x.food.item.getAttribute('data-hash')));
+    const balance=goldBalance(), offer=foodMarketOffers(support).find(x=>!sellerBlocked(x.seller) && Number.isSafeInteger(balance) && x.price<=balance && !(state.foodUnknownOffers||[]).some(u=>u.id===x.food.item.getAttribute('data-item-id') && u.hash===x.food.item.getAttribute('data-hash')));
     if (!offer) {
       if (support) {const page=Number(params.get('p')||'1'),text=document.body?.innerText||'',match=text.match(/Página\s+(\d+)\s*\/\s*(\d+)/i);if(!match || Number(match[1])!==page){state.foodBuyRetryAt=Date.now()+60000;state.message='Paginación de alimentos no verificable.';save();return false;}if(page<Number(match[2])) {if(foodMarketGoPage(page+1))return true;state.foodBuyRetryAt=Date.now()+60000;state.message='No se pudo revisar la siguiente página de alimentos.';save();return false;}state.foodSupportNeeded=false;state.goldSupportSweepDone=true;state.message='Alimentos asequibles revisados; continúo con el oro.';save();return false;}
       state.foodBuyNeeded=false; state.foodBuyRetryAt=Date.now()+60000; state.message='Sin alimento asequible y verificable en la alianza.'; log(state.message,'warn'); save(); return false; }

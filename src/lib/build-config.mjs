@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   dungeonId: 'dungeon-temple-perdition',
   dungeonLossLimit: 3,
   smeltingPriority: 'crystal',
+  marketProfile: '',
 });
 
 export function eligibleExpeditions(catalog, playerLevel, region = null) {
@@ -88,7 +89,10 @@ export function normalizeBuildConfig(input, catalog) {
 
   const smeltingPriority = input.smeltingPriority ?? 'crystal';
   if (!['crystal','stamina','green-blue'].includes(smeltingPriority)) throw new TypeError('Prioridad de fundición no válida.');
-  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon, smeltingPriority };
+  const marketProfile = input.marketProfile || '';
+  if (!['', 'huggin'].includes(marketProfile)) throw new TypeError('Perfil de mercado no válido.');
+  const blockedMarketSellers = marketProfile === 'huggin' ? ['FanCarrazera','PrefectAcilius','CarrazeraFan','CurioUmbrius','CassianVesper'] : [];
+  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon, smeltingPriority, marketProfile, blockedMarketSellers };
 }
 
 export function buildUserscript(config, fragments) {

@@ -113,6 +113,7 @@ export function initializeGenerator() {
   areaSelect.addEventListener('change', refreshCatalog);
   enemySelect.addEventListener('change', refreshCatalog);
   dungeonSelect.addEventListener('change', refreshCatalog);
+  document.querySelector('#market-profile-huggin').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   dungeonLossLimit.addEventListener('input', () => { result.hidden = true; error.hidden = true; });
   document.querySelector('#smelting-priority').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   expeditionToggle.addEventListener('change', updateModuleControls);
@@ -134,6 +135,7 @@ export function initializeGenerator() {
     try {
       const modules = Object.fromEntries(moduleKeys.map(key => [key, form.querySelector(`input[name="${key}"]`).checked]));
       const input = {
+        marketProfile: document.querySelector('#market-profile-huggin').checked ? 'huggin' : '',
         playerLevel: level.value,
         campaignRegion: regionSelect.value,
         modules,

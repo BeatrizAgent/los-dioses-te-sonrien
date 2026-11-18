@@ -14,6 +14,10 @@ Web de configuración y generación de un userscript para Gladiatus, hecha con A
 
 El Gist anterior queda como copia personal/histórica. Esta web y este repositorio son la vía de generación y distribución del proyecto.
 
+## Exclusiones de mercado
+
+El perfil opcional «huggin», desmarcado por defecto, excluye FanCarrazera, PrefectAcilius, CarrazeraFan, CurioUmbrius y CassianVesper de las compras de oro y alimento. El panel permite añadir otros nombres por personaje y navegador. Las exclusiones del perfil se conservan mientras esté instalado; para quitarlas, genera otro script sin el perfil. El reinicio total conserva las exclusiones manuales. Esta función está probada en simulación, pendiente de validación instalada, y no garantiza evitar sanciones.
+
 ## Desarrollo
 
 Requiere Node.js compatible con Astro y pnpm.

@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {DEFAULT_CONFIG,normalizeBuildConfig} from '../src/lib/build-config.mjs';
+import {configToSearch,searchToConfig} from '../src/lib/install-link.mjs';
+const catalog=JSON.parse(await readFile(new URL('../src/data/catalog.json',import.meta.url),'utf8'));
+const expected=['FanCarrazera','PrefectAcilius','CarrazeraFan','CurioUmbrius','CassianVesper'];
+test('perfil huggin desactivado por defecto',()=>{const config=normalizeBuildConfig(DEFAULT_CONFIG,catalog);assert.equal(config.marketProfile,'');assert.deepEqual(config.blockedMarketSellers,[]);});
+test('perfil huggin incluye exactamente los cinco nombres también en enlace de instalación',()=>{const input={...DEFAULT_CONFIG,marketProfile:'huggin'};for(const config of [normalizeBuildConfig(input,catalog),normalizeBuildConfig(searchToConfig(configToSearch(input)),catalog)]){assert.equal(config.marketProfile,'huggin');assert.deepEqual(config.blockedMarketSellers,expected);}});
+test('rechaza perfil desconocido',()=>assert.throws(()=>normalizeBuildConfig({...DEFAULT_CONFIG,marketProfile:'otro'},catalog),/Perfil de mercado/));

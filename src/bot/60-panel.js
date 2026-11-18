@@ -111,6 +111,15 @@
       content.append(textElement('div','sectionlabel','Ubicación'),textElement('div','card name',current));
       if (state.dungeonCombatUnknown) content.append(textElement('p','small','Resultado de mazmorra desconocido; se reanudará automáticamente.'));
       content.append(textElement('div','sectionlabel','Paquetes de oro'),textElement('p','small',state.goldTx?.manualReview ? 'Operación sin confirmar; continuará automáticamente.' : state.goldTx?.blocked ? 'Operación pendiente: volveré a comprobarla automáticamente.' : state.goldTx ? 'Operación en curso: '+state.goldTx.stage : BUILD_CONFIG.modules.guildGold ? 'Objetos de nivel 1 por más de 100.000; sin utilizables ni bienes de forja. Reserva 100.000 más tarifa; anuncios a 24 horas.' : 'Módulo no seleccionado en esta configuración.'));
+      content.append(textElement('div','sectionlabel','Vendedores excluidos'),textElement('p','small','No comprar oro ni alimento a estos jugadores. Un nombre exacto por línea; se ignoran mayúsculas. Solo para este personaje y navegador.'));
+      if (BUILD_CONFIG.marketProfile==='huggin') content.append(textElement('p','small','Perfil huggin activo: '+BUILD_CONFIG.blockedMarketSellers.join(', ')+'. Estas exclusiones se mantienen mientras uses este perfil.'));
+      const sellerList=document.createElement('textarea');
+      sellerList.setAttribute('aria-label','Jugadores excluidos de compras'); sellerList.rows=3;
+      sellerList.style.cssText='width:100%;max-width:100%;padding:8px;color:#ece6d9;background:#151b23;border:1px solid #806c4d;border-radius:6px;font:inherit';
+      sellerList.value=Array.isArray(state.blockedMarketSellers) ? state.blockedMarketSellers.join('\n') : '';
+      const saveSellers=textElement('button','btn','Guardar exclusiones');
+      saveSellers.onclick=()=>{if(!ownerActive)return;state.blockedMarketSellers=[...new Set(sellerList.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];save();state.message='Exclusiones de vendedores guardadas.';contentKey='';saveSellers.blur();renderStatus();};
+      content.append(sellerList,saveSellers);
       if (state.foodBuyTx?.stage==='buy') content.append(textElement('p','small','Compra de alimento pendiente: continuará automáticamente si no se confirma.'));
       if (['buy','verifyBuy'].includes(state.goldTx?.stage)) content.append(textElement('p','small','Compra pendiente: comprobaré automáticamente mercado y paquetes sin repetirla.'));
       if (BUILD_CONFIG.modules.smelting || state.smeltTx) content.append(textElement('div','sectionlabel','Fundición'),textElement('p','small',state.smeltTx?.blocked ? 'Bloqueada: '+state.smeltTx.problem : state.smeltTx ? 'Etapa: '+state.smeltTx.stage : 'Activa: '+(BUILD_CONFIG.smeltingPriority==='crystal'?'prioridad cristal':BUILD_CONFIG.smeltingPriority==='stamina'?'prioridad tintura':'equipo verde o azul')+'.'));
@@ -122,11 +131,11 @@
       content.append(textElement('div','sectionlabel','Registro de combate'),textElement('p','small',`${state.records.length} resultados guardados · Consulta la pestaña Rivales en Circo Turma.`));
       content.append(textElement('div','sectionlabel','Reinicio total'));
       if (resetConfirmation) {
-        content.append(textElement('p','small','Se detendrá el bot y se borrarán los ciclos pendientes, exclusiones, historial y estadísticas de este personaje en este navegador. Revisa primero compras y anuncios: el juego no se reinicia y podrían repetirse operaciones al reactivar.'));
+        content.append(textElement('p','small','Se detendrá el bot y se borrarán los ciclos pendientes, historial y estadísticas; se conservan los vendedores excluidos de este personaje en este navegador. Revisa primero compras y anuncios: el juego no se reinicia y podrían repetirse operaciones al reactivar.'));
         const confirmReset=textElement('button','btn','Confirmar reinicio total');
         confirmReset.onclick=()=>{
           if (!ownerActive) return;
-          state={running:false,goldEnabled:false,goldAutoDefaultV1:true,records:[],logs:[],statsEvents:[],statsStartedAt:Date.now(),message:'Reinicio total completado. Revisa el juego antes de activar el bot.'};
+          state={blockedMarketSellers:state.blockedMarketSellers,running:false,goldEnabled:false,goldAutoDefaultV1:true,records:[],logs:[],statsEvents:[],statsStartedAt:Date.now(),message:'Reinicio total completado. Revisa el juego antes de activar el bot.'};
           log('Reinicio total solicitado por el jugador.','warn'); save(); resetConfirmation=false; contentKey=''; confirmReset.blur(); renderStatus();
         };
         const cancelReset=textElement('button','btn','Cancelar reinicio');
