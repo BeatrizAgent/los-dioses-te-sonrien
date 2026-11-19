@@ -585,11 +585,16 @@
     if(!item || !repairSame(item,tx.item) || item.refinement!==100) return false;
     state.repairTx=null;state.repairNextAt=Date.now()+300000;state.message='Pieza comprobada en su ranura; reparación pendiente resuelta.';log(state.message,'success');save();return true;
   }
-  function repairBagReady(bag,inv) {
+  function repairBagReady(bag,inv,expected=null) {
     const now=Date.now();
     const selected=bag.classList.contains('current');
     const loading=state.repairBagSwitchAt && now-state.repairBagSwitchAt<5000;
-    const stale=!inv || [...inv.querySelectorAll('.ui-draggable')].some(item=>item.getAttribute('data-container-number')!=='514');
+    const entries=inv ? [...inv.querySelectorAll('.ui-draggable')] : [];
+    // Traslado/re-equipamiento: una pieza única identificada en el contenedor
+    // correcto prueba su ubicación aunque otro elemento tenga datos antiguos.
+    const target=expected && validItemHash(expected.hash) ? entries.filter(item=>item.getAttribute('data-hash')===expected.hash) : [];
+    const targetVerified=selected && target.length===1 && target[0].getAttribute('data-container-number')==='514' && repairSame(repairItem(target[0]),expected.item);
+    const stale=!inv || (!targetVerified && entries.some(item=>item.getAttribute('data-container-number')!=='514'));
     if (!selected || loading || stale) {
       if (!state.repairBagWaitAt) {state.repairBagWaitAt=now;save();}
       if (now-state.repairBagWaitAt>=30000) {delete state.repairBagWaitAt;delete state.repairBagSwitchAt;save();return null;}
@@ -667,7 +672,7 @@
         if(!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv)return true;
         // Aún no se ha enviado pieza ni pago al banco. Intentar devolverla a
         // su ranura original, con las mismas comprobaciones de identidad.
-        {const ready=repairBagReady(bag,inv);if(ready===null)return repairRestore('Baúl III sin confirmar en banco de trabajo.');if(!ready)return true;}
+        {const ready=repairBagReady(bag,inv,{hash:tx.item.hash,item:tx.item});if(ready===null)return repairRestore('Baúl III sin confirmar en banco de trabajo.');if(!ready)return true;}
         const item=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
         if(item.length!==1)return fail('Pieza original no identificable en baúl III.');
         const free=slots.findIndex(x=>x.classList.contains('forge_closed'));if(free<0)return repairRestore('No hay hueco libre en el banco de trabajo.');
@@ -770,7 +775,7 @@
     }
     if(['equip','verifyEquip','restore','verifyRestore'].includes(tx.stage)) {
       if(mod!=='overview'||(params.has('doll')&&!['0','1'].includes(params.get('doll')))){if(!smeltNav('#mainmenu a[href*="mod=overview"]','overview',null,'Volviendo al personaje para equipar.')&&now-tx.at>25000)return fail('No se pudo abrir el personaje.');return true;}
-      if(!visible(bag)||!inv)return true;{const ready=repairBagReady(bag,inv);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
+      if(!visible(bag)||!inv)return true;
       const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
       if(!target)return fail('Ranura original no verificable.');
       const equipped=repairItem(target.querySelector('[data-tooltip][data-basis]'));
@@ -785,6 +790,7 @@
         if(equipped&&equipped.hash===tx.newHash&&equipped.refinement===100&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.newHash)){state.repairTx=null;state.repairNextAt=now;state.message='Pieza reparada y equipada: '+tx.item.name;log(state.message,'success');save();return true;}
         if(now-tx.actionAt>20000)return fail('Reequipamiento sin confirmar.');return true;
       }
+      {const hash=tx.stage==='equip'?tx.newHash:tx.stage==='restore'?tx.item?.hash:null;const ready=repairBagReady(bag,inv,hash?{hash,item:tx.item}:null);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
       if(equipped||target.querySelector('[data-basis]'))return fail('Ranura original ocupada.');
       if(tx.stage==='restore'){
         const original=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
