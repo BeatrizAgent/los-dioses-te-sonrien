@@ -124,6 +124,8 @@ Tras el número de derrotas consecutivas confirmadas contra el mismo enemigo ele
 
 ## Paquetes de oro (0.12.4)
 
+En 0.12.70, la búsqueda de objetos de oro revisa como máximo las dos primeras páginas, comenzando por la más reciente. Una coincidencia única en la primera página tiene prioridad; varias coincidencias en la misma página son ambiguas. La referencia previa cubre solo esas páginas y presupone el orden LIFO; no demuestra ausencia en páginas antiguas. Si hay páginas sin revisar, una compra incierta no se confirma solo por encontrar un paquete. Requiere validación instalada.
+
 El módulo admite ofertas de 100.000 a 1.000.000 de oro, sin limitarse a importes fijos. Selecciona la oferta válida más alta que deje una reserva de 100.000 después de compra y tarifa verificada, y anuncia el objeto al mismo precio durante 24 horas. Se conservan las demás comprobaciones de identidad y de operación pendiente. Este intervalo ampliado está probado en simulación; su aceptación y reventa en juego quedan pendientes de validar.
 
 ## Objetos de nivel 1 (0.12.5)
@@ -144,6 +146,8 @@ Una operación de oro pendiente al actualizar requiere revisión manual. En s64-
 Ante un aviso no reconocido en los cuadros del juego que el bot detecta, vuelve una vez a una página segura para intentar retirarlo y continuar. Conserva las operaciones pendientes y no confirma sus resultados por recargar. Si el aviso persiste se detiene para evitar un bucle; ante CAPTCHA o indicios de verificación pide intervención. La recuperación se ha probado en simulación, no con todos los avisos reales. Los diálogos nativos del navegador pueden bloquear JavaScript y no están cubiertos.
 
 ## Refinamiento experimental (0.12.12)
+
+En 0.12.70, si Crazy Addon confirma falta de materiales estándar y Ceres, se cancela la ranura y se recupera el paquete del banco para reequipar la pieza original. El ciclo termina solo al comprobar la pieza en su ranura. La cancelación y el refinamiento con reequipamiento se observaron manualmente en ComesAgapitus; la automatización modificada necesita validación instalada.
 
 Módulo opcional apagado por defecto. Vigila solo el equipo del personaje principal y selecciona una pieza con refinamiento del 50 % o menos. Utiliza el baúl III vacío, un hueco del banco de trabajo, oro dejando 100.000 de reserva y materiales del depósito estándar o Ceres mediante Crazy Addon. Solo inicia cuando la vista previa indica refinamiento final del 100 %. Recupera el paquete del banco y verifica que la pieza se equipa en su ranura original antes de continuar otras tareas. Una operación ambigua detiene el bot y conserva el estado para revisión; si no hay hueco o la tarifa no es verificable antes de pagar, intenta reequipar la pieza original.
 
