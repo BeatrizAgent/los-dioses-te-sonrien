@@ -136,7 +136,8 @@
       }
       return;
     }
-    if (state.repairTx && !state.repairTx.blocked) { safeRepairTick(); return; }
+    // No ejecutar otras tareas mientras la ubicación del equipo siga pendiente.
+    if (state.repairTx) { safeRepairTick(); return; }
     const hpText = (document.querySelector('#header_values_hp_percent')?.textContent || '').trim();
     const hpMatch = hpText.match(/^(\d{1,3})\s*%$/);
     const reading=healthReading(), current=reading?.current, maximum=reading?.maximum;

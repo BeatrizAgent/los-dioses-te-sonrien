@@ -206,6 +206,8 @@ La 0.12.61 reserva una casilla del baúl I durante la recogida periódica y apla
 La 0.12.62 espera informes de combate incompletos, reconoce como derrota la victoria de un defensor identificado y confirma la cancelación aunque la entrada esté deshabilitada por espera. El reinicio al límite está comprobado en simulación; un informe real de derrota y el ciclo completo siguen pendientes de validación en juego.
 # Cambios 0.12.64
 
+Versión 0.12.67: mientras exista una reparación pendiente, incluso bloqueada, la cola no procesa otras tareas ni fundición. Los efectos de fundición pendientes se conservan sin repetir y se revisan tras resolver la reparación. Probado en simulación; pendiente de instalación y validación de reparación completa en juego.
+
 Versión 0.12.66: reintenta seleccionar el baúl III y reanuda automáticamente etapas seguras bloqueadas por falta de confirmación del baúl. No reenvía pagos, traslados ni acciones de resultado incierto. Probado en simulación; no demuestra que el ciclo real de reparación se complete.
 
 La versión 0.12.65 busca la pieza reparada desde la primera página y recoge la primera coincidencia inequívoca sin recorrer las siguientes. Varios objetos coincidentes en la misma página bloquean la recogida. Si el baúl no se confirma antes de enviar la pieza al banco, intenta devolver la pieza original. El orden reciente se observó para paquetes con la misma duración; no se ha demostrado para todas las categorías o duraciones. Pendiente de validación instalada.

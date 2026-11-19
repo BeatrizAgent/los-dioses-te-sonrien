@@ -96,6 +96,22 @@ test('vida baja aplazada no inicia recogida periódica de utilizables', () => {
   assert.equal(collected,false);assert.equal(state.packageCollectTrip,undefined);assert.match(state.message,/Vida baja/);
 });
 
+test('reparación recuperable tiene prioridad sobre lectura de fundición',()=>{
+ const calls=[],state={running:true,repairTx:{blocked:true},smeltTx:{stage:'search'}};
+ const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,BUILD_CONFIG:{modules:{repair:true}},document:{querySelector:()=>null},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,safeRepairTick:()=>{calls.push('repair');return true;},safeSmeltingTick:()=>{calls.push('smelt');return true;},save(){},log(){}};
+ vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);assert.deepEqual(calls,['repair']);
+});
+test('fundición con pago pendiente queda intacta mientras hay reparación',()=>{
+ const calls=[],state={running:true,repairTx:{blocked:true},smeltTx:{stage:'rent'}};
+ const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,BUILD_CONFIG:{modules:{repair:true}},document:{querySelector:()=>null},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,safeRepairTick:()=>{calls.push('repair');return true;},safeSmeltingTick:()=>{calls.push('smelt');return true;},save(){},log(){}};
+ vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);assert.deepEqual(calls,['repair']);assert.equal(state.smeltTx.stage,'rent');
+});
+test('reparación bloqueada mantiene detenida la cola aunque no pueda reanudarse',()=>{
+ const calls=[],state={running:true,repairTx:{blocked:true},smeltTx:{stage:'search'}};
+ const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,BUILD_CONFIG:{modules:{repair:true}},document:{querySelector:()=>null},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),safeRepairTick:()=>{calls.push('repair');return false;},safeSmeltingTick:()=>{calls.push('smelt');return true;},goldTick:()=>{calls.push('gold');return false;},pveTick:()=>{calls.push('pve');return false;},save(){},log(){}};
+ vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);assert.deepEqual(calls,['repair']);
+});
+
 test('espera en página actual cuando arena y circo están en enfriamiento', () => {
   const state={running:true};let navigations=0,message='';
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,ID:'id',

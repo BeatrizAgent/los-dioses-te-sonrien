@@ -434,6 +434,7 @@
   function smeltDone(message) { state.smeltTx=null;state.smeltNextAt=Date.now()+120000;state.message=message;log(message);save(); }
   function smeltingTick() {
     const now=Date.now();
+    if (state.repairTx) return false;
     if (!BUILD_CONFIG.modules.smelting && !state.smeltTx) return false;
     let tx=state.smeltTx;
     // Solo se reinician lecturas/navegación: ninguna de estas etapas envía
@@ -573,7 +574,7 @@
   function repairBlock(message) {
     if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;}
     if (repairAcknowledge(true)) { state.message='Reparación aplazada: '+message+' Pieza verificada en su ranura; continúo con las demás tareas.';log(state.message,'warn');save();return; }
-    state.message='Reparación sin confirmar: '+message+' Continúo con las demás tareas.'; log(state.message,'warn'); save();
+    state.message='Reparación sin confirmar: '+message+' Pauso las demás tareas hasta recuperar la pieza.'; log(state.message,'warn'); save();
   }
   function repairRestore(message) { state.repairTx.stage='restore';state.repairTx.reason=message;state.repairTx.at=Date.now();save();return true; }
   function repairAcknowledge(allowRunning=false) {
@@ -581,7 +582,7 @@
     if (!tx?.blocked || (state.running && !allowRunning) || mod!=='overview' || !mainGladiatorSelected() || (params.has('doll')&&!['0','1'].includes(params.get('doll'))) || !/^(?:[2-9]|1[01])$/.test(String(tx.slot||''))) return false;
     const target=document.querySelector('#char > .ui-droppable[data-container-number="'+tx.slot+'"]');
     const item=repairItem(target?.querySelector('[data-tooltip][data-basis]'));
-    if(!item || !repairSame(item,tx.item) || (item.hash!==tx.item.hash && item.refinement!==100)) return false;
+    if(!item || !repairSame(item,tx.item) || item.refinement!==100) return false;
     state.repairTx=null;state.repairNextAt=Date.now()+300000;state.message='Pieza comprobada en su ranura; reparación pendiente resuelta.';log(state.message,'success');save();return true;
   }
   function repairBagReady(bag,inv) {
@@ -774,7 +775,10 @@
       if(!target)return fail('Ranura original no verificable.');
       const equipped=repairItem(target.querySelector('[data-tooltip][data-basis]'));
       if(tx.stage==='verifyRestore'){
-        if(equipped&&equipped.hash===tx.item.hash&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.item.hash)){state.repairTx=null;state.repairNextAt=now+300000;state.message='Pieza original reequipada; '+tx.reason;log(state.message,'warn');save();return true;}
+        if(equipped&&equipped.hash===tx.item.hash&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.item.hash)){
+          if(equipped.refinement===100){state.repairTx=null;state.repairNextAt=now;state.message='Pieza reparada y equipada: '+tx.item.name;log(state.message,'success');save();return true;}
+          tx.blocked=true;tx.problem='Pieza original reequipada sin reparación completa. '+(tx.reason||'');state.message='Pieza original reequipada sin reparar; demás tareas pausadas.';log(state.message,'warn');save();return true;
+        }
         if(now-tx.actionAt>20000)return fail('Reequipamiento original sin confirmar.');return true;
       }
       if(tx.stage==='verifyEquip'){

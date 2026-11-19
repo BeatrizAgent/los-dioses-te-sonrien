@@ -20,6 +20,7 @@ test('confirma fundición solo con hueco en marcha y baúl correcto',()=>{
  const x=setup({stage:'rent',slot:2,hash:'opaque',name:'Guantes',at:Date.now(),actionAt:Date.now()-21000},{inventoryItemByHash:()=>({})});x.c.smeltingTick();assert.equal(x.state.smeltTx.blocked,true);
 });
 test('operación ya bloqueada no se repite',()=>{const {c,state}=setup({stage:'rent',blocked:true,at:Date.now()});assert.equal(c.smeltingTick(),false);assert.equal(state.smeltTx.blocked,true);});
+test('nunca procesa ni inicia fundición mientras reparación siga pendiente',()=>{for(const tx of [null,{stage:'rent',at:Date.now()}]){const x=setup(tx);x.state.repairTx={blocked:true,stage:'restore'};assert.equal(x.c.smeltingTick(),false);assert.equal(x.state.smeltTx,tx);}});
 
 test('configuración conserva prioridad de fundición en enlace y compilación', async () => {
   const {normalizeBuildConfig}=await import('../src/lib/build-config.mjs');
