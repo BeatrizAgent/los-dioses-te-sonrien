@@ -206,6 +206,8 @@ La 0.12.61 reserva una casilla del baúl I durante la recogida periódica y apla
 La 0.12.62 espera informes de combate incompletos, reconoce como derrota la victoria de un defensor identificado y confirma la cancelación aunque la entrada esté deshabilitada por espera. El reinicio al límite está comprobado en simulación; un informe real de derrota y el ciclo completo siguen pendientes de validación en juego.
 # Cambios 0.12.64
 
+Versión 0.12.69: un pendiente reparado llegó al baúl III desde paquetes con `data-container-number` ausente; la comprobación quedó bloqueada en `collect`. La corrección admite ese atributo ausente únicamente para la pieza reparada identificada y permite reanudar la comprobación sin repetir recogida. Pruebas simuladas; reequipamiento real pendiente.
+
 Versión 0.12.68: una revisión anterior exigía que todos los objetos declarasen el baúl III, incluso si la pieza de reparación estaba identificada allí. El cambio acepta esa pieza si es única, coincide con la identidad guardada y declara el contenedor III; confirma el reequipamiento desde la ranura. No se reprodujo el fallo original en vivo y el ciclo completo sigue pendiente de validar instalado.
 
 Versión 0.12.67: mientras exista una reparación pendiente, incluso bloqueada, la cola no procesa otras tareas ni fundición. Los efectos de fundición pendientes se conservan sin repetir y se revisan tras resolver la reparación. Probado en simulación; pendiente de instalación y validación de reparación completa en juego.

@@ -593,7 +593,10 @@
     // Traslado/re-equipamiento: una pieza única identificada en el contenedor
     // correcto prueba su ubicación aunque otro elemento tenga datos antiguos.
     const target=expected && validItemHash(expected.hash) ? entries.filter(item=>item.getAttribute('data-hash')===expected.hash) : [];
-    const targetVerified=selected && target.length===1 && target[0].getAttribute('data-container-number')==='514' && repairSame(repairItem(target[0]),expected.item);
+    const container=target.length===1 ? target[0].getAttribute('data-container-number') : null;
+    // Crazy Addon puede dejar el atributo ausente tras recoger un paquete.
+    // Solo admitirlo para la pieza reparada identificada por el hash guardado.
+    const targetVerified=selected && target.length===1 && (container==='514' || (container===null && expected.allowMissingContainer===true)) && repairSame(repairItem(target[0]),expected.item);
     const stale=!inv || (!targetVerified && entries.some(item=>item.getAttribute('data-container-number')!=='514'));
     if (!selected || loading || stale) {
       if (!state.repairBagWaitAt) {state.repairBagWaitAt=now;save();}
@@ -611,7 +614,7 @@
       if (repairAcknowledge(true)) return false;
       // Sólo reanudar etapas de lectura o previas al arrastre; nunca repetir
       // pagos, envíos o movimientos cuya confirmación esté pendiente.
-      if (tx.problem==='Baúl III sin confirmar.' && ['workbench','search','find','equip','restore'].includes(tx.stage) && now>=(tx.bagRecoveryAt||0)) {
+      if (tx.problem==='Baúl III sin confirmar.' && ['workbench','search','find','collect','equip','restore'].includes(tx.stage) && now>=(tx.bagRecoveryAt||0)) {
         tx.blocked=false;tx.bagRecoveryAt=now+60000;tx.at=now;delete state.repairBagWaitAt;delete state.repairBagSwitchAt;
         state.message='Reintentando comprobar baúl III para completar reparación.';log(state.message,'warn');save();return true;
       }
@@ -729,7 +732,7 @@
     if(tx.stage==='search' || tx.stage==='find' || tx.stage==='collect') {
       if(mod!=='packages') {if(!smeltNav('#menue_packages','packages',null,'Buscando pieza reparada en paquetes.') && now-tx.at>25000)return fail('No se pudieron abrir los paquetes.');return true;}
       if(!visible(bag)||!inv||!document.querySelector('#packages'))return true;
-      {const ready=repairBagReady(bag,inv);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
+      {const expected=tx.stage==='collect' && validItemHash(tx.newHash)?{hash:tx.newHash,item:tx.item,allowMissingContainer:true}:null;const ready=repairBagReady(bag,inv,expected);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
       const packages=document.querySelector('#packages');
       if(tx.stage==='collect') {
         const found=bagItems().filter(x=>x.hash===tx.newHash&&repairSame(x,tx.item));
@@ -790,7 +793,7 @@
         if(equipped&&equipped.hash===tx.newHash&&equipped.refinement===100&&repairSame(equipped,tx.item)&&!bagItems().some(x=>x.hash===tx.newHash)){state.repairTx=null;state.repairNextAt=now;state.message='Pieza reparada y equipada: '+tx.item.name;log(state.message,'success');save();return true;}
         if(now-tx.actionAt>20000)return fail('Reequipamiento sin confirmar.');return true;
       }
-      {const hash=tx.stage==='equip'?tx.newHash:tx.stage==='restore'?tx.item?.hash:null;const ready=repairBagReady(bag,inv,hash?{hash,item:tx.item}:null);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
+      {const hash=tx.stage==='equip'?tx.newHash:tx.stage==='restore'?tx.item?.hash:null;const ready=repairBagReady(bag,inv,hash?{hash,item:tx.item,allowMissingContainer:tx.stage==='equip'}:null);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
       if(equipped||target.querySelector('[data-basis]'))return fail('Ranura original ocupada.');
       if(tx.stage==='restore'){
         const original=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
