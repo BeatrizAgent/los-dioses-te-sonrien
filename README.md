@@ -224,3 +224,5 @@ La reparación comprueba huecos contiguos en el baúl III y apunta al espacio li
 
 
 En 0.12.71, el generador admite nivel 102, Mina y sus cuatro rivales, y Externsteine avanzada. En Externsteine prioriza al Pastor del Árbol y omite los tres fanáticos para acortar la ruta; comprueba el nombre de la instancia. La ruta completa y la automatización instalada requieren validación en juego.
+
+En 0.12.72, la instancia de Externsteine se identifica por el elemento de nombre real del juego, que aparece unido al texto de apertura; la cancelación también lee ese elemento. Pendiente de validación automática instalada.

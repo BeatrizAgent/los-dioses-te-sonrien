@@ -245,8 +245,9 @@
         else { if (Date.now()-reset.at>30000) return deferDungeon('Cancelación de mazmorra sin confirmar; no se repetirá.',true); return true; }
       } else if (reset.phase==='needed') {
         const cancel=[...document.querySelectorAll('#content input[type="submit"]')].find(x=>x.value==='Cancelar Mazmorra' && visible(x) && !x.disabled);
+        const instanceName=document.querySelector('#content h3 .dungeon_header_open')?.textContent;
         const instanceTitle=document.querySelector('#content h3')?.textContent || '';
-        const titleMatches=sameName(instanceTitle).startsWith(sameName(dungeon.name)+' ');
+        const titleMatches=instanceName ? sameName(instanceName)===sameName(dungeon.name) : sameName(instanceTitle).startsWith(sameName(dungeon.name)+' ');
         const form=cancel?.form; let u; try { u=new URL(form?.getAttribute('action'),location.href); } catch {}
         const id=form?.querySelector('input[type="hidden"][name="dungeonId"]');
         const csrf=form?.querySelector('input[type="hidden"][name="csrf_token"]');
@@ -264,8 +265,8 @@
     const fights=[...document.querySelectorAll('#content img[onclick^="startFight"]')].filter(x=>visible(x) && /^\s*startFight\(\s*(['"])\d+\1\s*,\s*(['"])\d+\2\s*\)\s*;\s*showWait\(\s*\)\s*;\s*return\s+false\s*;?\s*$/.test(x.getAttribute('onclick') || '') && !/rub[ií]|diamant|premium/i.test(x.outerHTML));
     let fight=fights[0];
     if (dungeon.id==='dungeon-externsteine') {
-      const title=sameName(document.querySelector('#content h3')?.textContent);
-      if (!title.startsWith('externsteine ')) return deferDungeon('La instancia activa no coincide con Externsteine.');
+      const instanceName=document.querySelector('#content h3 .dungeon_header_open')?.textContent;
+      if (sameName(instanceName)!=='externsteine') return deferDungeon('La instancia activa no coincide con Externsteine.');
       const fightId=x=>Number((x.getAttribute('onclick') || '').match(/^\s*startFight\(\s*['"](\d+)['"]/)?.[1]);
       // Ruta observada: pastor, sacerdotes, doncella y jefe; 1–3 son fanáticos opcionales.
       fight=[8,6,9,7].map(id=>fights.find(x=>fightId(x)===id)).find(Boolean);
