@@ -655,7 +655,9 @@
       if(slots.length!==6||active<0)return true;
       if(tx.stage==='workbench') {
         if(!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv)return true;
-        {const ready=repairBagReady(bag,inv);if(ready===null)return fail('Baúl III sin confirmar.');if(!ready)return true;}
+        // Aún no se ha enviado pieza ni pago al banco. Intentar devolverla a
+        // su ranura original, con las mismas comprobaciones de identidad.
+        {const ready=repairBagReady(bag,inv);if(ready===null)return repairRestore('Baúl III sin confirmar en banco de trabajo.');if(!ready)return true;}
         const item=bagItems().filter(x=>x.hash===tx.item.hash&&repairSame(x,tx.item));
         if(item.length!==1)return fail('Pieza original no identificable en baúl III.');
         const free=slots.findIndex(x=>x.classList.contains('forge_closed'));if(free<0)return repairRestore('No hay hueco libre en el banco de trabajo.');
@@ -742,8 +744,13 @@
         if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return fail('Página de paquetes repetida.');
         if(fp)scan.fingerprints[page]=fp;
         for(const x of matches){if(scan.matches.some(m=>m.hash===x.hash))return fail('Pieza reparada ambigua.');scan.matches.push({hash:x.hash,page});}
-        scan.pages.push(page);save();const next=document.querySelector('.paging_right_step');
-        if(visible(next)){if(page>=100||!go(page+1))return fail('No se pudo abrir la siguiente página de la pieza reparada.');return true;}
+        scan.pages.push(page);save();
+        // Priorizar la primera coincidencia bajo el orden reciente observado.
+        // No se ha verificado el orden para todas las duraciones de paquete.
+        if(scan.matches.length>1)return fail('Pieza reparada ambigua en la página actual.');
+        if(scan.matches.length===1){scan.complete=true;save();}
+        const next=document.querySelector('.paging_right_step');
+        if(!scan.complete && visible(next)){if(page>=100||!go(page+1))return fail('No se pudo abrir la siguiente página de la pieza reparada.');return true;}
         if(scan.matches.length===0&&tx.packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);tx.stage='search';tx.at=now;save();return true;}
         if(scan.matches.length!==1)return fail('No se identificó una pieza reparada única.');scan.complete=true;save();
       }

@@ -39,10 +39,13 @@ test('página repetida en reparación se bloquea sin trasladar pieza',()=>{
 });
 
 
-test('pieza hallada antes vuelve a su página solo tras comprobar las demás',()=>{
- const x=repairFixture();x.setItemPage(1);x.c.repairTick();assert.equal(x.moves,0);assert.equal(x.visits,1);
- x.setPage(2);x.tx.loadedAt=Date.now()-6000;x.c.repairTick();assert.equal(x.moves,0);assert.equal(x.visits,2);assert.equal(x.tx.scan.complete,true);
- x.setPage(1);x.tx.loadedAt=Date.now()-6000;x.c.repairTick();assert.equal(x.moves,1);assert.equal(x.tx.stage,'collect');
+test('pieza reciente se recoge en primera página sin visitar las antiguas',()=>{
+ const x=repairFixture();x.setItemPage(1);x.c.repairTick();assert.equal(x.moves,1);assert.equal(x.visits,0);assert.equal(x.tx.stage,'collect');
+});
+test('dos piezas idénticas en página actual bloquean recogida ambigua',()=>{
+ const x=repairFixture();let moves=0;const make=hash=>({getAttribute:k=>k==='data-hash'?hash:null,hasAttribute:()=>true,closest:()=>({textContent:'Banco de trabajo'}),dispatchEvent:()=>moves++});const a=make('a'),b=make('b');const lookup=x.c.document.querySelector;
+ x.c.document.querySelector=s=>s==='#packages'?{querySelectorAll:()=>[a,b]}:lookup(s);x.c.repairItem=e=>({...x.tx.item,hash:e.getAttribute('data-hash'),refinement:100,el:e});
+ x.c.repairTick();assert.equal(x.tx.blocked,true);assert.equal(moves,0);assert.equal(x.visits,0);
 });
 test('búsqueda de pieza en carga no falla ni envía otra acción',()=>{
  const x=repairFixture();x.tx.searchRequestedAt=Date.now();x.c.params=new URLSearchParams('mod=packages&f=0');
