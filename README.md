@@ -206,6 +206,8 @@ La 0.12.61 reserva una casilla del baúl I durante la recogida periódica y apla
 La 0.12.62 espera informes de combate incompletos, reconoce como derrota la victoria de un defensor identificado y confirma la cancelación aunque la entrada esté deshabilitada por espera. El reinicio al límite está comprobado en simulación; un informe real de derrota y el ciclo completo siguen pendientes de validación en juego.
 # Cambios 0.12.64
 
+Versión 0.12.66: reintenta seleccionar el baúl III y reanuda automáticamente etapas seguras bloqueadas por falta de confirmación del baúl. No reenvía pagos, traslados ni acciones de resultado incierto. Probado en simulación; no demuestra que el ciclo real de reparación se complete.
+
 La versión 0.12.65 busca la pieza reparada desde la primera página y recoge la primera coincidencia inequívoca sin recorrer las siguientes. Varios objetos coincidentes en la misma página bloquean la recogida. Si el baúl no se confirma antes de enviar la pieza al banco, intenta devolver la pieza original. El orden reciente se observó para paquetes con la misma duración; no se ha demostrado para todas las categorías o duraciones. Pendiente de validación instalada.
 
 La reparación comprueba huecos contiguos en el baúl III y apunta al espacio libre, incluso si hay otros objetos. Las búsquedas previas de oro y alimento para curación terminan al encontrar una coincidencia. Un vigilante de PvE intenta recuperar la navegación tras cinco minutos disponibles sin bajar puntos, pausando su reloj durante operaciones pendientes. Pruebas simuladas; quedan pendientes ciclos reales con baúles parcialmente ocupados y recuperación de atascos.

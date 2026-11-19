@@ -591,8 +591,8 @@
     const stale=!inv || [...inv.querySelectorAll('.ui-draggable')].some(item=>item.getAttribute('data-container-number')!=='514');
     if (!selected || loading || stale) {
       if (!state.repairBagWaitAt) {state.repairBagWaitAt=now;save();}
-      if (now-state.repairBagWaitAt>=15000) {delete state.repairBagWaitAt;delete state.repairBagSwitchAt;save();return null;}
-      if (!selected && !state.repairBagSwitchAt) {state.repairBagSwitchAt=now;save();bag.click();}
+      if (now-state.repairBagWaitAt>=30000) {delete state.repairBagWaitAt;delete state.repairBagSwitchAt;save();return null;}
+      if (!selected && (!state.repairBagSwitchAt || now-state.repairBagSwitchAt>=5000)) {state.repairBagSwitchAt=now;save();bag.click();}
       return false;
     }
     if (state.repairBagSwitchAt || state.repairBagWaitAt) {delete state.repairBagSwitchAt;delete state.repairBagWaitAt;save();}
@@ -601,7 +601,16 @@
   function repairTick() {
     let tx=state.repairTx; const now=Date.now();
     if (!BUILD_CONFIG.modules.repair && !tx) return false;
-    if (tx?.blocked) { repairAcknowledge(true); return false; }
+    if (tx?.blocked) {
+      if (repairAcknowledge(true)) return false;
+      // Sólo reanudar etapas de lectura o previas al arrastre; nunca repetir
+      // pagos, envíos o movimientos cuya confirmación esté pendiente.
+      if (tx.problem==='Baúl III sin confirmar.' && ['workbench','search','find','equip','restore'].includes(tx.stage) && now>=(tx.bagRecoveryAt||0)) {
+        tx.blocked=false;tx.bagRecoveryAt=now+60000;tx.at=now;delete state.repairBagWaitAt;delete state.repairBagSwitchAt;
+        state.message='Reintentando comprobar baúl III para completar reparación.';log(state.message,'warn');save();return true;
+      }
+      return false;
+    }
     if (!tx) {
       if (now<(state.repairNextAt||0) || state.goldTx || state.smeltTx || state.pendingFight || state.pendingPve || state.pending) return false;
       if (!Number.isSafeInteger(goldBalance()) || goldBalance()<101000) {state.repairNextAt=now+300000;save();return false;}
