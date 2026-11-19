@@ -78,3 +78,5 @@ test('releer la misma página tras un error no reinicia plazo de aislamiento',()
  const x=fixture({names:['Ojo de Ra','Ojo de Ra']});x.tx.readProgress={key:'packages:packages:0:Ojo de Ra',page:1};x.tx.unresolvedSince=Date.now()-30000;
  assert.equal(x.c.goldTick(),false);assert.equal(x.tx.blocked,true);assert.ok(x.tx.unresolvedSince<=Date.now()-30000);
 });
+
+test('una coincidencia reciente descarta la compra sin recorrer páginas antiguas',()=>{const x=fixture({next:true});x.tx.stage='baseline';assert.equal(x.c.goldTick(),false);assert.equal(x.state.goldTx,null);assert.equal(x.location.destination,undefined);});

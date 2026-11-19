@@ -72,7 +72,7 @@
     if (!ownerActive) return;
     if (state.running) return stop('Misiones detenidas por el jugador.');
     if (!verified() || captcha()) return stop('Abre Visión general para verificar identidad; comprueba que no haya CAPTCHA.');
-  state.running = true; state.lastNavigationAt = 0; state.message = 'Misiones y combate activados.'; log('Bot activado.'); save(); renderStatus();
+  state.running = true; state.lastNavigationAt = 0; state.pveWatch={}; state.message = 'Misiones y combate activados.'; log('Bot activado.'); save(); renderStatus();
     setTimeout(combatTick, 300);
   };
   $('.go').onclick = () => { const link = document.querySelector('#mainmenu a[href*="mod=quests"]'); if (link && visible(link) && !captcha() && verified()) link.click(); else stop('No se pudo abrir el Panteón. Verifica la cuenta.'); };

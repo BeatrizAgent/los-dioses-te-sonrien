@@ -204,3 +204,6 @@ La 0.12.60 reconoce nombres de expedición abreviados mediante el nombre complet
 La 0.12.61 reserva una casilla del baúl I durante la recogida periódica y aplaza su revisión diez minutos cuando no queda espacio adicional; la curación urgente puede usarla. Evita recoger utilizables mientras se espera curación con vida baja, permite al módulo de oro avanzar si el mercado de comida está desactivado y evita navegar entre arenas mientras ambas esperan. Comprobado en simulación; pendiente de validar instalado en juego.
 
 La 0.12.62 espera informes de combate incompletos, reconoce como derrota la victoria de un defensor identificado y confirma la cancelación aunque la entrada esté deshabilitada por espera. El reinicio al límite está comprobado en simulación; un informe real de derrota y el ciclo completo siguen pendientes de validación en juego.
+# Cambios 0.12.64
+
+La reparación comprueba huecos contiguos en el baúl III y apunta al espacio libre, incluso si hay otros objetos. Las búsquedas previas de oro y alimento para curación terminan al encontrar una coincidencia. Un vigilante de PvE intenta recuperar la navegación tras cinco minutos disponibles sin bajar puntos, pausando su reloj durante operaciones pendientes. Pruebas simuladas; quedan pendientes ciclos reales con baúles parcialmente ocupados y recuperación de atascos.

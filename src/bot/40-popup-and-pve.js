@@ -95,6 +95,29 @@
     const limit=Number.isInteger(BUILD_CONFIG.dungeon?.lossLimit) ? BUILD_CONFIG.dungeon.lossLimit : 3;
     if (count>=limit && state.dungeonUnresolvedReset?.dungeonId!==dungeonId) state.dungeonReset={dungeonId,phase:'needed'};
   }
+  function pveStallTick(healthPercent) {
+    const now=Date.now(), busy=state.pendingPve || state.pendingFight || state.pendingLoot || state.pending || state.goldTx || state.foodBuyTx || state.smeltTx || state.repairTx || state.pendingHeal || state.pendingPackageFood || state.packageFoodTrip || state.packageCollectTrip || state.dungeonReset || state.pveEntryAt;
+    const watches=state.pveWatch || (state.pveWatch={});
+    let changed=false, stalled=null;
+    for (const [mode,selector,bar] of [['expedition','#expeditionpoints_value','#cooldown_bar_expedition'],['dungeon','#dungeonpoints_value','#cooldown_bar_dungeon']]) {
+      const text=(document.querySelector(selector)?.textContent || '').trim(), match=text.match(/^(\d+)(?:\s*\/\s*\d+)?$/), points=match ? Number(match[1]) : NaN;
+      const cooldown=document.querySelector(bar), enabled=BUILD_CONFIG.modules[mode] && BUILD_CONFIG[mode];
+      const eligible=enabled && !(mode==='dungeon' && (state.dungeonCombatUnknown || now<(state.dungeonRouteRetryAt||0))) && Number.isSafeInteger(points) && points>0 && cooldownSeconds(cooldown?.textContent)===0 && visible(cooldown?.querySelector('a'));
+      if (!eligible) {if(watches[mode]) {delete watches[mode];changed=true;} continue;}
+      const previous=watches[mode];
+      if (busy || healthPercent<=40) {if(previous && !previous.pausedAt){previous.pausedAt=now;changed=true;}continue;}
+      if (previous?.pausedAt) {previous.since+=Math.max(0,now-previous.pausedAt);delete previous.pausedAt;changed=true;}
+      if (!previous || !Number.isFinite(previous.since) || points<previous.points) {watches[mode]={points,since:now};changed=true;continue;}
+      if (now-previous.since>=300000 && now-(state.pveStallRecoveryAt||0)>=300000) stalled=stalled||mode;
+    }
+    if(changed)save();
+    if (!stalled || captcha() || !verified()) return false;
+    const link=document.querySelector('#mainmenu a[href*="mod=overview"]'); let url;
+    try {url=new URL(link?.getAttribute('href'),location.href);} catch {return false;}
+    if(!visible(link) || url.origin!==location.origin || url.pathname!=='/game/index.php' || url.searchParams.get('mod')!=='overview' || [...url.searchParams.keys()].some(k=>!['mod','sh'].includes(k))) return false;
+    if(!navigation(link,'Recuperando '+(stalled==='expedition'?'expedición':'mazmorra')+' sin avance; vuelvo a comprobar el juego.')) return false;
+    state.pveStallRecoveryAt=now;state.pveWatch={};state.pveTarget=null;delete state.pveRouteGuard;log('PvE sin avance durante cinco minutos: reinicio seguro de navegación.','warn');save();return true;
+  }
   function pveTick() {
     function deferDungeon(message,uncertain=false) {
       state.pveTarget=null;

@@ -346,7 +346,9 @@
         if(fp&&Object.entries(scan.fingerprints).some(([p,v])=>Number(p)!==page&&v===fp))return deferFoodCheck('Página de alimento repetida; volveré a comprobarla.');
         if(fp)scan.fingerprints[page]=fp;
         scan.matches+=listed.filter(e=>{const food=healingFood(e);return food && food.name===tx.name && food.amount===tx.amount && food.level===tx.level && e.getAttribute('data-basis')===tx.basis && (e.getAttribute('data-soulbound-to')||null)===tx.soul && /\bMercado\b/i.test(e.closest('.packageItem')?.textContent||'');}).length;
-        scan.pages.push(page);tx.at=now;save();if(visible(document.querySelector('.paging_right_step')))return page<100 && go(page+1) || deferFoodCheck('No se pudo abrir la siguiente página de alimento.');
+        scan.pages.push(page);tx.at=now;save();
+        if(tx.stage==='baseline' && scan.matches!==0 && !tx.support){state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;state.packageFoodTrip=true;delete state.packageScan;state.message='Ya hay alimento en paquetes; intentaré recogerlo.';save();return true;}
+        if(visible(document.querySelector('.paging_right_step')))return page<100 && go(page+1) || deferFoodCheck('No se pudo abrir la siguiente página de alimento.');
         if(tx.stage==='baseline') {
           if(scan.matches!==0 && !tx.support){state.foodBuyTx=null;state.foodBuyNeeded=false;state.healSkipUntil=0;state.packageFoodTrip=true;delete state.packageScan;state.message='Ya hay alimento en paquetes; intentaré recogerlo.';save();return true;}
           tx.baselineCount=scan.matches;tx.baselineComplete=true;tx.baselineEmpty=scan.matches===0;tx.stage='readyBuy';tx.at=now;delete tx.scan;delete tx.loadedAt;save();return true;

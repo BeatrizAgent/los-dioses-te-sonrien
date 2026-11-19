@@ -352,6 +352,7 @@
         if (!tx.readProgress || tx.readProgress.key!==progressKey || page>tx.readProgress.page) {tx.readProgress={key:progressKey,page};delete tx.unresolvedSince;}
         for (const match of matches) { const hash=match.getAttribute('data-hash'); if (!validItemHash(hash) || scan.matches.some(x=>x.hash===hash)) { goldPause('Identificadores de paquetes ambiguos.'); return false; } scan.matches.push({hash,page}); }
         scan.pages.push(page); save();
+        if (tx.stage==='baseline' && scan.matches.length) {state.goldTx=null;state.goldCheckAt=now+60000;state.message='Ya existe un paquete igual; omito esta oferta.';save();return false;}
         const next=document.querySelector('.paging_right_step');
         if (visible(next)) { if (page>=100 || !goPage(page+1)) { goldPause('No se pudo revisar la siguiente página de paquetes.'); return false; } return true; }
         if (scan.matches.length===0 && packageFilter.optimized){tx.packageFilter=packageBroadPlan(tx.item);delete tx.packageScan;delete tx.loadedAt;tx.at=now;save();return true;}
@@ -550,6 +551,25 @@
     return {el,name:name.trim(),refinement:Number(refinement[3]),refinementValue,refinementMax,hash,basis,quality,level,owner,width,height};
   }
   function repairSame(a,b) { return !!a && !!b && ['name','basis','quality','level','owner','width','height'].every(k=>a[k]===b[k]); }
+  // Devuelve un rectángulo libre para arrastrar al centro del hueco, no al centro del baúl.
+  function repairFreeRect(inv,item) {
+    if (!inv || !Number.isInteger(item?.width) || !Number.isInteger(item?.height) || item.width<1 || item.height<1) return null;
+    const box=inv.getBoundingClientRect(),cols=inv.offsetWidth/32,rows=inv.offsetHeight/32;
+    if (!Number.isInteger(cols)||!Number.isInteger(rows)||cols<item.width||rows<item.height||cols>20||rows>20||!Number.isFinite(box.left)||!Number.isFinite(box.top)||!Number.isFinite(box.width)||!Number.isFinite(box.height)||box.width<=0||box.height<=0)return null;
+    const cellX=box.width/cols,cellY=box.height/rows,used=[];
+    for(let y=0;y<rows;y++){const row=[];for(let x=0;x<cols;x++)row.push(false);used.push(row);}
+    for(const el of inv.querySelectorAll('.ui-draggable')) {
+      if(!visible(el)||!validItemHash(el.getAttribute('data-hash'))||(el.getAttribute('data-container-number')&&el.getAttribute('data-container-number')!=='514'))return null;
+      const w=Number(el.getAttribute('data-measurement-x')),h=Number(el.getAttribute('data-measurement-y')),rect=el.getBoundingClientRect(),dx=(rect.left-box.left)/cellX,dy=(rect.top-box.top)/cellY,x=Math.round(dx),y=Math.round(dy);
+      if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||!Number.isFinite(dx)||!Number.isFinite(dy)||Math.abs(dx-x)>.1||Math.abs(dy-y)>.1||x<0||y<0||x+w>cols||y+h>rows)return null;
+      for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++){if(used[j][i])return null;used[j][i]=true;}
+    }
+    for(let y=0;y<=rows-item.height;y++)for(let x=0;x<=cols-item.width;x++){
+      let free=true;for(let j=y;j<y+item.height;j++)for(let i=x;i<x+item.width;i++)if(used[j][i])free=false;
+      if(free)return {left:box.left+x*cellX,top:box.top+y*cellY,width:item.width*cellX,height:item.height*cellY};
+    }
+    return null;
+  }
   function repairBlock(message) {
     if(state.repairTx){state.repairTx.blocked=true;state.repairTx.problem=message;}
     if (repairAcknowledge(true)) { state.message='Reparación aplazada: '+message+' Pieza verificada en su ranura; continúo con las demás tareas.';log(state.message,'warn');save();return; }
@@ -598,14 +618,15 @@
       if (!visible(bag)||bag.getAttribute('data-available')!=='true'||!inv) {state.repairNextAt=now+300000;save();return false;}
       const bagReady=repairBagReady(bag,inv);
       if (bagReady!==true) {if(bagReady===null){state.repairNextAt=now+300000;state.message='Baúl III sin confirmar; reparación aplazada.';save();return false;}return true;}
-      if (inv.querySelector('[data-basis]')) {state.repairNextAt=now+300000;state.message='Baúl III ocupado; pospongo la reparación.';save();return false;}
       const equipped=[...document.querySelectorAll('#char > .ui-droppable[data-container-number] > [data-tooltip][data-basis]')].map(repairItem).filter(Boolean);
       const choice=equipped.find(x=>x.refinement<=50 && /^[2-9]$|^1[01]$/.test(x.el.parentElement?.getAttribute('data-container-number')||''));
       if (!choice) {state.repairNextAt=now+300000;save();return false;}
+      const freeRect=repairFreeRect(inv,choice);
+      if(!freeRect){state.repairNextAt=now+300000;state.message='Sin espacio verificable para reparar en baúl III; lo intentaré después.';save();return false;}
       const slot=choice.el.parentElement.getAttribute('data-container-number');
       tx=state.repairTx={stage:'unequip',at:now,slot,item:{name:choice.name,hash:choice.hash,basis:choice.basis,quality:choice.quality,level:choice.level,owner:choice.owner,width:choice.width,height:choice.height,refinementMax:choice.refinementMax},actionAt:now};
       state.message='Retirando equipo para reparar: '+choice.name;log(state.message,'action');save();
-      if (!dragFood(choice.el,inv)) repairBlock('No se pudo iniciar el traslado al baúl III.'); return true;
+      if (!dragFood(choice.el,{getBoundingClientRect:()=>freeRect})) repairBlock('No se pudo iniciar el traslado al baúl III.'); return true;
     }
     const fail=(message)=>{repairBlock(message);return true;};
     if (!Number.isFinite(tx.at)||now-tx.at>180000) return fail('Tiempo agotado con pieza pendiente.');
@@ -727,7 +748,7 @@
         if(scan.matches.length!==1)return fail('No se identificó una pieza reparada única.');scan.complete=true;save();
       }
       const found=scan.matches[0];if(page!==found.page){if(!go(found.page))return fail('No se pudo volver a la pieza reparada.');return true;}
-      const item=matches.find(x=>x.hash===found.hash);if(matches.length!==1||!item||!item.el.hasAttribute('data-gca-flag_double-click-event')||bagItems().length)return fail('Pieza o baúl III ambiguos antes de recoger.');
+      const item=matches.find(x=>x.hash===found.hash);if(matches.length!==1||!item||!item.el.hasAttribute('data-gca-flag_double-click-event')||!repairFreeRect(inv,tx.item)||bagItems().some(x=>x.hash===found.hash))return fail('Pieza o espacio del baúl III ambiguos antes de recoger.');
       tx.stage='collect';tx.newHash=found.hash;tx.at=now;tx.actionAt=now;save();item.el.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));return true;
     }
     if(['equip','verifyEquip','restore','verifyRestore'].includes(tx.stage)) {

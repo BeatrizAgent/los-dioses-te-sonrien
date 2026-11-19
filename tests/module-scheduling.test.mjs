@@ -26,7 +26,7 @@ function runCombat(mod, state = {}) {
   const context = { state: { running: true, ...state }, ownerActive: true, mod, sub: '', params: new URLSearchParams(), Date, Number,
     BUILD_CONFIG: { modules: { missions: true, arenaCircus: false } },
     document: { querySelector: s => s.includes('mod=quests') ? {} : null, querySelectorAll: () => [] },
-    visible: () => false, captcha: () => false, verified: () => true, lootTick: () => false, updateMessage: message => { context.state.message=message; },
+    visible: () => false, captcha: () => false, verified: () => true, lootTick: () => false, pveStallTick: () => false, updateMessage: message => { context.state.message=message; },
     healthReading: () => ({ current: 100, maximum: 100 }), goldTick: () => false, pveTick: () => { calls.push('pve'); return false; },
     questTick: () => calls.push('quest'), navigation: () => { calls.push('navigation'); return true; }, save() {}, log() {} };
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()')) + '\ncombatTick()', context);
@@ -46,7 +46,7 @@ test('sin enlace de Circo, misiones cede paso a PvE y no se repite cada ciclo', 
   const calls=[], state={running:true};
   const context={state,ownerActive:true,mod:'quests',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},
-    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,
     healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>{calls.push('pve');return true;},
     questTick:()=>calls.push('quest'),checkTurmaParticipation:()=>false,navigation:()=>false,save(){},log(){}};
   vm.createContext(context);vm.runInContext(combat.slice(combat.indexOf('  function combatTick()')),context);
@@ -58,7 +58,7 @@ test('temporizadores de Arena ausentes permiten visitar misiones', () => {
   const calls=[],state={running:true};
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{missions:true,arenaCircus:true}},ID:'identity',sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},
-    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,
     healthReading:()=>({current:100,maximum:100}),goldTick:()=>false,pveTick:()=>false,checkTurmaParticipation:()=>false,cooldownSeconds:()=>null,
     navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
@@ -69,7 +69,7 @@ test('búsqueda de alimento aplazada no bloquea oro', () => {
   const calls=[],state={running:true,foodSupportNeeded:true,foodBuyRetryAt:Date.now()+60000};
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{guildGold:true,foodMarket:true}},
-    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    document:{querySelector:()=>null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,
     healthReading:()=>({current:100,maximum:100}),goldBalance:()=>500000,goldTick:pending=>{calls.push(pending?'pendiente':'oro');return !pending;},
     foodMarketTick:()=>{throw Error('alimento aplazado');},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
@@ -80,7 +80,7 @@ test('apoyo de comida antiguo no bloquea oro si el módulo de comida está desac
   const calls=[],state={running:true,foodSupportNeeded:true};
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{guildGold:true,foodMarket:false}},document:{querySelector:()=>null},visible:()=>false,
-    captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:100,maximum:100}),
+    captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),
     goldTick:pending=>{calls.push(pending?'pendiente':'oro');return !pending;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.deepEqual(calls,['pendiente','oro']);
@@ -90,7 +90,7 @@ test('vida baja aplazada no inicia recogida periódica de utilizables', () => {
   const state={running:true,healSkipUntil:Date.now()+60000};let collected=false;
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{healing:true}},document:{querySelector:()=>null},visible:()=>false,
-    captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:10,maximum:100}),goldTick:()=>false,
+    captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:10,maximum:100}),goldTick:()=>false,
     packageFoodTick:()=>{collected=true;return true;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.equal(collected,false);assert.equal(state.packageCollectTrip,undefined);assert.match(state.message,/Vida baja/);
@@ -101,7 +101,7 @@ test('espera en página actual cuando arena y circo están en enfriamiento', () 
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,ID:'id',
     sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},BUILD_CONFIG:{modules:{arenaCircus:true}},
     document:{querySelector:s=>s==='#cooldown_bar_arena'?{textContent:'0:20'}:s==='#cooldown_bar_ct'?{textContent:'0:30'}:null},
-    visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,healthReading:()=>({current:100,maximum:100}),
+    visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),
     goldTick:()=>false,checkTurmaParticipation:()=>false,pveTick:()=>false,cooldownSeconds:s=>s==='0:20'?20:30,
     navigation:()=>{navigations++;return true;},updateMessage:m=>{message=m;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
@@ -112,7 +112,7 @@ test('vida baja con curación aplazada permite misiones pero no inicia PvE', () 
   const calls=[],state={running:true,healSkipUntil:Date.now()+60000,packageCollectAt:Date.now()+60000};
   const context={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,
     BUILD_CONFIG:{modules:{missions:true,arenaCircus:true,healing:true}},
-    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,
+    document:{querySelector:s=>s.includes('mod=quests')?{}:null,querySelectorAll:()=>[]},visible:()=>false,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,
     healthReading:()=>({current:1000,maximum:10000}),goldTick:()=>false,pveTick:()=>{calls.push('pve');return true;},
     navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);

@@ -66,3 +66,5 @@ test('revisa dos páginas de alimento sin repetir navegación',()=>{
 test('alimento sin compra espera hasta que termine oro pendiente',()=>{
  const x=setup();x.state.goldTx={stage:'packages'};x.state.foodBuyTx={stage:'baseline',at:Date.now()};assert.equal(x.c.foodMarketTick(),false);assert.equal(x.clicks,0);
 });
+
+test('alimento reciente evita recorrer páginas antiguas antes de recoger',()=>{const x=setup(),now=Date.now();x.state.foodBuyTx={stage:'baseline',name:'Pan',amount:1000,level:1,basis:'7-1',soul:null,at:now,loadedAt:now-6000,scan:{pages:[],matches:0,fingerprints:{}}};x.c.mod='packages';x.c.params=new URLSearchParams('f=7&fq=-1&qry=Pan');const el={food:{name:'Pan',amount:1000,level:1},getAttribute:k=>({'data-hash':'recent','data-basis':'7-1'}[k]??null),closest:()=>({textContent:'Mercado'})};x.c.document={querySelector:s=>s==='#packages'?{querySelectorAll:()=>[el]}:s==='.paging_right_step'?{}:null};x.c.healingFood=e=>e.food;assert.equal(x.c.foodMarketTick(),true);assert.equal(x.state.foodBuyTx,null);assert.equal(x.state.packageFoodTrip,true);assert.equal(x.clicks,0);});

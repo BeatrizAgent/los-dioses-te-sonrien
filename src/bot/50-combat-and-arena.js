@@ -145,6 +145,8 @@
       if (state.message !== 'Esperando datos fiables de salud; volveré a comprobarlos.') { state.message='Esperando datos fiables de salud; volveré a comprobarlos.'; log(state.message,'warn'); save(); }
       return;
     }
+    const healthPercent=Number.isFinite(hp) ? Math.min(hp, 100 * current / maximum) : 100 * current / maximum;
+    if (pveStallTick(healthPercent)) return;
     if (state.pendingFight) {
       const isArenaPending = state.pendingFight.mode === 'arena-provinciarum';
       if (mod === 'reports' && sub === 'showCombatReport' && params.get('t') === (isArenaPending ? '2' : '3')) {
@@ -205,7 +207,6 @@
     if (state.foodBuyTx && foodMarketTick()) return;
     if (goldTick(true)) return;
     if (state.packageCollectTrip) { if (packageFoodTick()) return; }
-    const healthPercent=Number.isFinite(hp) ? Math.min(hp, 100 * current / maximum) : 100 * current / maximum;
     if (healthPercent > 40 && (state.pendingHeal || state.packageFoodTrip || state.pendingPackageFood)) {
       const p=state.pendingHeal;
       const selected=[...document.querySelectorAll('#inventory_nav a')].findIndex(a=>a.classList.contains('current'));
