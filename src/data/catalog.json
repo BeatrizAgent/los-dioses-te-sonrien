@@ -2,9 +2,9 @@
   "catalogVersion": 1,
   "scope": {
     "playerLevelMin": 1,
-    "playerLevelMax": 99,
+    "playerLevelMax": 102,
     "regions": ["Italia", "África", "Germania"],
-    "note": "Se muestran zonas y mazmorras cuyo nivel de acceso de personaje es 99 o menos. El nivel que aparece junto a cada enemigo es el rango de aparición de la criatura y puede superar el nivel del personaje."
+    "note": "Se muestran las zonas y mazmorras catalogadas hasta nivel de acceso 102. El nivel que aparece junto a cada enemigo es el rango de aparición de la criatura y puede superar el nivel del personaje."
   },
   "sources": [
     {
@@ -57,6 +57,7 @@
     {"id":"de-cursed-village","region":"Germania","name":"La Aldea Maldita","entryLevel":50,"sourceIds":["official-expedition-guide","fansite-expeditions"],"enemies":[{"id":"de-cursed-village-hun","name":"Huno","position":1,"levelMin":60,"levelMax":61},{"id":"de-cursed-village-ancestor","name":"Ancestral","position":2,"levelMin":61,"levelMax":64},{"id":"de-cursed-village-vampire","name":"Vampiro","position":3,"levelMin":63,"levelMax":67},{"id":"de-cursed-village-atrocity","name":"Atrocidad","position":4,"levelMin":66,"levelMax":68,"boss":true}]},
     {"id":"de-death-hill","region":"Germania","name":"La Colina Mortal","entryLevel":55,"sourceIds":["official-expedition-guide","fansite-expeditions"],"enemies":[{"id":"de-death-hill-skeleton-warrior","name":"Esqueleto Guerrero","position":1,"levelMin":65,"levelMax":66},{"id":"de-death-hill-berserk-skeleton","name":"Esqueleto Berserk","position":2,"levelMin":66,"levelMax":69},{"id":"de-death-hill-lich","name":"Lich","position":3,"levelMin":68,"levelMax":72},{"id":"de-death-hill-necromancer-prince","name":"Príncipe Nigromante","position":4,"levelMin":71,"levelMax":73,"boss":true}]},
     {"id":"de-vandal-village","region":"Germania","name":"Poblado Vándalo","entryLevel":95,"sourceIds":["official-expedition-guide","fansite-expeditions"],"enemies":[{"id":"de-vandal-village-vandal-warrior","name":"Guerrero Vándalo","position":1,"levelMin":105,"levelMax":106},{"id":"de-vandal-village-jarl","name":"Jarl","position":2,"levelMin":105,"levelMax":108},{"id":"de-vandal-village-evil-competitor","name":"Competidor Malvado","position":3,"levelMin":106,"levelMax":109},{"id":"de-vandal-village-death-knight","name":"Caballero de la Muerte","position":4,"levelMin":108,"levelMax":110,"boss":true}]}
+    ,{"id":"de-mine","region":"Germania","name":"Mina","entryLevel":100,"sourceIds":["official-expedition-guide","fansite-expeditions"],"enemies":[{"id":"de-mine-guard","name":"Guardián","position":1,"levelMin":108,"levelMax":109},{"id":"de-mine-draug","name":"Draug","position":2,"levelMin":109,"levelMax":112},{"id":"de-mine-golem","name":"Golem de Piedra","position":3,"levelMin":110,"levelMax":113},{"id":"de-mine-dragon-snake","name":"Serpiente Dragón","position":4,"levelMin":112,"levelMax":114,"boss":true}]}
   ],
   "dungeons": [
     {"id":"dungeon-gustavo-country-house","name":"La Casa de Campo de Gustavo","englishName":"Gustavo's Country House","region":"Italia","areaId":"it-shadow-forest","entryLevel":10,"difficulty":"normal","boss":"Rey Gustavo","levelMin":9,"levelMax":11,"sourceIds":["official-dungeon-guide","fansite-dungeons"]},
@@ -81,5 +82,6 @@
     {"id":"dungeon-blood-red-sky","name":"Bajo el Cielo Encendido","englishName":"Under a Blood-red Sky","region":"África","areaId":"af-bridge","entryLevel":86,"difficulty":"advanced","boss":"Shetu bin Seth","levelMin":95,"levelMax":97,"sourceIds":["official-dungeon-guide","fansite-dungeons"]},
     {"id":"dungeon-heart-of-decay","name":"En el Centro de la Corrupción","englishName":"In the Heart of Decay","region":"África","areaId":"af-lost-port","entryLevel":90,"difficulty":"advanced","boss":"Corrupción","levelMin":99,"levelMax":101,"sourceIds":["official-dungeon-guide","fansite-dungeons"]},
     {"id":"dungeon-sasama-last-journey","name":"El Último Viaje de Sasama","englishName":"Sasama's Last Journey","region":"África","areaId":"af-umpokta-tribe","entryLevel":92,"difficulty":"advanced","boss":"Akhekhu","bossAlias":"Ajejú (guía ES 2018)","levelMin":101,"levelMax":103,"sourceIds":["official-dungeon-guide","fansite-dungeons"],"nameNote":"La guía ES de 2018 llama al jefe Ajejú; la referencia comunitaria actual usa Akhekhu. El rango de nivel es comunitario."}
+    ,{"id":"dungeon-externsteine","name":"Externsteine","region":"Germania","areaId":"de-green-forest","entryLevel":102,"difficulty":"advanced","boss":"Furia de la Montaña","levelMin":111,"levelMax":113,"sourceIds":["official-dungeon-guide","fansite-dungeons"]}
   ]
 }

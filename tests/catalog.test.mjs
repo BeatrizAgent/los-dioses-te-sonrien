@@ -5,11 +5,11 @@ import { eligibleDungeons, eligibleExpeditions, normalizeBuildConfig, DEFAULT_CO
 
 const catalog = JSON.parse(await readFile(new URL('../src/data/catalog.json', import.meta.url), 'utf8'));
 
-test('catálogo incluye todas las zonas de Italia, África y Germania accesibles hasta nivel 99', () => {
-  assert.equal(catalog.expeditions.length, 20);
+test('catálogo incluye todas las zonas de Italia, África y Germania accesibles hasta nivel 102', () => {
+  assert.equal(catalog.expeditions.length, 21);
   assert.deepEqual(new Set(catalog.expeditions.map(area => area.region)), new Set(['Italia', 'África', 'Germania']));
-  assert.ok(catalog.expeditions.every(area => area.entryLevel <= 99 && area.enemies.length === 4));
-  assert.equal(catalog.expeditions.flatMap(area => area.enemies).length, 80);
+  assert.ok(catalog.expeditions.every(area => area.entryLevel <= 102 && area.enemies.length === 4));
+  assert.equal(catalog.expeditions.flatMap(area => area.enemies).length, 84);
 });
 
 test('todos los monstruos tienen posición y rango de aparición válido', () => {
@@ -20,10 +20,10 @@ test('todos los monstruos tienen posición y rango de aparición válido', () =>
   }
 });
 
-test('catálogo cubre las 22 mazmorras con requisito hasta nivel 99', () => {
-  assert.equal(catalog.dungeons.length, 22);
-  assert.ok(catalog.dungeons.every(dungeon => dungeon.entryLevel <= 99 && dungeon.levelMin <= dungeon.levelMax));
-  assert.ok(!catalog.dungeons.some(dungeon => dungeon.entryLevel > 99));
+test('catálogo cubre las 23 mazmorras con requisito hasta nivel 102', () => {
+  assert.equal(catalog.dungeons.length, 23);
+  assert.ok(catalog.dungeons.every(dungeon => dungeon.entryLevel <= 102 && dungeon.levelMin <= dungeon.levelMax));
+  assert.ok(!catalog.dungeons.some(dungeon => dungeon.entryLevel > 102));
   assert.ok(catalog.dungeons.some(dungeon => dungeon.levelMax > 99));
 });
 

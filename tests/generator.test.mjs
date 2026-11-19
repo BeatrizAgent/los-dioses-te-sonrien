@@ -12,7 +12,7 @@ test('genera un userscript completo desde los ocho módulos y sustituye la confi
   const config = normalizeBuildConfig(DEFAULT_CONFIG, catalog);
   const result = buildUserscript(config, fragments);
   assert.match(result, /@name\s+Los Dioses Te Sonríen/);
-  assert.match(result, /@version\s+0\.12\.70/);
+  assert.match(result, /@version\s+0\.12\.71/);
   assert.match(result, /const BUILD_CONFIG = Object\.freeze\(\{"playerLevel":20/);
   assert.ok(result.trimEnd().endsWith('})();'));
   assert.ok(!result.includes('__BUILD_CONFIG__'));
@@ -49,7 +49,7 @@ test('genera expediciones y mazmorras accesibles por debajo de nivel 92', () => 
 });
 
 test('rechaza nivel, zona, objetivo y mazmorra fuera del catálogo accesible', () => {
-  assert.throws(() => normalizeBuildConfig({ ...DEFAULT_CONFIG, playerLevel: 100 }, catalog), /entre 1 y 99/);
+  assert.throws(() => normalizeBuildConfig({ ...DEFAULT_CONFIG, playerLevel: 103 }, catalog), /entre 1 y 102/);
   assert.throws(() => normalizeBuildConfig({
     playerLevel: 20,
     modules: { ...DEFAULT_CONFIG.modules, expedition: true },
@@ -105,4 +105,15 @@ test('los módulos opcionales se limitan según las casillas y preservan las com
   assert.match(fragments[5], /!BUILD_CONFIG\.modules\.arenaCircus/);
   assert.match(fragments[5], /goldTick\(true\)/);
   assert.match(fragments[5], /state\.pendingHeal \|\| state\.packageFoodTrip/);
+});
+
+
+test('Germania nivel 102 ofrece Mina y Externsteine avanzada', () => {
+  for (const enemy of catalog.expeditions.find(x => x.id === 'de-mine').enemies) {
+    const cfg = normalizeBuildConfig({playerLevel:102,campaignRegion:'Germania',modules:{expedition:true,dungeon:true},expeditionAreaId:'de-mine',expeditionEnemyId:enemy.id,dungeonId:'dungeon-externsteine'},catalog);
+    assert.equal(cfg.expedition.enemy.position, enemy.position);
+    assert.equal(cfg.dungeon.difficulty, 'advanced');
+    assert.doesNotThrow(() => new vm.Script(buildUserscript(cfg, fragments)));
+  }
+  assert.throws(() => normalizeBuildConfig({playerLevel:101,campaignRegion:'Germania',modules:{dungeon:true},dungeonId:'dungeon-externsteine'},catalog), /no alcanza/);
 });

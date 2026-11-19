@@ -6,11 +6,11 @@ Web de configuración y generación de un userscript para Gladiatus, hecha con A
 
 - Explica las funciones del bot, sus dependencias y sus límites.
 - Permite elegir módulos con casillas y genera un `.user.js` descargable.
-- Deja declarar un nivel de personaje entre 1 y 99 y filtra zonas/mazmorras por requisito de acceso.
+- Deja declarar un nivel de personaje entre 1 y 102 y filtra zonas/mazmorras por requisito de acceso.
 - Usa una única región PvE para expedición y mazmorra, con listas filtradas por Italia, África o Germania.
 - Permite escoger el enemigo de expedición, la mazmorra y su modo normal o avanzado.
 - Muestra por separado el nivel de acceso y el rango de aparición del enemigo o jefe.
-- Publica un catálogo trazable de 20 zonas, 80 enemigos de expedición y 22 mazmorras.
+- Publica un catálogo trazable de 21 zonas, 84 enemigos de expedición y 23 mazmorras.
 
 El Gist anterior queda como copia personal/histórica. Esta web y este repositorio son la vía de generación y distribución del proyecto.
 
@@ -221,3 +221,6 @@ Versión 0.12.66: reintenta seleccionar el baúl III y reanuda automáticamente 
 La versión 0.12.65 busca la pieza reparada desde la primera página y recoge la primera coincidencia inequívoca sin recorrer las siguientes. Varios objetos coincidentes en la misma página bloquean la recogida. Si el baúl no se confirma antes de enviar la pieza al banco, intenta devolver la pieza original. El orden reciente se observó para paquetes con la misma duración; no se ha demostrado para todas las categorías o duraciones. Pendiente de validación instalada.
 
 La reparación comprueba huecos contiguos en el baúl III y apunta al espacio libre, incluso si hay otros objetos. Las búsquedas previas de oro y alimento para curación terminan al encontrar una coincidencia. Un vigilante de PvE intenta recuperar la navegación tras cinco minutos disponibles sin bajar puntos, pausando su reloj durante operaciones pendientes. Pruebas simuladas; quedan pendientes ciclos reales con baúles parcialmente ocupados y recuperación de atascos.
+
+
+En 0.12.71, el generador admite nivel 102, Mina y sus cuatro rivales, y Externsteine avanzada. En Externsteine prioriza al Pastor del Árbol y omite los tres fanáticos para acortar la ruta; comprueba el nombre de la instancia. La ruta completa y la automatización instalada requieren validación en juego.

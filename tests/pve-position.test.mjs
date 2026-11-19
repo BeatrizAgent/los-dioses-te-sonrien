@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const source = await readFile(new URL('../src/bot/40-popup-and-pve.js', import.meta.url), 'utf8');
 const pve = source.slice(source.indexOf('  function pveTick()'), source.lastIndexOf('\n'));
-function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Sumo Chaman', enemyName='Sumo Chamán', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, entryDisabled=false, entryAction='/game/index.php?mod=dungeon&loc=7', points='10', city=false, countryHref='/game/index.php?mod=map&submod=country'}={}) {
+function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Sumo Chaman', enemyName='Sumo Chamán', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, entryDisabled=false, entryAction='/game/index.php?mod=dungeon&loc=7', points='10', city=false, countryHref='/game/index.php?mod=map&submod=country', dungeonId='dungeon-test', dungeonName='Mazmorra'}={}) {
   let clicks = [];
   const area={id:'gorge',name:'El Desfiladero',entryLevel:90};
   const areaLink={textContent:area.name,getAttribute:()=>'/game/index.php?mod=location&loc=7',visible:true};
@@ -16,8 +16,8 @@ function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Su
   const enter={visible:true,disabled:entryDisabled,value:'Avanzado',form:{method:'post',getAttribute:()=>entryAction},outerHTML:'<input>',click:()=>clicks.push('enter')};
   const fights=fightCalls.map(call=>({visible:true,outerHTML:'<img>',getAttribute:()=>call,click:()=>clicks.push(call)}));
   const country={visible:true,getAttribute:()=>countryHref};
-  const doc={querySelector(selector){if(selector==='#header_values_level')return {textContent:'99'};if(selector==='a')return null;if(selector==='#submenuhead1')return city?{visible:true}:null;if(selector.includes('cooldown_bar_'))return selector.endsWith(' a')?bar.querySelector():bar;if(selector.includes('points_value'))return {textContent:points};if(selector==='#content h3')return {textContent:'Mazmorra Abierto hasta mañana'};if(selector==='#expedition_info4')return {getAttribute:()=>tooltipName ? JSON.stringify([[[tooltipName,'white']]]) : null};if(selector.includes('expedition_info'))return {textContent:name};if(selector.startsWith('#content input[type="submit"][name='))return entered?enter:null;return null;},querySelectorAll(selector){if(selector==='#submenuhead1 a.submenuswitch')return [country];if(selector==='#mainnav a, #mainmenu a')return city?[]:[areaLink,dungeonLink];if(selector==='#expedition_list .expedition_button')return [{},{},{},button];if(selector==='#content img[onclick^="startFight"]')return fights;if(selector==='#content input[type="submit"]')return [cancel];return [];}};
-  const context={document:doc,location:{origin:'https://s64-es.gladiatus.gameforge.com',href:`https://s64-es.gladiatus.gameforge.com/game/index.php?mod=${mode==='expedition'?'location':'dungeon'}&loc=7`},params:new URLSearchParams(`mod=${mode==='expedition'?'location':'dungeon'}&loc=7`),mod:mode==='expedition'?'location':'dungeon',URL,Date,Number,String,BUILD_CONFIG:{playerLevel:99,modules:{expedition:mode==='expedition',dungeon:mode==='dungeon'},expedition:{area,enemy:{position:4,name:enemyName,levelMin:106,levelMax:108}},dungeon:{id:'dungeon-test',area,entryLevel:90,name:'Mazmorra',difficulty:'advanced',boss:'Jefe',levelMin:1,levelMax:2}},state:{pveTarget:mode,dungeonReset:reset,dungeonCombatUnknown:unknown},visible:el=>!!el?.visible,cooldownSeconds:()=>0,log:()=>{},save:()=>{},stop:()=>{},navigation:()=>{clicks.push('country');}};
+  const doc={querySelector(selector){if(selector==='#header_values_level')return {textContent:'99'};if(selector==='a')return null;if(selector==='#submenuhead1')return city?{visible:true}:null;if(selector.includes('cooldown_bar_'))return selector.endsWith(' a')?bar.querySelector():bar;if(selector.includes('points_value'))return {textContent:points};if(selector==='#content h3')return {textContent:dungeonName+' Abierto hasta mañana'};if(selector==='#expedition_info4')return {getAttribute:()=>tooltipName ? JSON.stringify([[[tooltipName,'white']]]) : null};if(selector.includes('expedition_info'))return {textContent:name};if(selector.startsWith('#content input[type="submit"][name='))return entered?enter:null;return null;},querySelectorAll(selector){if(selector==='#submenuhead1 a.submenuswitch')return [country];if(selector==='#mainnav a, #mainmenu a')return city?[]:[areaLink,dungeonLink];if(selector==='#expedition_list .expedition_button')return [{},{},{},button];if(selector==='#content img[onclick^="startFight"]')return fights;if(selector==='#content input[type="submit"]')return [cancel];return [];}};
+  const context={document:doc,location:{origin:'https://s64-es.gladiatus.gameforge.com',href:`https://s64-es.gladiatus.gameforge.com/game/index.php?mod=${mode==='expedition'?'location':'dungeon'}&loc=7`},params:new URLSearchParams(`mod=${mode==='expedition'?'location':'dungeon'}&loc=7`),mod:mode==='expedition'?'location':'dungeon',URL,Date,Number,String,BUILD_CONFIG:{playerLevel:99,modules:{expedition:mode==='expedition',dungeon:mode==='dungeon'},expedition:{area,enemy:{position:4,name:enemyName,levelMin:106,levelMax:108}},dungeon:{id:dungeonId,area,entryLevel:90,name:dungeonName,difficulty:'advanced',boss:'Jefe',levelMin:1,levelMax:2}},state:{pveTarget:mode,dungeonReset:reset,dungeonCombatUnknown:unknown},visible:el=>!!el?.visible,cooldownSeconds:()=>0,log:()=>{},save:()=>{},stop:()=>{},navigation:()=>{clicks.push('country');}};
   vm.runInNewContext(`${pve}\npveTick()`,context);
   return {clicks,state:context.state};
 }
@@ -74,4 +74,13 @@ test('nombre truncado usa tooltip completo solo si coincide el prefijo',()=>{
  assert.deepEqual(run({name:'Antílope Maldit…',enemyName:'Antílope Maldito',tooltipName:'Antílope Maldito'}).clicks,['expedition']);
  assert.deepEqual(run({name:'Araña…',enemyName:'Antílope Maldito',tooltipName:'Antílope Maldito'}).clicks,[]);
  assert.deepEqual(run({name:'Antílope Maldit…',enemyName:'Antílope Maldito',tooltipName:''}).clicks,[]);
+});
+
+
+test('Externsteine prioriza pastor y evita fanáticos',()=>{
+ const calls=[1,2,3,8].map(n=>`startFight('${n}', '31090');showWait();return false;`);
+ const options={mode:'dungeon',dungeonId:'dungeon-externsteine',dungeonName:'Externsteine'};
+ assert.deepEqual(run({...options,fightCalls:calls}).clicks,[calls[3]]);
+ assert.deepEqual(run({...options,fightCalls:calls.slice(0,3)}).clicks,[]);
+ assert.deepEqual(run({...options,dungeonName:'Otra instancia',fightCalls:calls}).clicks,[]);
 });

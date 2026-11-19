@@ -261,7 +261,15 @@
       state.pveEntryAt=Date.now(); state.message='Iniciando '+dungeon.name+' ('+difficulty+') · enemigos nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); enter.click(); return true;
     }
     state.pveEntryAt=0;
-    const fight=[...document.querySelectorAll('#content img[onclick^="startFight"]')].find(x=>visible(x) && /^\s*startFight\(\s*(['"])\d+\1\s*,\s*(['"])\d+\2\s*\)\s*;\s*showWait\(\s*\)\s*;\s*return\s+false\s*;?\s*$/.test(x.getAttribute('onclick') || '') && !/rub[ií]|diamant|premium/i.test(x.outerHTML));
+    const fights=[...document.querySelectorAll('#content img[onclick^="startFight"]')].filter(x=>visible(x) && /^\s*startFight\(\s*(['"])\d+\1\s*,\s*(['"])\d+\2\s*\)\s*;\s*showWait\(\s*\)\s*;\s*return\s+false\s*;?\s*$/.test(x.getAttribute('onclick') || '') && !/rub[ií]|diamant|premium/i.test(x.outerHTML));
+    let fight=fights[0];
+    if (dungeon.id==='dungeon-externsteine') {
+      const title=sameName(document.querySelector('#content h3')?.textContent);
+      if (!title.startsWith('externsteine ')) return deferDungeon('La instancia activa no coincide con Externsteine.');
+      const fightId=x=>Number((x.getAttribute('onclick') || '').match(/^\s*startFight\(\s*['"](\d+)['"]/)?.[1]);
+      // Ruta observada: pastor, sacerdotes, doncella y jefe; 1–3 son fanáticos opcionales.
+      fight=[8,6,9,7].map(id=>fights.find(x=>fightId(x)===id)).find(Boolean);
+    }
     if (!fight) { state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Sin encuentro reconocible en '+dungeon.name+'; no atacaré.'; log(state.message,'warn'); save(); return true; }
     state.pendingPve={mode:selected,dungeonId:dungeon.id,at:Date.now(),target:dungeon.name,boss:dungeon.boss,area:area.name,spawn:[dungeon.levelMin,dungeon.levelMax],declaredPlayerLevel:BUILD_CONFIG.playerLevel};
     state.pveTarget=null; state.lastPveAt=Date.now(); state.lastPveMode=selected; state.lastAction='pve'; state.message='Iniciando encuentro de '+dungeon.name+' · jefe '+dungeon.boss+' · nivel '+dungeon.levelMin+'–'+dungeon.levelMax+'.'; log(state.message,'action'); save(); fight.click(); return true;
