@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const source = await readFile(new URL('../src/bot/40-popup-and-pve.js', import.meta.url), 'utf8');
 const pve = source.slice(source.indexOf('  function pveTick()'), source.lastIndexOf('\n'));
-function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Sumo Chaman', enemyName='Sumo Chamán', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, entryDisabled=false, entryAction='/game/index.php?mod=dungeon&loc=7', points='10', city=false, countryHref='/game/index.php?mod=map&submod=country', dungeonId='dungeon-test', dungeonName='Mazmorra', instanceName=dungeonName}={}) {
+function run({mode='expedition', position=4, onclick=`attack(null, '7', ${position}, 0, '')`, name='Sumo Chaman', enemyName='Sumo Chamán', enemyId='', tooltipName='', visibleButton=true, disabled=false, fightCalls=[], reset=null, unknown=null, cancelAction='cancelDungeon', entered=false, entryDisabled=false, entryAction='/game/index.php?mod=dungeon&loc=7', points='10', city=false, countryHref='/game/index.php?mod=map&submod=country', dungeonId='dungeon-test', dungeonName='Mazmorra', instanceName=dungeonName, areaId='gorge', areaName='El Desfiladero', linkName=areaName}={}) {
   let clicks = [];
-  const area={id:'gorge',name:'El Desfiladero',entryLevel:90};
-  const areaLink={textContent:area.name,getAttribute:()=>'/game/index.php?mod=location&loc=7',visible:true};
+  const area={id:areaId,name:areaName,entryLevel:90};
+  const areaLink={textContent:linkName,getAttribute:()=>'/game/index.php?mod=location&loc=7',visible:true};
   const dungeonLink={textContent:'Mazmorra',getAttribute:()=>'/game/index.php?mod=dungeon&loc=7',visible:true};
   const bar={textContent:'00:00',querySelector:()=>({visible:true,getAttribute:()=>'/game/index.php?mod=dungeon&loc=7'})};
   const button={getAttribute:()=>onclick,visible:visibleButton,disabled,outerHTML:'<button>Atacar</button>',click:()=>clicks.push('expedition')};
@@ -17,7 +17,10 @@ function run({mode='expedition', onclick="attack(null, '7', 4, 0, '')", name='Su
   const fights=fightCalls.map(call=>({visible:true,outerHTML:'<img>',getAttribute:()=>call,click:()=>clicks.push(call)}));
   const country={visible:true,getAttribute:()=>countryHref};
   const doc={querySelector(selector){if(selector==='#header_values_level')return {textContent:'99'};if(selector==='a')return null;if(selector==='#submenuhead1')return city?{visible:true}:null;if(selector.includes('cooldown_bar_'))return selector.endsWith(' a')?bar.querySelector():bar;if(selector.includes('points_value'))return {textContent:points};if(selector==='#content h3 .dungeon_header_open')return instanceName ? {textContent:instanceName}:null;if(selector==='#content h3')return {textContent:dungeonName+'Abierto hasta mañana'};if(selector==='#expedition_info4')return {getAttribute:()=>tooltipName ? JSON.stringify([[[tooltipName,'white']]]) : null};if(selector.includes('expedition_info'))return {textContent:name};if(selector.startsWith('#content input[type="submit"][name='))return entered?enter:null;return null;},querySelectorAll(selector){if(selector==='#submenuhead1 a.submenuswitch')return [country];if(selector==='#mainnav a, #mainmenu a')return city?[]:[areaLink,dungeonLink];if(selector==='#expedition_list .expedition_button')return [{},{},{},button];if(selector==='#content img[onclick^="startFight"]')return fights;if(selector==='#content input[type="submit"]')return [cancel];return [];}};
-  const context={document:doc,location:{origin:'https://s64-es.gladiatus.gameforge.com',href:`https://s64-es.gladiatus.gameforge.com/game/index.php?mod=${mode==='expedition'?'location':'dungeon'}&loc=7`},params:new URLSearchParams(`mod=${mode==='expedition'?'location':'dungeon'}&loc=7`),mod:mode==='expedition'?'location':'dungeon',URL,Date,Number,String,BUILD_CONFIG:{playerLevel:99,modules:{expedition:mode==='expedition',dungeon:mode==='dungeon'},expedition:{area,enemy:{position:4,name:enemyName,levelMin:106,levelMax:108}},dungeon:{id:dungeonId,area,entryLevel:90,name:dungeonName,difficulty:'advanced',boss:'Jefe',levelMin:1,levelMax:2}},state:{pveTarget:mode,dungeonReset:reset,dungeonCombatUnknown:unknown},visible:el=>!!el?.visible,cooldownSeconds:()=>0,log:()=>{},save:()=>{},stop:()=>{},navigation:()=>{clicks.push('country');}};
+  const originalQuery=doc.querySelector, originalAll=doc.querySelectorAll;
+  doc.querySelector=s=>s===`#expedition_info${position}`?{getAttribute:()=>tooltipName?JSON.stringify([[[tooltipName,'white']]]):null}:s===`#expedition_info${position} .expedition_name`?{textContent:name}:originalQuery(s);
+  doc.querySelectorAll=s=>s==='#expedition_list .expedition_button'?Array.from({length:4},(_,i)=>i===position-1?button:{}):originalAll(s);
+  const context={document:doc,location:{origin:'https://s64-es.gladiatus.gameforge.com',href:`https://s64-es.gladiatus.gameforge.com/game/index.php?mod=${mode==='expedition'?'location':'dungeon'}&loc=7`},params:new URLSearchParams(`mod=${mode==='expedition'?'location':'dungeon'}&loc=7`),mod:mode==='expedition'?'location':'dungeon',URL,Date,Number,String,BUILD_CONFIG:{playerLevel:99,modules:{expedition:mode==='expedition',dungeon:mode==='dungeon'},expedition:{area,enemy:{id:enemyId,position,name:enemyName,levelMin:106,levelMax:108}},dungeon:{id:dungeonId,area,entryLevel:90,name:dungeonName,difficulty:'advanced',boss:'Jefe',levelMin:1,levelMax:2}},state:{pveTarget:mode,dungeonReset:reset,dungeonCombatUnknown:unknown},visible:el=>!!el?.visible,cooldownSeconds:()=>0,log:()=>{},save:()=>{},stop:()=>{},navigation:()=>{clicks.push('country');}};
   vm.runInNewContext(`${pve}\npveTick()`,context);
   return {clicks,state:context.state};
 }
@@ -27,6 +30,22 @@ test('recupera menú de territorio tras visitar ciudad y rechaza rutas externas'
 });
 test('expedición usa la posición y acepta la llamada real de cinco argumentos aunque falte el acento',()=>{
   const result=run();assert.deepEqual(result.clicks,['expedition']);assert.equal(result.state.pendingPve.target,'Sumo Chaman');
+});
+test('Caravana acepta su nombre observado solo para la zona de catálogo correspondiente',()=>{
+  assert.deepEqual(run({areaId:'af-caravan',areaName:'La Caravana',linkName:'Caravana',name:'Comerciante de …',enemyName:'Comerciante de Esclavos',tooltipName:'Comerciante de Esclavos'}).clicks,['expedition']);
+  assert.deepEqual(run({areaId:'another',areaName:'La Caravana',linkName:'Caravana'}).clicks,[]);
+});
+test('nombres observados solo se aceptan para su zona, enemigo y posición',()=>{
+ for (const [areaId,enemyId,position,enemyName,name] of [
+  ['af-umpokta-tribe','af-umpokta-tribe-warrior',1,'Guerrero de la Tribu','Guerrero de Tribu'],
+  ['af-blood-cave','af-blood-cave-blood-wolf',1,'Lobo Sangriento','Lobo Sanguinario'],
+  ['af-lost-port','af-lost-port-giant-snake',3,'Serpiente Gigante','Serpiente Gigante de Agua']
+ ]) {
+  const opts={areaId,enemyId,position,enemyName,name};
+  assert.deepEqual(run(opts).clicks,['expedition']);
+  assert.deepEqual(run({...opts,areaId:'other'}).clicks,[]);
+  assert.deepEqual(run({...opts,position:4}).clicks,[]);
+ }
 });
 test('expedición acepta seis argumentos y rechaza posición o zona de ataque distintas',()=>{
   assert.equal(run({onclick:`attack(null, '7', 4, 0, '', '')`}).clicks.length,1);

@@ -138,7 +138,7 @@
     let selected=choices.includes(state.pveTarget) ? state.pveTarget : null;
     if (state.dungeonReset && choices.includes('dungeon')) selected='dungeon';
     if (!selected || (!ready(selected) && !(selected==='dungeon' && state.dungeonReset))) {
-      const arenaReady=BUILD_CONFIG.modules.arenaCircus && (cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0 || (state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0));
+      const arenaReady=BUILD_CONFIG.modules.arenaCircus && ((BUILD_CONFIG.pvp?.arena!==false && cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent)===0) || (BUILD_CONFIG.pvp?.turma!==false && state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent)===0));
       if (arenaReady && state.lastAction==='pve') {
         if (!state.pvpWaitSince) {state.pvpWaitSince=Date.now();save();}
         if (Date.now()-state.pvpWaitSince<30000) return false;
@@ -161,10 +161,11 @@
     }
     const links=[...document.querySelectorAll('#mainnav a, #mainmenu a')];
     const sameName=value=>String(value||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLocaleLowerCase('es');
-    const areaLink=links.find(a=>sameName(a.textContent)===sameName(area.name) && visible(a));
+    const areaMatches=value=>sameName(value)===sameName(area.name) || (area.id==='af-caravan' && sameName(value)==='caravana');
+    const areaLink=links.find(a=>areaMatches(a.textContent) && visible(a));
     let areaLoc=null;
     try { const u=new URL(areaLink?.getAttribute('href'),location.href); if (u.origin===location.origin && u.pathname==='/game/index.php' && u.searchParams.get('mod')==='location' && /^\d+$/.test(u.searchParams.get('loc')||'') && !u.searchParams.has('action')) areaLoc=u.searchParams.get('loc'); } catch {}
-    const currentArea=links.some(a=>sameName(a.textContent)===sameName(area.name) && visible(a));
+    const currentArea=links.some(a=>areaMatches(a.textContent) && visible(a));
     const inConfiguredArea=currentArea && areaLoc!==null && params.get('loc')===areaLoc;
     let dungeonLink=null,dungeonLoc=null;
     if (selected==='dungeon') {
@@ -225,7 +226,14 @@
       const call=onclick.match(/^\s*attack\(null,\s*(['"])(\d+)\1,\s*(\d+),\s*0,\s*(['"])[^'"]*\4(?:,\s*(['"])[^'"]*\5)?\)\s*;?\s*$/);
       const safeCall=call?.[2]===loc && Number(call?.[3])===position;
       const enemyName=value=>sameName(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      if (!enemy?.name || !rival || enemyName(rival)!==enemyName(enemy.name) || !safeCall || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
+      const observedAliases={
+        'af-umpokta-tribe-warrior':{area:'af-umpokta-tribe',position:1,name:'Guerrero de Tribu'},
+        'af-blood-cave-blood-wolf':{area:'af-blood-cave',position:1,name:'Lobo Sanguinario'},
+        'af-lost-port-giant-snake':{area:'af-lost-port',position:3,name:'Serpiente Gigante de Agua'}
+      };
+      const alias=observedAliases[enemy?.id];
+      const matchesEnemy=enemyName(rival)===enemyName(enemy?.name) || (alias && area.id===alias.area && position===alias.position && enemyName(rival)===enemyName(alias.name));
+      if (!enemy?.name || !rival || !matchesEnemy || !safeCall || !visible(button) || button.disabled || /rub[ií]|diamant|premium/i.test(button.outerHTML)) {
         state.expeditionMismatchSince ||= Date.now();state.pveTarget=null; state.lastPveAt=Date.now(); state.message='Expedición aplazada: enemigo o ataque no coincide con la posición elegida.'; log(state.message,'warn'); save(); return false;
       }
       delete state.expeditionMismatchSince;

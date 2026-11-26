@@ -126,6 +126,7 @@ export function initializeGenerator() {
       result.hidden = true;
     });
   }
+  for (const name of ['pvpArena','pvpTurma']) form.querySelector(`input[name="${name}"]`).addEventListener('change', () => { error.hidden = true; result.hidden = true; });
   refreshCatalog();
   updateModuleControls();
 
@@ -133,12 +134,14 @@ export function initializeGenerator() {
     event.preventDefault();
     error.hidden = true;
     try {
-      const modules = Object.fromEntries(moduleKeys.map(key => [key, form.querySelector(`input[name="${key}"]`).checked]));
+      const pvp = {arena:form.querySelector('input[name="pvpArena"]').checked,turma:form.querySelector('input[name="pvpTurma"]').checked};
+      const modules = Object.fromEntries(moduleKeys.map(key => [key, key==='arenaCircus' ? pvp.arena || pvp.turma : form.querySelector(`input[name="${key}"]`).checked]));
       const input = {
         marketProfile: document.querySelector('#market-profile-huggin').checked ? 'huggin' : '',
         playerLevel: level.value,
         campaignRegion: regionSelect.value,
         modules,
+        pvp,
         expeditionAreaId: areaSelect.value,
         expeditionEnemyId: enemySelect.value,
         dungeonId: dungeonSelect.value,

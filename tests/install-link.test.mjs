@@ -8,6 +8,18 @@ const catalog = JSON.parse(await readFile(new URL('../src/data/catalog.json', im
 const names = ['00-bootstrap.js','10-core-and-missions.js','20-healing.js','30-guild-market.js','40-popup-and-pve.js','50-combat-and-arena.js','60-panel-theme.js','60-panel.js'];
 const fragments = await Promise.all(names.map(name => readFile(new URL(`../src/bot/${name}`, import.meta.url), 'utf8')));
 const handler = createHandler(catalog, fragments);
+test('enlaces conservan Arena y Turma independientes y enlaces antiguos activan ambos',()=>{
+  for(const pvp of [{arena:true,turma:false},{arena:false,turma:true},{arena:true,turma:true}]) {
+    const input={...DEFAULT_CONFIG,pvp};
+    const params=configToSearch(input);
+    assert.deepEqual(searchToConfig(params).pvp,pvp);
+    assert.equal(handler(new Request(`https://example.com/los-dioses-te-sonrien.user.js?${params}`)).status,200);
+  }
+  const legacy=configToSearch(DEFAULT_CONFIG);
+  assert.deepEqual(searchToConfig(legacy).pvp,{arena:true,turma:true});
+  legacy.set('pvp','arena,unknown');
+  assert.equal(handler(new Request(`https://example.com/los-dioses-te-sonrien.user.js?${legacy}`)).status,400);
+});
 test('el enlace reconstruye la selección y devuelve un userscript instalable', async () => {
   const input = {...DEFAULT_CONFIG, playerLevel: 90, modules: {...DEFAULT_CONFIG.modules, expedition: true}, expeditionAreaId: 'af-gorge', expeditionEnemyId: 'af-gorge-high-shaman'};
   const params = configToSearch(input);

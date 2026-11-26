@@ -100,10 +100,10 @@
       const questState=questLink?.textContent.trim() || 'Estado no visible';
       const expedition=document.querySelector('#cooldown_bar_expedition')?.textContent.trim() || 'No disponible';
       const dungeon=document.querySelector('#cooldown_bar_dungeon')?.textContent.trim() || 'No disponible';
-      content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Circo: '+ct),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
-      if (BUILD_CONFIG.modules.arenaCircus) {
+      content.append(textElement('div','sectionlabel','Cola de tareas'),textElement('div','card name','Arena: '+(BUILD_CONFIG.modules.arenaCircus && BUILD_CONFIG.pvp?.arena!==false ? 'Activada' : 'Desactivada')),textElement('div','card name','Circo: '+(BUILD_CONFIG.modules.arenaCircus && BUILD_CONFIG.pvp?.turma!==false ? ct : 'Desactivado')),textElement('div','card name','Misiones: '+questState),textElement('div','card name','Expedición: '+expedition),textElement('div','card name','Mazmorra: '+dungeon),textElement('p','small','Alterna los encuentros disponibles y revisa misiones durante las esperas.'));
+      if (BUILD_CONFIG.modules.arenaCircus && BUILD_CONFIG.pvp?.turma!==false) {
         const participation=state.turmaParticipation;
-        content.append(textElement('p','small',participation ? 'Turma: '+participation.status+' · comprobado '+new Date(participation.checkedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+(participation.status==='pasivo' ? ' · solo Arena hasta nueva comprobación.' : '.') : 'Estado de Turma aún no comprobado.'));
+        content.append(textElement('p','small',participation ? 'Turma: '+participation.status+' · comprobado '+new Date(participation.checkedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+(participation.status==='pasivo' ? ' · Turma aplazado hasta nueva comprobación.' : '.') : 'Estado de Turma aún no comprobado.'));
         const recheck=textElement('button','btn','Comprobar estado de Turma');
         recheck.onclick=()=>{if(!ownerActive || !verified() || captcha())return;state.turmaCheckRequested=true;state.turmaCheckRetryAt=0;state.message='Comprobación de Turma solicitada.';save();contentKey='';recheck.blur();renderContent();if(state.running)setTimeout(combatTick,300);};
         content.append(recheck);

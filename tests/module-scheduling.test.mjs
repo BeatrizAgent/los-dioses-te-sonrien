@@ -123,6 +123,17 @@ test('espera en página actual cuando arena y circo están en enfriamiento', () 
   vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',context);
   assert.equal(navigations,0);assert.match(message,/20 s/);
 });
+test('navega solo al modo PvP seleccionado y no comprueba participación de Turma cuando está apagado',()=>{
+ for (const [pvp,expected] of [[{arena:true,turma:false},'Arena'],[{arena:false,turma:true},'Circo']]) {
+  const calls=[],state={running:true};
+  const c={state,ownerActive:true,mod:'overview',sub:'',params:new URLSearchParams(),Date,Number,ID:'id',sessionStorage:{getItem:()=>JSON.stringify({at:Date.now()})},
+   BUILD_CONFIG:{modules:{arenaCircus:true},pvp},document:{querySelector:s=>s.includes('cooldown_bar')?{textContent:'0:00'}:null},visible:x=>!!x,captcha:()=>false,verified:()=>true,lootTick:()=>false,pveStallTick:()=>false,healthReading:()=>({current:100,maximum:100}),
+   goldTick:()=>false,checkTurmaParticipation:()=>{calls.push('check');return false;},pveTick:()=>false,cooldownSeconds:()=>0,navigation:(_link,purpose)=>{calls.push(purpose);return true;},save(){},log(){}};
+  vm.runInNewContext(combat.slice(combat.indexOf('  function combatTick()'))+'\ncombatTick()',c);
+  assert.equal(calls.some(x=>x.includes('Abriendo '+expected)),true);
+  assert.equal(calls.includes('check'),pvp.turma);
+ }
+});
 
 test('vida baja con curación aplazada permite misiones pero no inicia PvE', () => {
   const calls=[],state={running:true,healSkipUntil:Date.now()+60000,packageCollectAt:Date.now()+60000};

@@ -2,7 +2,7 @@
 
 
   const host = new URL(location.href).hostname.toLowerCase();
-  const realm = host.match(/^s\d+-(es)\.gladiatus\.gameforge\.com$/)?.[1] || '';
+  const realm = host.match(/^s\d+-(es|pt)\.gladiatus\.gameforge\.com$/)?.[1] || '';
   const KEY = host === 's64-es.gladiatus.gameforge.com' && accountName.toLocaleLowerCase() === 'cassiusferox' ? 'axelbot.evento.cassius.s64.v1' : 'axelbot.evento.account.v1.' + encodeURIComponent(accountName.normalize('NFKC').toLocaleLowerCase());
   const ID = 'axelbot.evento.identity';
   const UI_KEY = 'axelbot.evento.ui.v1';

@@ -37,6 +37,8 @@ export function normalizeBuildConfig(input, catalog) {
   }
 
   const modules = Object.fromEntries(MODULE_KEYS.map(key => [key, input.modules?.[key] === true]));
+  const pvp = modules.arenaCircus ? {arena:input.pvp?.arena !== false,turma:input.pvp?.turma !== false} : {arena:false,turma:false};
+  if (modules.arenaCircus && !pvp.arena && !pvp.turma) throw new TypeError('Selecciona Arena o Circo Turma.');
   if (modules.foodMarket && !modules.healing) throw new TypeError('La compra de alimentos requiere activar la curación.');
   if (!MODULE_KEYS.some(key => modules[key])) throw new TypeError('Activa al menos un módulo.');
   const requestedRegion = input.campaignRegion || null;
@@ -92,7 +94,7 @@ export function normalizeBuildConfig(input, catalog) {
   const marketProfile = input.marketProfile || '';
   if (!['', 'huggin'].includes(marketProfile)) throw new TypeError('Perfil de mercado no válido.');
   const blockedMarketSellers = marketProfile === 'huggin' ? ['FanCarrazera','PrefectAcilius','CarrazeraFan','CurioUmbrius','CassianVesper'] : [];
-  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, expedition, dungeon, smeltingPriority, marketProfile, blockedMarketSellers };
+  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, pvp, expedition, dungeon, smeltingPriority, marketProfile, blockedMarketSellers };
 }
 
 export function buildUserscript(config, fragments) {

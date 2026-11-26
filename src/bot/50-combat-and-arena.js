@@ -67,7 +67,7 @@
     const pending=pendingKeys.some(k=>!!state[k]) || txKeys.some(k=>!!state[k]) || !!state.packageCollectTrip || !!state.packageFoodTrip;
     const readyBar=selector=>cooldownSeconds(document.querySelector(selector)?.textContent)===0;
     const pveReady=(BUILD_CONFIG.modules.expedition && readyBar('#cooldown_bar_expedition') && Number((document.querySelector('#expeditionpoints_value')?.textContent||'').trim().split('/')[0])>0) || (BUILD_CONFIG.modules.dungeon && readyBar('#cooldown_bar_dungeon') && Number((document.querySelector('#dungeonpoints_value')?.textContent||'').trim().split('/')[0])>0);
-    const pvpReady=BUILD_CONFIG.modules.arenaCircus && (readyBar('#cooldown_bar_arena') || (state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && readyBar('#cooldown_bar_ct')));
+    const pvpReady=BUILD_CONFIG.modules.arenaCircus && ((BUILD_CONFIG.pvp?.arena!==false && readyBar('#cooldown_bar_arena')) || (BUILD_CONFIG.pvp?.turma!==false && state.turmaParticipation?.status!=='pasivo' && Date.now()>=(state.turmaSkipUntil||0) && readyBar('#cooldown_bar_ct')));
     if (!force && !pending && !pveReady && !pvpReady) {stallObservation=null;return false;}
     const signature=JSON.stringify([mod,sub,params.get('loc'),params.get('page'),params.get('p'),state.pveTarget,state.lastAction,state.lastPveAt,state.lastFightMode,...txKeys.map(k=>[state[k]?.stage,state[k]?.blocked,state[k]?.at,state[k]?.scan?.pages?.length,state[k]?.packageScan?.pages?.length,state[k]?.saleScan?.pages?.length]),...pendingKeys.map(k=>[state[k]?.kind,state[k]?.mode,state[k]?.at]),state.packageScan?.pages?.length]);
     const now=Date.now();
@@ -243,7 +243,7 @@
       if (!state.running) return;
       if (state.running && !state.pending) {
         state.lastQuestVisit = Date.now(); save();
-        if (BUILD_CONFIG.modules.arenaCircus && navigation(document.querySelector(state.turmaParticipation?.status==='pasivo' ? '#cooldown_bar_arena a' : '#cooldown_bar_ct a'), 'Volviendo a combates Provinciarum.')) return;
+        if (BUILD_CONFIG.modules.arenaCircus && navigation(document.querySelector(BUILD_CONFIG.pvp?.turma===false || (BUILD_CONFIG.pvp?.arena!==false && state.turmaParticipation?.status==='pasivo') ? '#cooldown_bar_arena a' : '#cooldown_bar_ct a'), 'Volviendo a combates Provinciarum.')) return;
       }
       if (state.pending) return;
     }
@@ -252,7 +252,7 @@
       if (state.message!=='Vida baja; esperando curación antes de combatir.') {state.message='Vida baja; esperando curación antes de combatir.';log(state.message,'warn');save();}
       return;
     }
-    if (BUILD_CONFIG.modules.arenaCircus && checkTurmaParticipation()) return;
+    if (BUILD_CONFIG.modules.arenaCircus && BUILD_CONFIG.pvp?.turma!==false && checkTurmaParticipation()) return;
     if (pveTick()) return;
     if (BUILD_CONFIG.modules.missions && !BUILD_CONFIG.modules.arenaCircus && mod !== 'quests' && Date.now() >= (state.questRetryAt || 0) && Date.now() - (state.lastQuestVisit || 0) >= 30000) {
       if (navigation(document.querySelector('#mainmenu a[href*="mod=quests"]'), 'Revisando misiones del Panteón.')) return;
@@ -264,8 +264,8 @@
     }
     const ctRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_ct')?.textContent);
     const arenaRemaining = cooldownSeconds(document.querySelector('#cooldown_bar_arena')?.textContent);
-    const arenaReady = arenaRemaining === 0;
-    const ctReady = ctRemaining === 0 && state.turmaParticipation?.status !== 'pasivo' && Date.now() >= (state.turmaSkipUntil || 0);
+    const arenaReady = BUILD_CONFIG.pvp?.arena!==false && arenaRemaining === 0;
+    const ctReady = BUILD_CONFIG.pvp?.turma!==false && ctRemaining === 0 && state.turmaParticipation?.status !== 'pasivo' && Date.now() >= (state.turmaSkipUntil || 0);
     const type = arenaReady && (!ctReady || state.lastFightMode !== 'arena-provinciarum') ? '2' : '3';
     const mode = type === '2' ? 'arena-provinciarum' : 'turma-provinciarum';
     const bar = type === '2' ? '#cooldown_bar_arena' : '#cooldown_bar_ct';
@@ -276,7 +276,7 @@
     }
     if (!arenaReady && !ctReady && (state.turmaParticipation?.status === 'pasivo' || Date.now() < (state.turmaSkipUntil || 0))) { updateMessage('Turma aplazado; esperando otras tareas.'); return; }
     if (!arenaReady && !ctReady) {
-      const waits=[arenaRemaining,ctRemaining].filter(Number.isFinite);
+      const waits=[BUILD_CONFIG.pvp?.arena!==false ? arenaRemaining : null,BUILD_CONFIG.pvp?.turma!==false ? ctRemaining : null].filter(Number.isFinite);
       updateMessage(waits.length ? 'Esperando disponibilidad: '+Math.min(...waits)+' s.' : 'Esperando tiempos de combate verificables.'); return;
     }
     if (mod !== 'arena' || sub !== 'serverArena' || params.get('aType') !== type) {
