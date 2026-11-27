@@ -181,21 +181,40 @@
           } else if (item.channel === 'private_mail' && item.recipient) {
             const sh = currentSh();
             if (!sh || params.has('login')) return;
-            const formBody = new URLSearchParams({
-              messageRecipient: item.recipient,
-              messageSubject: item.subject || 'Re: Mensaje',
-              messageContent: item.body,
-              sent: 'Enviar'
-            });
-            const mailRes = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageNew&sh=' + encodeURIComponent(sh), {
-              method: 'POST',
-              credentials: 'same-origin',
-              redirect: 'manual',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: formBody.toString(),
-              signal: AbortSignal.timeout(15000)
-            });
-            delivered = mailRes.type === 'basic' && mailRes.status === 200;
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = location.origin + '/game/index.php?mod=messages&submod=messageNew&sh=' + encodeURIComponent(sh);
+            document.body.appendChild(iframe);
+            try {
+              await new Promise((resolve, reject) => {
+                const t = setTimeout(() => reject(new Error('timeout')), 8000);
+                iframe.onload = () => { clearTimeout(t); resolve(); };
+                iframe.onerror = () => { clearTimeout(t); reject(new Error('error')); };
+              });
+              const form = iframe.contentDocument?.querySelector('#messageForm');
+              if (form) {
+                const rec = form.querySelector('input[name="messageRecipient"]');
+                const sub = form.querySelector('input[name="messageSubject"]');
+                const msg = form.querySelector('textarea[name="messageContent"]');
+                const btn = form.querySelector('input[name="sent"]');
+                if (rec && sub && msg && btn) {
+                  rec.value = String(item.recipient).slice(0, 30);
+                  sub.value = String(item.subject || 'Respuesta').slice(0, 30);
+                  msg.value = String(item.body).slice(0, 3900);
+                  const sentDone = new Promise(resolve => {
+                    const t = setTimeout(() => resolve(false), 8000);
+                    iframe.onload = () => { clearTimeout(t); resolve(true); };
+                  });
+                  btn.click();
+                  if (await sentDone) {
+                    const confirmText = iframe.contentDocument?.querySelector('#content')?.textContent || '';
+                    delivered = /Tu mensaje ha sido enviado|message has been sent/i.test(confirmText);
+                  }
+                }
+              }
+            } finally {
+              iframe.remove();
+            }
           }
 
           await fetch(chatApiBase + '/api/outbox/ack', {
