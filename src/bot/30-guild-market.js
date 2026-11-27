@@ -718,7 +718,10 @@
       if(tx.stage==='confirmCancel') {
         const dialog=document.querySelector('#blackoutDialogForgeCancel'),confirm=document.querySelector('#linkForgeCancel');
         if(!visible(dialog)||!visible(confirm)){if(now-tx.actionAt>20000)return fail('Confirmación de cancelación no disponible.');return true;}
-        if(active!==tx.slotIndex||!slots[active].classList.contains('forge_opened')||!/recibirás de vuelta todos los objetos/i.test(dialog.textContent)||confirm.textContent.trim()!=='Sí')return fail('Confirmación de cancelación ambigua.');
+        const confirmLabel=(confirm.value||confirm.textContent||'').trim();
+        const dialogText=String(dialog.textContent||'').normalize('NFKC');
+        const safeText=/(?:recibirás de vuelta todos los objetos|¿?seguro que quieres cancelar el proceso\??)/i.test(dialogText) && !/rub[ií]|diamant|premium|reducir tiempo/i.test(dialogText);
+        if(active!==tx.slotIndex||!slots[active].classList.contains('forge_opened')||!safeText||!/^s[ií]$/i.test(confirmLabel))return fail('Confirmación de cancelación ambigua.');
         tx.stage='awaitCancel';tx.at=now;tx.actionAt=now;tx.cancelled=true;save();confirm.click();return true;
       }
       if(tx.stage==='awaitCancel') {
