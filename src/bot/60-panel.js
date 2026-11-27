@@ -117,6 +117,11 @@
     };
     let outboxBusy = false;
     let mailBusy = false;
+    const withTabernaLock = async (fn, ms = 15000) => {
+      tabernaBusyUntil = Date.now() + ms;
+      try { return await fn(); }
+      finally { tabernaBusyUntil = 0; if (ownerActive && state.running) setTimeout(combatTick, 250); }
+    };
     const mentionRe = new RegExp('(^|[\\s,.;:!?¿¡])@' + accountName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[\\s,.;:!?¿¡])', 'i');
     const isRecentChatTime = (hhmmss) => {
       const parts = hhmmss.split(':').map(Number);
@@ -155,53 +160,55 @@
     const flushOutbox = async () => {
       if (!chatEnabled || outboxBusy || !ownerActive || !verified() || captcha()) return;
       outboxBusy = true;
-      try {
-        const res = await fetch(chatApiBase + '/api/outbox?character=' + encodeURIComponent(accountName), { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(12000) });
-        if (!res.ok) return;
-        const data = await res.json();
-        const item = Array.isArray(data.items) ? data.items.find(x => (x.channel === 'guild_chat' || x.channel === 'private_mail') && x.body) : null;
-        if (!item) return;
+      await withTabernaLock(async () => {
+        try {
+          const res = await fetch(chatApiBase + '/api/outbox?character=' + encodeURIComponent(accountName), { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(12000) });
+          if (!res.ok) return;
+          const data = await res.json();
+          const item = Array.isArray(data.items) ? data.items.find(x => (x.channel === 'guild_chat' || x.channel === 'private_mail') && x.body) : null;
+          if (!item) return;
 
-        let delivered = false;
-        if (item.channel === 'guild_chat') {
-          const tabGuild = document.querySelector('#tab_guild');
-          const chatInput = document.querySelector('#chatInput');
-          if (!tabGuild || !chatInput || typeof window.chat?.sendMessage !== 'function') return;
-          if (window.chat.aktWindow !== 'guild') { tabGuild.click(); await new Promise(r => setTimeout(r, 300)); }
-          if (window.chat.aktWindow !== 'guild') return;
-          chatInput.focus();
-          chatInput.value = item.body;
-          window.chat.sendMessage();
-          await new Promise(r => setTimeout(r, 1100));
-          delivered = chatInput.value === '' && (document.querySelector('#chat_guild')?.textContent || '').includes(item.body.slice(0, 24));
-        } else if (item.channel === 'private_mail' && item.recipient) {
-          const sh = new URL(location.href).searchParams.get('sh');
-          if (!sh) return;
-          const formBody = new URLSearchParams({
-            messageRecipient: item.recipient,
-            messageSubject: item.subject || 'Re: Mensaje',
-            messageContent: item.body,
-            sent: 'Enviar'
-          });
-          const mailRes = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageNew&sh=' + encodeURIComponent(sh), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formBody.toString(),
-            signal: AbortSignal.timeout(15000)
-          });
-          delivered = mailRes.ok;
-        }
+          let delivered = false;
+          if (item.channel === 'guild_chat') {
+            const tabGuild = document.querySelector('#tab_guild');
+            const chatInput = document.querySelector('#chatInput');
+            if (!tabGuild || !chatInput || typeof window.chat?.sendMessage !== 'function') return;
+            if (window.chat.aktWindow !== 'guild') { tabGuild.click(); await new Promise(r => setTimeout(r, 300)); }
+            if (window.chat.aktWindow !== 'guild') return;
+            chatInput.focus();
+            chatInput.value = item.body;
+            window.chat.sendMessage();
+            await new Promise(r => setTimeout(r, 1100));
+            delivered = chatInput.value === '' && (document.querySelector('#chat_guild')?.textContent || '').includes(item.body.slice(0, 24));
+          } else if (item.channel === 'private_mail' && item.recipient) {
+            const sh = new URL(location.href).searchParams.get('sh');
+            if (!sh) return;
+            const formBody = new URLSearchParams({
+              messageRecipient: item.recipient,
+              messageSubject: item.subject || 'Re: Mensaje',
+              messageContent: item.body,
+              sent: 'Enviar'
+            });
+            const mailRes = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageNew&sh=' + encodeURIComponent(sh), {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formBody.toString(),
+              signal: AbortSignal.timeout(15000)
+            });
+            delivered = mailRes.ok;
+          }
 
-        await fetch(chatApiBase + '/api/outbox/ack', {
-          method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ character: accountName, id: item.id, status: delivered ? 'sent' : 'failed' }),
-          signal: AbortSignal.timeout(10000)
-        });
-        renderChatCard(delivered ? (item.channel === 'private_mail' ? 'Correo respondido a ' + item.recipient + '.' : 'Mensaje enviado al chat de alianza.') : 'Envío no confirmado; marcado sin reintentar.');
-      } catch {}
-      finally { outboxBusy = false; }
+          await fetch(chatApiBase + '/api/outbox/ack', {
+            method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ character: accountName, id: item.id, status: delivered ? 'sent' : 'failed' }),
+            signal: AbortSignal.timeout(10000)
+          });
+          renderChatCard(delivered ? (item.channel === 'private_mail' ? 'Correo respondido a ' + item.recipient + '.' : 'Mensaje enviado al chat de alianza.') : 'Envío no confirmado; marcado sin reintentar.');
+        } catch {}
+        finally { outboxBusy = false; }
+      }, 15000);
     };
 
     const scanGuildChat = async () => {
@@ -215,31 +222,33 @@
       const target = fresh.find(e => e.author.toLowerCase() !== accountName.toLowerCase() && isRecentChatTime(e.time) && mentionRe.test(e.text));
       if (!target) return;
       renderChatCard('Mención de ' + target.author + '; consultando taberna…');
-      try {
-        const res = await fetch(chatApiBase + '/api/chat/trigger', {
-          method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            character: accountName,
-            server: host.split('.')[0],
-            author: target.author,
-            time: target.time,
-            text: target.text,
-            recentMessages: entries.slice(-6).map(x => ({ author: x.author, text: x.text })),
-            state: readLiveState()
-          }),
-          signal: AbortSignal.timeout(25000)
-        });
-        const data = await res.json();
-        if (data.queuedId) {
-          renderChatCard('Respuesta encolada (turno ' + (data.chainDepth || 1) + ').');
-          setTimeout(flushOutbox, 600);
-        } else if (data.deduplicated) {
-          renderChatCard('Mención ya procesada (sin duplicar).');
-        } else if (data.skipped === 'chain_limit') {
-          renderChatCard('Tope anti-bucle alcanzado; esperando a un jugador.');
-        }
-      } catch { renderChatCard('No se pudo contactar con taberna.yampi.eu.'); }
+      await withTabernaLock(async () => {
+        try {
+          const res = await fetch(chatApiBase + '/api/chat/trigger', {
+            method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              character: accountName,
+              server: host.split('.')[0],
+              author: target.author,
+              time: target.time,
+              text: target.text,
+              recentMessages: entries.slice(-6).map(x => ({ author: x.author, text: x.text })),
+              state: readLiveState()
+            }),
+            signal: AbortSignal.timeout(20000)
+          });
+          const data = await res.json();
+          if (data.queuedId) {
+            renderChatCard('Respuesta encolada (turno ' + (data.chainDepth || 1) + ').');
+            setTimeout(flushOutbox, 400);
+          } else if (data.deduplicated) {
+            renderChatCard('Mención ya procesada (sin duplicar).');
+          } else if (data.skipped === 'chain_limit') {
+            renderChatCard('Tope anti-bucle alcanzado; esperando a un jugador.');
+          }
+        } catch { renderChatCard('No se pudo contactar con taberna.yampi.eu.'); }
+      }, 15000);
     };
 
     const scanPrivateMail = async () => {
@@ -247,43 +256,45 @@
       const sh = new URL(location.href).searchParams.get('sh');
       if (!sh) return;
       mailBusy = true;
-      try {
-        const res = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageShow&folder=0&sh=' + encodeURIComponent(sh), { credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
-        if (!res.ok) return;
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const boxes = [...doc.querySelectorAll('#content form .message_box')].slice(0, 30);
-        const messages = [];
-        for (const box of boxes) {
-          const cb = box.querySelector('input[type="checkbox"][name="x[]"]');
-          if (!cb?.value) continue;
-          const subj = box.querySelector('.messageSubject');
-          const playerLink = subj?.querySelector('a[href*="mod=player"]');
-          const isSystem = !playerLink;
-          const author = playerLink ? playerLink.textContent.trim() : 'Sistema';
-          const titleRaw = (subj?.querySelector('.message_box_title')?.textContent || subj?.textContent || '').replace(/\s+/g, ' ').trim();
-          const bodyRaw = isSystem ? '' : (box.querySelector('.message_box_content')?.textContent || '').replace(/\s+/g, ' ').trim();
-          messages.push({ externalId: cb.value, channel: 'private_mail', author, subject: titleRaw.slice(0, 140), body: bodyRaw.slice(0, 900), isSystem });
-        }
-        let baseline = false;
-        try { baseline = localStorage.getItem(mailBaselineKey) !== '1'; } catch {}
-        const syncRes = await fetch(chatApiBase + '/api/inbox/sync', {
-          method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ character: accountName, server: host.split('.')[0], baseline, state: readLiveState(), messages }),
-          signal: AbortSignal.timeout(25000)
-        });
-        if (!syncRes.ok) return;
-        const syncData = await syncRes.json();
-        if (baseline && syncData.ok) {
-          try { localStorage.setItem(mailBaselineKey, '1'); } catch {}
-          renderChatCard('Bandeja inicializada (solo responderá correos nuevos).');
-        } else if (Array.isArray(syncData.queuedMailIds) && syncData.queuedMailIds.length) {
-          renderChatCard('Correo nuevo encolado; enviando respuesta…');
-          setTimeout(flushOutbox, 800);
-        }
-      } catch {}
-      finally { mailBusy = false; }
+      await withTabernaLock(async () => {
+        try {
+          const res = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageShow&folder=0&sh=' + encodeURIComponent(sh), { credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
+          if (!res.ok) return;
+          const html = await res.text();
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const boxes = [...doc.querySelectorAll('#content form .message_box')].slice(0, 30);
+          const messages = [];
+          for (const box of boxes) {
+            const cb = box.querySelector('input[type="checkbox"][name="x[]"]');
+            if (!cb?.value) continue;
+            const subj = box.querySelector('.messageSubject');
+            const playerLink = subj?.querySelector('a[href*="mod=player"]');
+            const isSystem = !playerLink;
+            const author = playerLink ? playerLink.textContent.trim() : 'Sistema';
+            const titleRaw = (subj?.querySelector('.message_box_title')?.textContent || subj?.textContent || '').replace(/\s+/g, ' ').trim();
+            const bodyRaw = isSystem ? '' : (box.querySelector('.message_box_content')?.textContent || '').replace(/\s+/g, ' ').trim();
+            messages.push({ externalId: cb.value, channel: 'private_mail', author, subject: titleRaw.slice(0, 140), body: bodyRaw.slice(0, 900), isSystem });
+          }
+          let baseline = false;
+          try { baseline = localStorage.getItem(mailBaselineKey) !== '1'; } catch {}
+          const syncRes = await fetch(chatApiBase + '/api/inbox/sync', {
+            method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ character: accountName, server: host.split('.')[0], baseline, state: readLiveState(), messages }),
+            signal: AbortSignal.timeout(20000)
+          });
+          if (!syncRes.ok) return;
+          const syncData = await syncRes.json();
+          if (baseline && syncData.ok) {
+            try { localStorage.setItem(mailBaselineKey, '1'); } catch {}
+            renderChatCard('Bandeja inicializada (solo responderá correos nuevos).');
+          } else if (Array.isArray(syncData.queuedMailIds) && syncData.queuedMailIds.length) {
+            renderChatCard('Correo nuevo encolado; enviando respuesta…');
+            setTimeout(flushOutbox, 400);
+          }
+        } catch {}
+        finally { mailBusy = false; }
+      }, 15000);
     };
 
     const chatBoxNode = document.querySelector('#chat_guild');
@@ -292,8 +303,9 @@
       chatObs.observe(chatBoxNode, { childList: true, subtree: true });
     }
     setInterval(scanGuildChat, 5000);
+    setTimeout(flushOutbox, 2000);
     setInterval(flushOutbox, 12000);
-    setTimeout(scanPrivateMail, 8000);
+    setTimeout(scanPrivateMail, 6000);
     setInterval(scanPrivateMail, 90000);
   }
   $('.subtitle').textContent = accountName + ' · ' + host.split('.')[0] + ' · ' + Object.entries(BUILD_CONFIG.modules).filter(([,enabled])=>enabled).map(([name])=>name).join(', ');

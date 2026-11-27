@@ -90,6 +90,7 @@
     if (!ownerActive || !state.running) return;
     if (captcha()) return stop('CAPTCHA detectado. Intervención humana requerida.');
     if (!verified()) { if (renewIdentity()) return; return stop('Identidad sin verificar. Abre Visión general del personaje y reactiva.'); }
+    if (typeof tabernaBusyUntil === 'number' && Date.now() < tabernaBusyUntil) return;
     if (!state.repairTx && lootTick()) return;
     const levelDialog=document.querySelector('#blackoutDialognotification');
     if (levelDialog && !visible(levelDialog)) noticeAttempts.delete(levelDialog);
