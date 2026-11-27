@@ -39,6 +39,8 @@ test('el userscript generado incluye la configuración allianceChat y excluye Ca
   const script = buildUserscript(cfg, fragments);
   assert.ok(script.includes('"allianceChat":true'));
   assert.ok(script.includes('/api/chat/trigger'));
+  assert.ok(script.includes('/api/inbox/sync'));
   assert.ok(script.includes('/api/outbox/ack'));
+  assert.ok(script.includes('submod=messageNew'));
   assert.ok(script.includes("cassiusferox"));
 });
