@@ -233,3 +233,5 @@ En 0.12.72, la instancia de Externsteine se identifica por el elemento de nombre
 En el configurador, «Participar en la taberna» está desactivado por defecto. Si se selecciona, el panel del userscript ofrece un botón que envía directamente desde el navegador nombre del personaje, servidor y nivel a `https://taberna.yampi.eu/api/sync`, solo al pulsarlo. Se genera y conserva localmente un identificador aleatorio por personaje y servidor para actualizar el mismo registro; si se borran los datos del navegador se crea otro. No se envían contraseñas, cookies ni URL de la sesión. El backend trata los perfiles como declarados, no como cuentas verificadas. El envío con el userscript instalado y la política de seguridad del juego aún requieren validación real.
 
 En 0.12.75, el botón reemplaza identificadores locales con formato inválido y genera el hexadecimal sin depender de conversiones modificables por la página. Pendiente de comprobar en la instalación afectada.
+
+En 0.12.76, la generación también evita depender de `Array.from`, que puede estar modificado por la página; pendiente de validar instalado.

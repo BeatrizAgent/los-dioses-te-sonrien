@@ -15,13 +15,13 @@ test('sincronización es opcional y sobrevive a enlaces de instalación',()=>{
   assert.throws(()=>searchToConfig(new URLSearchParams('v=1&taberna=bad')),/taberna/);
 });
 
-test('identificador inválido se reemplaza incluso si la página modifica Number.toString',async()=>{
+test('identificador inválido se reemplaza incluso si la página modifica Number.toString y Array.from',async()=>{
   const source=await readFile(new URL('../src/bot/60-panel.js',import.meta.url),'utf8');
   const match=source.match(/if \(!\/\^\[a-f0-9\]\{64\}\$\/.test\(token \|\| ''\)\) \{[^\n]+\}/);
   assert.ok(match, 'falta la generación de identificador');
   const saved={};
   const sandbox={token:'11625310524017525316910517222523911202019991246514466477518145215123403922013622022',key:'test',localStorage:{setItem:(k,v)=>saved[k]=v},crypto:{getRandomValues:bytes=>{bytes.set(Array.from({length:32},(_,i)=>i*8));return bytes;}}};
-  vm.runInNewContext(`Number.prototype.toString = function () { return 'decimal'; }; ${match[0]}`,sandbox);
+  vm.runInNewContext(`Number.prototype.toString = function () { return 'decimal'; }; Array.from = function (items) { return [...items]; }; ${match[0]}`,sandbox);
   assert.match(saved.test,/^[a-f0-9]{64}$/);
   assert.equal(saved.test.slice(0,8),'00081018');
 });

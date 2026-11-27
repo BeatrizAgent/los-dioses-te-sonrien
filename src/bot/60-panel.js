@@ -65,7 +65,7 @@
       let token;
       try {
         token=localStorage.getItem(key);
-        if (!/^[a-f0-9]{64}$/.test(token || '')) { const bytes=new Uint8Array(32); crypto.getRandomValues(bytes); const hex='0123456789abcdef'; token=Array.from(bytes,b=>hex[(b>>>4)&15]+hex[b&15]).join(''); localStorage.setItem(key,token); }
+        if (!/^[a-f0-9]{64}$/.test(token || '')) { const bytes=new Uint8Array(32); crypto.getRandomValues(bytes); const hex='0123456789abcdef'; token=''; for (let i=0;i<bytes.length;i++) token+=hex[(bytes[i]>>>4)&15]+hex[bytes[i]&15]; localStorage.setItem(key,token); }
       } catch { feedback.textContent='No se pudo guardar la clave local de sincronización.'; return; }
       button.disabled=true; feedback.textContent='Sincronizando…';
       try {
