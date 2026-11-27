@@ -108,12 +108,13 @@
     };
 
     const seenLines = new Set();
+    const chatBootAt = Date.now();
     try {
-      const savedSeen = JSON.parse(sessionStorage.getItem(chatSeenKey) || '[]');
-      if (Array.isArray(savedSeen)) for (const k of savedSeen.slice(-200)) seenLines.add(k);
+      const savedSeen = JSON.parse(localStorage.getItem(chatSeenKey) || '[]');
+      if (Array.isArray(savedSeen)) for (const k of savedSeen.slice(-250)) seenLines.add(k);
     } catch {}
     const persistSeen = () => {
-      try { sessionStorage.setItem(chatSeenKey, JSON.stringify([...seenLines].slice(-200))); } catch {}
+      try { localStorage.setItem(chatSeenKey, JSON.stringify([...seenLines].slice(-250))); } catch {}
     };
     let outboxBusy = false;
     let mailBusy = false;
@@ -123,17 +124,6 @@
       finally { tabernaBusyUntil = 0; if (ownerActive && state.running) setTimeout(combatTick, 250); }
     };
     const mentionRe = new RegExp('(^|[\\s,.;:!?¿¡])@' + accountName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[\\s,.;:!?¿¡])', 'i');
-    const isRecentChatTime = (hhmmss) => {
-      const parts = hhmmss.split(':').map(Number);
-      if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return false;
-      const now = new Date();
-      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-      const msgSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      let diff = nowSec - msgSec;
-      if (diff < -43200) diff += 86400;
-      if (diff > 43200) diff -= 86400;
-      return diff >= -30 && diff <= 120;
-    };
     const parseChatEntries = () => {
       const box = document.querySelector('#chat_guild');
       if (!box) return [];
@@ -142,9 +132,10 @@
       const out = [];
       for (const raw of lines) {
         const line = raw.replace(/\s+/g, ' ').trim();
-        if (!line || /está conectado al chat/i.test(line)) continue;
+        if (!line || /está conectado al chat|Bienvenido al chat|Miembros de la alianza|Miembros de tu Familia/i.test(line)) continue;
         const m = /^(\d{2}:\d{2}:\d{2})\s+([^:]{1,40}):\s+(.+)$/.exec(line);
-        if (m) out.push({ key: m[1] + '|' + m[2].trim().toLowerCase() + '|' + m[3].trim(), time: m[1], author: m[2].trim(), text: m[3].trim() });
+        // Key omits HH:MM:SS because Gladiatus re-stamps replayed history with page-load time.
+        if (m) out.push({ key: m[2].trim().toLowerCase() + '|' + m[3].trim().toLowerCase(), time: m[1], author: m[2].trim(), text: m[3].trim() });
       }
       return out;
     };
@@ -217,9 +208,11 @@
       const fresh = entries.filter(e => !seenLines.has(e.key));
       if (!fresh.length) return;
       for (const e of fresh) seenLines.add(e.key);
-      if (seenLines.size > 300) { const keep = [...seenLines].slice(-200); seenLines.clear(); for (const k of keep) seenLines.add(k); }
+      if (seenLines.size > 300) { const keep = [...seenLines].slice(-250); seenLines.clear(); for (const k of keep) seenLines.add(k); }
       persistSeen();
-      const target = fresh.find(e => e.author.toLowerCase() !== accountName.toLowerCase() && isRecentChatTime(e.time) && mentionRe.test(e.text));
+      // Ignore the initial 3s history replay burst when Gladiatus populates #chat_guild after page load.
+      if (Date.now() - chatBootAt < 3000) return;
+      const target = fresh.find(e => e.author.toLowerCase() !== accountName.toLowerCase() && mentionRe.test(e.text));
       if (!target) return;
       renderChatCard('Mención de ' + target.author + '; consultando taberna…');
       await withTabernaLock(async () => {
