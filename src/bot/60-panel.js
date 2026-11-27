@@ -47,6 +47,35 @@
     root.addEventListener(type, event => event.stopPropagation());
   }
   const $ = selector => root.querySelector(selector);
+  if (BUILD_CONFIG.tabernaSync === true) {
+    const section = document.createElement('div');
+    section.className = 'card';
+    const explanation = document.createElement('p');
+    explanation.className = 'small';
+    explanation.textContent = 'Taberna: al pulsar se envían nombre, servidor y nivel del personaje a taberna.yampi.eu. La identidad no se verifica en el servidor.';
+    const button = document.createElement('button'); button.className = 'btn'; button.textContent = 'Sincronizar con la taberna';
+    const feedback = document.createElement('p'); feedback.className = 'small'; feedback.setAttribute('role','status');
+    section.append(explanation,button,feedback); root.querySelector('.actions').after(section);
+    button.onclick = async () => {
+      if (!ownerActive || !verified() || captcha()) { feedback.textContent='Abre Visión general y verifica el personaje antes de sincronizar.'; return; }
+      const rawLevel = (document.querySelector('#header_values_level')?.textContent || '').trim();
+      const level = /^\d{1,3}$/.test(rawLevel) ? Number(rawLevel) : 0;
+      if (!level || level > 999) { feedback.textContent='No se puede leer el nivel actual. Abre Visión general.'; return; }
+      const key='gladibot.taberna.v1.'+host+'.'+encodeURIComponent(accountName.normalize('NFKC').trim().toLowerCase());
+      let token;
+      try {
+        token=localStorage.getItem(key);
+        if (!/^[a-f0-9]{64}$/.test(token || '')) { const bytes=new Uint8Array(32); crypto.getRandomValues(bytes); token=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''); localStorage.setItem(key,token); }
+      } catch { feedback.textContent='No se pudo guardar la clave local de sincronización.'; return; }
+      button.disabled=true; feedback.textContent='Sincronizando…';
+      try {
+        const response=await fetch('https://taberna.yampi.eu/api/sync',{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:accountName,server:host.split('.')[0],level,token}),signal:AbortSignal.timeout(15000)});
+        const data=await response.json();
+        feedback.textContent=response.ok && data.ok === true ? 'Perfil enviado a la taberna.' : 'No se pudo sincronizar (HTTP '+response.status+').';
+      } catch { feedback.textContent='No se pudo conectar. Comprueba el navegador y vuelve a intentarlo.'; }
+      finally { button.disabled=false; }
+    };
+  }
   $('.subtitle').textContent = accountName + ' · ' + host.split('.')[0] + ' · ' + Object.entries(BUILD_CONFIG.modules).filter(([,enabled])=>enabled).map(([name])=>name).join(', ');
   const uiState = loadUI();
   let tabName = uiState.tab;
