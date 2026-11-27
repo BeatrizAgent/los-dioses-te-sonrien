@@ -80,31 +80,42 @@
     const chatApiBase = 'https://taberna.yampi.eu';
     const normAcc = encodeURIComponent(accountName.normalize('NFKC').trim().toLowerCase());
     const chatPrefKey = 'gladibot.allianceChat.v1.' + host + '.' + normAcc;
+    const globalPrefKey = 'gladibot.globalChat.v1.' + host + '.' + normAcc;
     const chatSeenKey = 'gladibot.allianceChat.seen.v1.' + host + '.' + normAcc;
     const mailBaselineKey = 'gladibot.privateMail.baseline.v1.' + host + '.' + normAcc;
     let chatEnabled = true;
+    let globalEnabled = true;
     try { const saved = localStorage.getItem(chatPrefKey); if (saved === '0') chatEnabled = false; } catch {}
+    try { const savedG = localStorage.getItem(globalPrefKey); if (savedG === '0') globalEnabled = false; } catch {}
     const chatCard = document.createElement('div');
     chatCard.className = 'card';
     const chatHead = document.createElement('p');
     chatHead.className = 'small';
     const chatBtn = document.createElement('button');
     chatBtn.className = 'btn';
+    const globalBtn = document.createElement('button');
+    globalBtn.className = 'btn';
     const chatStatus = document.createElement('p');
     chatStatus.className = 'small';
     chatStatus.setAttribute('role', 'status');
     const renderChatCard = (note) => {
-      chatHead.textContent = 'Chat y correo IA: ' + (chatEnabled ? 'Activo (@' + accountName + ')' : 'Pausado');
+      chatHead.textContent = 'Chat y correo IA: ' + (chatEnabled ? 'Activo (@' + accountName + ' · Global ' + (globalEnabled ? 'ON' : 'OFF') + ')' : 'Pausado');
       chatBtn.textContent = chatEnabled ? 'Pausar chat/correo IA' : 'Activar chat/correo IA';
+      globalBtn.textContent = globalEnabled ? 'Pausar Global (Todo)' : 'Activar Global (Todo)';
       if (note) chatStatus.textContent = note;
     };
-    renderChatCard('Escuchando Alianza y correos nuevos.');
-    chatCard.append(chatHead, chatBtn, chatStatus);
+    renderChatCard('Escuchando Alianza, Global (Todo) y correos nuevos.');
+    chatCard.append(chatHead, chatBtn, globalBtn, chatStatus);
     root.querySelector('.actions').after(chatCard);
     chatBtn.onclick = () => {
       chatEnabled = !chatEnabled;
       try { localStorage.setItem(chatPrefKey, chatEnabled ? '1' : '0'); } catch {}
       renderChatCard(chatEnabled ? 'Activo para @' + accountName + ' y correos nuevos.' : 'Chat y correo IA en pausa.');
+    };
+    globalBtn.onclick = () => {
+      globalEnabled = !globalEnabled;
+      try { localStorage.setItem(globalPrefKey, globalEnabled ? '1' : '0'); } catch {}
+      renderChatCard(globalEnabled ? 'Global (Todo) activo ante @' + accountName + '.' : 'Global (Todo) en pausa.');
     };
 
     const seenLines = new Set();
@@ -124,8 +135,8 @@
       finally { tabernaBusyUntil = 0; if (ownerActive && state.running) setTimeout(combatTick, 250); }
     };
     const mentionRe = new RegExp('(^|[\\s,.;:!?¿¡])@' + accountName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[\\s,.;:!?¿¡])', 'i');
-    const parseChatEntries = () => {
-      const box = document.querySelector('#chat_guild');
+    const parseChatEntries = (channel, selector) => {
+      const box = document.querySelector(selector);
       if (!box) return [];
       const rawNodes = [...box.children];
       const lines = rawNodes.length ? rawNodes.map(n => (n.textContent || '').replace(/\s+/g, ' ').trim()) : (box.textContent || '').split(/(?=\d{2}:\d{2}:\d{2}\s)/);
@@ -135,11 +146,12 @@
         if (!line || /está conectado al chat|Bienvenido al chat|Miembros de la alianza|Miembros de tu Familia/i.test(line)) continue;
         const m = /^(\d{2}:\d{2}:\d{2})\s+([^:]{1,40}):\s+(.+)$/.exec(line);
         // Key omits HH:MM:SS because Gladiatus re-stamps replayed history with page-load time.
-        if (m) out.push({ key: m[2].trim().toLowerCase() + '|' + m[3].trim().toLowerCase(), time: m[1], author: m[2].trim(), text: m[3].trim() });
+        if (m) out.push({ key: channel + '|' + m[2].trim().toLowerCase() + '|' + m[3].trim().toLowerCase(), time: m[1], author: m[2].trim(), text: m[3].trim() });
       }
       return out;
     };
-    for (const entry of parseChatEntries()) seenLines.add(entry.key);
+    for (const entry of parseChatEntries('guild_chat', '#chat_guild')) seenLines.add(entry.key);
+    for (const entry of parseChatEntries('global_chat', '#chat_general')) seenLines.add(entry.key);
     persistSeen();
 
     const readLiveState = () => ({
@@ -163,21 +175,24 @@
           const res = await fetch(chatApiBase + '/api/outbox?character=' + encodeURIComponent(accountName), { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(12000) });
           if (!res.ok) return;
           const data = await res.json();
-          const item = Array.isArray(data.items) ? data.items.find(x => (x.channel === 'guild_chat' || x.channel === 'private_mail') && x.body) : null;
+          const item = Array.isArray(data.items) ? data.items.find(x => (x.channel === 'guild_chat' || (x.channel === 'global_chat' && globalEnabled) || x.channel === 'private_mail') && x.body) : null;
           if (!item) return;
 
           let delivered = false;
-          if (item.channel === 'guild_chat') {
-            const tabGuild = document.querySelector('#tab_guild');
+          if (item.channel === 'guild_chat' || item.channel === 'global_chat') {
+            const isGlobal = item.channel === 'global_chat';
+            const tabEl = document.querySelector(isGlobal ? '#tab_general' : '#tab_guild');
+            const boxSel = isGlobal ? '#chat_general' : '#chat_guild';
+            const wantWin = isGlobal ? 'general' : 'guild';
             const chatInput = document.querySelector('#chatInput');
-            if (!tabGuild || !chatInput || typeof window.chat?.sendMessage !== 'function') return;
-            if (window.chat.aktWindow !== 'guild') { tabGuild.click(); await new Promise(r => setTimeout(r, 300)); }
-            if (window.chat.aktWindow !== 'guild') return;
+            if (!tabEl || !chatInput || typeof window.chat?.sendMessage !== 'function') return;
+            if (window.chat.aktWindow !== wantWin) { tabEl.click(); await new Promise(r => setTimeout(r, 300)); }
+            if (window.chat.aktWindow !== wantWin) return;
             chatInput.focus();
             chatInput.value = item.body;
             window.chat.sendMessage();
             await new Promise(r => setTimeout(r, 1100));
-            delivered = chatInput.value === '' && (document.querySelector('#chat_guild')?.textContent || '').includes(item.body.slice(0, 24));
+            delivered = chatInput.value === '' && (document.querySelector(boxSel)?.textContent || '').includes(item.body.slice(0, 24));
           } else if (item.channel === 'private_mail' && item.recipient) {
             const sh = currentSh();
             if (!sh || params.has('login')) return;
@@ -223,25 +238,26 @@
             body: JSON.stringify({ character: accountName, id: item.id, status: delivered ? 'sent' : 'failed' }),
             signal: AbortSignal.timeout(10000)
           });
-          renderChatCard(delivered ? (item.channel === 'private_mail' ? 'Correo respondido a ' + item.recipient + '.' : 'Mensaje enviado al chat de alianza.') : 'Envío no confirmado; marcado sin reintentar.');
+          renderChatCard(delivered ? (item.channel === 'private_mail' ? 'Correo respondido a ' + item.recipient + '.' : item.channel === 'global_chat' ? 'Mensaje enviado a Global (Todo).' : 'Mensaje enviado al chat de alianza.') : 'Envío no confirmado; marcado sin reintentar.');
         } catch {}
         finally { outboxBusy = false; }
       }, 15000);
     };
 
-    const scanGuildChat = async () => {
+    const scanChatChannel = async (channel, selector) => {
       if (!chatEnabled || !ownerActive || !verified() || captcha()) return;
-      const entries = parseChatEntries();
+      if (channel === 'global_chat' && !globalEnabled) return;
+      const entries = parseChatEntries(channel, selector);
       const fresh = entries.filter(e => !seenLines.has(e.key));
       if (!fresh.length) return;
       for (const e of fresh) seenLines.add(e.key);
       if (seenLines.size > 300) { const keep = [...seenLines].slice(-250); seenLines.clear(); for (const k of keep) seenLines.add(k); }
       persistSeen();
-      // Ignore the initial 3s history replay burst when Gladiatus populates #chat_guild after page load.
+      // Ignore the initial 3s history replay burst when Gladiatus populates chat after page load.
       if (Date.now() - chatBootAt < 3000) return;
       const target = fresh.find(e => e.author.toLowerCase() !== accountName.toLowerCase() && mentionRe.test(e.text));
       if (!target) return;
-      renderChatCard('Mención de ' + target.author + '; consultando taberna…');
+      renderChatCard('Mención de ' + target.author + (channel === 'global_chat' ? ' (Global)' : '') + '; consultando taberna…');
       await withTabernaLock(async () => {
         try {
           const res = await fetch(chatApiBase + '/api/chat/trigger', {
@@ -249,6 +265,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               character: accountName,
+              channel,
               server: host.split('.')[0],
               author: target.author,
               time: target.time,
@@ -260,15 +277,19 @@
           });
           const data = await res.json();
           if (data.queuedId) {
-            renderChatCard('Respuesta encolada (turno ' + (data.chainDepth || 1) + ').');
+            renderChatCard('Respuesta encolada (' + (channel === 'global_chat' ? 'Global' : 'turno ' + (data.chainDepth || 1)) + ').');
             setTimeout(flushOutbox, 400);
           } else if (data.deduplicated) {
             renderChatCard('Mención ya procesada (sin duplicar).');
-          } else if (data.skipped === 'chain_limit') {
+          } else if (data.skipped === 'chain_limit' || data.skipped === 'global_no_bot_chain') {
             renderChatCard('Tope anti-bucle alcanzado; esperando a un jugador.');
           }
         } catch { renderChatCard('No se pudo contactar con taberna.yampi.eu.'); }
       }, 15000);
+    };
+    const scanAllChats = async () => {
+      await scanChatChannel('guild_chat', '#chat_guild');
+      await scanChatChannel('global_chat', '#chat_general');
     };
 
     const scanPrivateMail = async () => {
@@ -319,10 +340,15 @@
 
     const chatBoxNode = document.querySelector('#chat_guild');
     if (chatBoxNode) {
-      const chatObs = new MutationObserver(() => { scanGuildChat(); });
+      const chatObs = new MutationObserver(() => { scanChatChannel('guild_chat', '#chat_guild'); });
       chatObs.observe(chatBoxNode, { childList: true, subtree: true });
     }
-    setInterval(scanGuildChat, 5000);
+    const globalBoxNode = document.querySelector('#chat_general');
+    if (globalBoxNode) {
+      const globalObs = new MutationObserver(() => { scanChatChannel('global_chat', '#chat_general'); });
+      globalObs.observe(globalBoxNode, { childList: true, subtree: true });
+    }
+    setInterval(scanAllChats, 5000);
     setTimeout(flushOutbox, 2000);
     setInterval(flushOutbox, 12000);
     setTimeout(scanPrivateMail, 6000);
