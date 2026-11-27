@@ -147,6 +147,13 @@
       gold: (document.querySelector('#sstat_gold_val')?.textContent || '').trim() || undefined,
       hp: (document.querySelector('#header_values_hp_percent')?.textContent || '').trim() || undefined
     });
+    const currentSh = () => {
+      const link = document.querySelector('#mainmenu a[href*="sh="], a[href*="mod=messages"][href*="sh="]');
+      if (link) {
+        try { const s = new URL(link.getAttribute('href'), location.href).searchParams.get('sh'); if (s) return s; } catch {}
+      }
+      return new URL(location.href).searchParams.get('sh') || '';
+    };
 
     const flushOutbox = async () => {
       if (!chatEnabled || outboxBusy || !ownerActive || !verified() || captcha()) return;
@@ -172,8 +179,8 @@
             await new Promise(r => setTimeout(r, 1100));
             delivered = chatInput.value === '' && (document.querySelector('#chat_guild')?.textContent || '').includes(item.body.slice(0, 24));
           } else if (item.channel === 'private_mail' && item.recipient) {
-            const sh = new URL(location.href).searchParams.get('sh');
-            if (!sh) return;
+            const sh = currentSh();
+            if (!sh || params.has('login')) return;
             const formBody = new URLSearchParams({
               messageRecipient: item.recipient,
               messageSubject: item.subject || 'Re: Mensaje',
@@ -183,11 +190,12 @@
             const mailRes = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageNew&sh=' + encodeURIComponent(sh), {
               method: 'POST',
               credentials: 'same-origin',
+              redirect: 'manual',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formBody.toString(),
               signal: AbortSignal.timeout(15000)
             });
-            delivered = mailRes.ok;
+            delivered = mailRes.type === 'basic' && mailRes.status === 200;
           }
 
           await fetch(chatApiBase + '/api/outbox/ack', {
@@ -245,14 +253,14 @@
     };
 
     const scanPrivateMail = async () => {
-      if (!chatEnabled || mailBusy || !ownerActive || !verified() || captcha()) return;
-      const sh = new URL(location.href).searchParams.get('sh');
+      if (!chatEnabled || mailBusy || !ownerActive || !verified() || captcha() || params.has('login')) return;
+      const sh = currentSh();
       if (!sh) return;
       mailBusy = true;
       await withTabernaLock(async () => {
         try {
-          const res = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageShow&folder=0&sh=' + encodeURIComponent(sh), { credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
-          if (!res.ok) return;
+          const res = await fetch(location.origin + '/game/index.php?mod=messages&submod=messageShow&folder=0&sh=' + encodeURIComponent(sh), { credentials: 'same-origin', redirect: 'manual', signal: AbortSignal.timeout(15000) });
+          if (res.type !== 'basic' || res.status !== 200) return;
           const html = await res.text();
           const doc = new DOMParser().parseFromString(html, 'text/html');
           const boxes = [...doc.querySelectorAll('#content form .message_box')].slice(0, 30);
