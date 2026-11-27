@@ -76,6 +76,134 @@
       finally { button.disabled=false; }
     };
   }
+  if (BUILD_CONFIG.allianceChat === true && accountName.normalize('NFKC').trim().toLowerCase() !== 'cassiusferox') {
+    const chatApiBase = 'https://taberna.yampi.eu';
+    const chatPrefKey = 'gladibot.allianceChat.v1.' + host + '.' + encodeURIComponent(accountName.normalize('NFKC').trim().toLowerCase());
+    let chatEnabled = true;
+    try { const saved = localStorage.getItem(chatPrefKey); if (saved === '0') chatEnabled = false; } catch {}
+    const chatCard = document.createElement('div');
+    chatCard.className = 'card';
+    const chatHead = document.createElement('p');
+    chatHead.className = 'small';
+    const chatBtn = document.createElement('button');
+    chatBtn.className = 'btn';
+    const chatStatus = document.createElement('p');
+    chatStatus.className = 'small';
+    chatStatus.setAttribute('role', 'status');
+    const renderChatCard = (note) => {
+      chatHead.textContent = 'Chat de alianza IA: ' + (chatEnabled ? 'Activo (@' + accountName + ')' : 'Pausado');
+      chatBtn.textContent = chatEnabled ? 'Pausar chat IA' : 'Activar chat IA';
+      if (note) chatStatus.textContent = note;
+    };
+    renderChatCard('Esperando menciones en la pestaña Alianza.');
+    chatCard.append(chatHead, chatBtn, chatStatus);
+    root.querySelector('.actions').after(chatCard);
+    chatBtn.onclick = () => {
+      chatEnabled = !chatEnabled;
+      try { localStorage.setItem(chatPrefKey, chatEnabled ? '1' : '0'); } catch {}
+      renderChatCard(chatEnabled ? 'Escuchando menciones @' + accountName + '.' : 'Chat IA en pausa.');
+    };
+
+    const seenLines = new Set();
+    let outboxBusy = false;
+    const mentionRe = new RegExp('(^|[\\s,.;:!?¿¡])@' + accountName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[\\s,.;:!?¿¡])', 'i');
+    const parseChatEntries = () => {
+      const box = document.querySelector('#chat_guild');
+      if (!box) return [];
+      const rawNodes = [...box.children];
+      const lines = rawNodes.length ? rawNodes.map(n => (n.textContent || '').replace(/\s+/g, ' ').trim()) : (box.textContent || '').split(/(?=\d{2}:\d{2}:\d{2}\s)/);
+      const out = [];
+      for (const raw of lines) {
+        const line = raw.replace(/\s+/g, ' ').trim();
+        if (!line || /está conectado al chat/i.test(line)) continue;
+        const m = /^(\d{2}:\d{2}:\d{2})\s+([^:]{1,40}):\s+(.+)$/.exec(line);
+        if (m) out.push({ key: m[1] + '|' + m[2].trim().toLowerCase() + '|' + m[3].trim(), time: m[1], author: m[2].trim(), text: m[3].trim() });
+      }
+      return out;
+    };
+    // Seed existing lines on load so page reloads never replay old chat history.
+    for (const entry of parseChatEntries()) seenLines.add(entry.key);
+
+    const readLiveState = () => ({
+      level: Number((document.querySelector('#header_values_level')?.textContent || '').replace(/\D/g, '')) || undefined,
+      gold: (document.querySelector('#sstat_gold_val')?.textContent || '').trim() || undefined,
+      hp: (document.querySelector('#header_values_hp_percent')?.textContent || '').trim() || undefined
+    });
+
+    const flushOutbox = async () => {
+      if (!chatEnabled || outboxBusy || !ownerActive || !verified() || captcha()) return;
+      const tabGuild = document.querySelector('#tab_guild');
+      const chatInput = document.querySelector('#chatInput');
+      if (!tabGuild || !chatInput || typeof window.chat?.sendMessage !== 'function') return;
+      outboxBusy = true;
+      try {
+        const res = await fetch(chatApiBase + '/api/outbox?character=' + encodeURIComponent(accountName), { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(12000) });
+        if (!res.ok) return;
+        const data = await res.json();
+        const item = Array.isArray(data.items) ? data.items.find(x => x.channel === 'guild_chat' && x.body) : null;
+        if (!item) return;
+        if (window.chat.aktWindow !== 'guild') { tabGuild.click(); await new Promise(r => setTimeout(r, 300)); }
+        if (window.chat.aktWindow !== 'guild') return;
+        chatInput.focus();
+        chatInput.value = item.body;
+        window.chat.sendMessage();
+        await new Promise(r => setTimeout(r, 1100));
+        const delivered = chatInput.value === '' && (document.querySelector('#chat_guild')?.textContent || '').includes(item.body.slice(0, 24));
+        await fetch(chatApiBase + '/api/outbox/ack', {
+          method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ character: accountName, id: item.id, status: delivered ? 'sent' : 'failed' }),
+          signal: AbortSignal.timeout(10000)
+        });
+        renderChatCard(delivered ? 'Mensaje enviado al chat de alianza.' : 'Envío no confirmado; marcado sin reintentar.');
+      } catch {}
+      finally { outboxBusy = false; }
+    };
+
+    const scanGuildChat = async () => {
+      if (!chatEnabled || !ownerActive || !verified() || captcha()) return;
+      const entries = parseChatEntries();
+      const fresh = entries.filter(e => !seenLines.has(e.key));
+      if (!fresh.length) return;
+      for (const e of fresh) seenLines.add(e.key);
+      if (seenLines.size > 400) { const keep = [...seenLines].slice(-200); seenLines.clear(); for (const k of keep) seenLines.add(k); }
+      const target = fresh.find(e => e.author.toLowerCase() !== accountName.toLowerCase() && mentionRe.test(e.text));
+      if (!target) return;
+      renderChatCard('Mención de ' + target.author + '; consultando taberna…');
+      try {
+        const res = await fetch(chatApiBase + '/api/chat/trigger', {
+          method: 'POST', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            character: accountName,
+            server: host.split('.')[0],
+            author: target.author,
+            text: target.text,
+            recentMessages: entries.slice(-6).map(x => ({ author: x.author, text: x.text })),
+            state: readLiveState()
+          }),
+          signal: AbortSignal.timeout(25000)
+        });
+        const data = await res.json();
+        if (data.queuedId) {
+          renderChatCard('Respuesta encolada (turno ' + (data.chainDepth || 1) + ').');
+          setTimeout(flushOutbox, 600);
+        } else if (data.deduplicated) {
+          renderChatCard('Mención ya procesada (sin duplicar).');
+        } else if (data.skipped === 'chain_limit') {
+          renderChatCard('Tope anti-bucle alcanzado; esperando a un jugador.');
+        }
+      } catch { renderChatCard('No se pudo contactar con taberna.yampi.eu.'); }
+    };
+
+    const chatBoxNode = document.querySelector('#chat_guild');
+    if (chatBoxNode) {
+      const chatObs = new MutationObserver(() => { scanGuildChat(); });
+      chatObs.observe(chatBoxNode, { childList: true, subtree: true });
+    }
+    setInterval(scanGuildChat, 5000);
+    setInterval(flushOutbox, 12000);
+  }
   $('.subtitle').textContent = accountName + ' · ' + host.split('.')[0] + ' · ' + Object.entries(BUILD_CONFIG.modules).filter(([,enabled])=>enabled).map(([name])=>name).join(', ');
   const uiState = loadUI();
   let tabName = uiState.tab;

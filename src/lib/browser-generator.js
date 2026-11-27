@@ -115,6 +115,7 @@ export function initializeGenerator() {
   dungeonSelect.addEventListener('change', refreshCatalog);
   document.querySelector('#market-profile-huggin').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   document.querySelector('#taberna-sync').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
+  document.querySelector('#alliance-chat').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   dungeonLossLimit.addEventListener('input', () => { result.hidden = true; error.hidden = true; });
   document.querySelector('#smelting-priority').addEventListener('change', () => { result.hidden = true; error.hidden = true; });
   expeditionToggle.addEventListener('change', updateModuleControls);
@@ -139,6 +140,7 @@ export function initializeGenerator() {
       const modules = Object.fromEntries(moduleKeys.map(key => [key, key==='arenaCircus' ? pvp.arena || pvp.turma : form.querySelector(`input[name="${key}"]`).checked]));
       const input = {
         tabernaSync: document.querySelector('#taberna-sync').checked,
+        allianceChat: document.querySelector('#alliance-chat').checked,
         marketProfile: document.querySelector('#market-profile-huggin').checked ? 'huggin' : '',
         playerLevel: level.value,
         campaignRegion: regionSelect.value,

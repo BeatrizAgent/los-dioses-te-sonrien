@@ -232,6 +232,8 @@ En 0.12.72, la instancia de Externsteine se identifica por el elemento de nombre
 
 En el configurador, «Participar en la taberna» está desactivado por defecto. Si se selecciona, el panel ofrece un botón que publica nombre, servidor y nivel en `https://taberna.yampi.eu`, visibles para todos. Solo se envían desde el navegador al pulsarlo. Se genera y conserva localmente un identificador aleatorio por personaje y servidor para actualizar el mismo registro; si se borran los datos del navegador se crea otro. No se envían contraseñas, cookies ni URL de la sesión. El backend trata los perfiles como declarados, no como cuentas verificadas. La publicación con el userscript 0.12.77 instalado aún requiere validación real.
 
+A partir de **0.12.78**, el configurador añade también la casilla opcional «Chat de alianza IA (Taberna · opcional)», desactivada por defecto y no obligatoria. Si se marca, el bot escucha menciones `@TuPersonaje` en la pestaña Alianza (`#chat_guild`), consulta `https://taberna.yampi.eu/api/chat/trigger` con deduplicación y tope anti-bucle, recoge la respuesta encolada en `/api/outbox`, la envía solo por el canal de alianza (`window.chat.sendMessage()`) y confirma `/api/outbox/ack`. Excluye explícitamente a `CassiusFerox` y ofrece un botón de pausa/activación en el panel.
+
 En 0.12.75, el botón reemplaza identificadores locales con formato inválido y genera el hexadecimal sin depender de conversiones modificables por la página. Pendiente de comprobar en la instalación afectada.
 
 En 0.12.76, la generación también evita depender de `Array.from`, que puede estar modificado por la página; pendiente de validar instalado.

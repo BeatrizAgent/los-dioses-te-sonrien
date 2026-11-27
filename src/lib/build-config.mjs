@@ -94,7 +94,7 @@ export function normalizeBuildConfig(input, catalog) {
   const marketProfile = input.marketProfile || '';
   if (!['', 'huggin'].includes(marketProfile)) throw new TypeError('Perfil de mercado no válido.');
   const blockedMarketSellers = marketProfile === 'huggin' ? ['FanCarrazera','PrefectAcilius','CarrazeraFan','CurioUmbrius','CassianVesper'] : [];
-  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, pvp, expedition, dungeon, smeltingPriority, marketProfile, blockedMarketSellers, tabernaSync: input.tabernaSync === true };
+  return { playerLevel, campaignRegion: requestedRegion || targetRegion, modules, pvp, expedition, dungeon, smeltingPriority, marketProfile, blockedMarketSellers, tabernaSync: input.tabernaSync === true, allianceChat: input.allianceChat === true };
 }
 
 export function buildUserscript(config, fragments) {
